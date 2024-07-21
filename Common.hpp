@@ -1,78 +1,13 @@
 #pragma once
 
 #include "main.h"
-#include <cstdio>
+
 #include <string_view>
 #include <vector>
 #include <functional>
 #include <type_traits>
 
 
-
-#ifndef COM_LOG
-constexpr bool _LOG = false;
-#else
-constexpr bool _LOG = true;
-#endif
-
-
-
-
-inline void LOG(void (*f)())
-{
-	if constexpr (_LOG)
-		f();
-}
-
-template <class... Args>
-inline void LOGF(const char *fmt, Args... args)
-{
-	if constexpr (_LOG)
-		printf(fmt, args...);
-}
-
-template <class... Args>
-inline void LOGFI(const size_t indent, const char *fmt, Args... args)
-{
-	if constexpr (_LOG)
-	{
-		printf("%*s", indent * 4, "");
-		printf(fmt, args...);
-	}
-}
-
-template <class... Args>
-inline bool LOGFC(const bool c, const char *fmt, Args... args)
-{
-	if (c)
-		LOGF(fmt, args...);
-	
-	return c;
-}
-
-inline void LOGSEP()
-{
-	if constexpr (_LOG)
-		printf("--------------------------------------------------------------------------------\n");
-}
-
-
-//#define LOGFI(indent, fmt, ...)		{ if constexpr (_LOG) { printf("%*s" fmt, indent * 4, "", ##__VA_ARGS__); } }
-#define LOGT(__msg__, __min_time__, ...) \
-{ \
-	if constexpr (_LOG) \
-	{ \
-		volatile uint32_t __start__ = HAL_GetTick(); \
-		__VA_ARGS__ \
-		uint32_t __elapsed__ = HAL_GetTick() - __start__; \
-		if (__elapsed__ >= __min_time__) \
-			printf(__msg__ ": %ums\n", __elapsed__); \
-	} \
-	else \
-	{ \
-		__VA_ARGS__ \
-	} \
-}
 
 #define _countof(arr)				(sizeof(arr) / sizeof(arr[0]))
 
@@ -103,22 +38,6 @@ namespace STM32T
 		{
 			action();
 		}
-	}
-	
-	inline void Startup()
-	{
-		LOG([]()
-		{
-			printf("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
-		
-			const uint32_t version = HAL_GetHalVersion();
-			
-			// major.minor.patch-rc
-			printf("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n", version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF);
-			printf("RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n", HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
-			printf("HCLK: %.1f MHz\n", HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
-			printf("\n");
-		});
 	}
 	
 	template <typename T>
