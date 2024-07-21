@@ -80,7 +80,7 @@ inline void LOGSEP()
 
 using std::operator"" sv;
 
-namespace COM
+namespace STM32T
 {
 	using strv = std::string_view;
 
@@ -420,70 +420,4 @@ namespace COM
 		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
-	
-	class SingleOutput
-	{
-		uint32_t lastEndTime = 0, lastStartTime = 0;
-		GPIO_TypeDef* const Port;
-		const uint16_t Pin;
-		const bool active_low;
-		
-		static constexpr uint32_t GPIO_NUMBER = 16;
-		
-	public:
-		SingleOutput(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
-		{
-			assert_param(IS_GPIO_PIN(Pin));
-		}
-		
-		~SingleOutput() {}
-		
-		__attribute__((always_inline)) void Set(bool state = true)
-		{
-			Port->BSRR = Pin << ((active_low ? state : !state) * GPIO_NUMBER);
-		}
-		
-		__attribute__((always_inline)) void Reset()
-		{
-			Set(false);
-		}
-		
-		__attribute__((always_inline)) void Toggle()
-		{
-			const uint32_t odr = Port->ODR;
-			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);
-		}
-		
-		template<typename T>
-		void Timed(const T time, void (* const delay)(const T delay) = HAL_Delay)
-		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
-			
-			Set();
-			delay(time);
-			Reset();
-		}
-		
-		/*void Delayed(const uint32_t time, const uint32_t delay, const bool waitAfter = false)
-		{
-			//uint32_t now = HAL_GetTick();
-			//if (now - lastEndTime < delay)
-			//	HAL_Delay(delay - (now - lastEndTime));
-			WaitAfter(lastEndTime, delay);
-			
-			Timed(time);
-			
-			if (waitAfter)
-				HAL_Delay(delay);
-		}*/
-		
-		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
-		{
-			for (uint8_t i = 0; i < n ; i++)
-			{
-				Timed(time1);
-				HAL_Delay(time2);
-			}
-		}
-	};
 }
