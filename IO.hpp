@@ -8,6 +8,19 @@
 
 namespace STM32T
 {
+	template <typename T>
+	inline bool WaitOnPin(GPIO_TypeDef* const port, uint16_t pin, const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
+	{
+		const T startTime = get_tick();
+		while (HAL_GPIO_ReadPin(port, pin) != desired_state)
+		{
+			if (get_tick() - startTime > timeout)
+				return false;
+		}
+		
+		return true;
+	}
+	
 	class IO
 	{
 		static constexpr uint32_t GPIO_NUMBER = 16;
@@ -24,9 +37,14 @@ namespace STM32T
 		
 		~IO() {}
 		
-		__attribute__((always_inline)) bool Get()
+		__attribute__((always_inline)) bool Read()
 		{
 			return (bool)(Port->IDR & Pin) ^ active_low;
+		}
+		
+		__attribute__((always_inline)) bool OutGet()
+		{
+			return (bool)(Port->ODR & Pin) ^ active_low;
 		}
 		
 		__attribute__((always_inline)) void Set(bool state = true)

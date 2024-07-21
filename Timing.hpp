@@ -2,6 +2,8 @@
 
 #include "main.h"
 
+#include <type_traits>
+
 
 
 #define STM32T_GET_TICK(TIM) \
@@ -29,7 +31,6 @@ void delay_us(const uint32_t delay) \
 namespace STM32T
 {
 	#ifdef DWT
-	
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
 	inline void DWT_Init()
 	{
@@ -52,6 +53,13 @@ namespace STM32T
 		const uint32_t startTick = DWT->CYCCNT, delayTicks = us * (SystemCoreClock / 1'000'000);
 		while (DWT->CYCCNT - startTick < delayTicks);
 	}
-	
 	#endif
+	
+	template <typename T>
+	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
+	{
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		
+		while (get_tick() - start < wait);
+	}
 }

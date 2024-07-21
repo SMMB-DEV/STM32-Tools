@@ -5,7 +5,6 @@
 #include <string_view>
 #include <vector>
 #include <functional>
-#include <type_traits>
 
 
 
@@ -38,27 +37,6 @@ namespace STM32T
 		{
 			action();
 		}
-	}
-	
-	template <typename T>
-	inline bool WaitOnPin(GPIO_TypeDef* const port, uint16_t pin, const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
-	{
-		const T startTime = get_tick();
-		while (HAL_GPIO_ReadPin(port, pin) != desired_state)
-		{
-			if (get_tick() - startTime > timeout)
-				return false;
-		}
-		
-		return true;
-	}
-	
-	template <typename T>
-	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
-	{
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
-		
-		while (get_tick() - start < wait);
 	}
 	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
