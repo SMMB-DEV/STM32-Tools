@@ -52,6 +52,20 @@ namespace STM32T
 	{
 		const uint32_t startTick = DWT->CYCCNT, delayTicks = us * (SystemCoreClock / 1'000'000);
 		while (DWT->CYCCNT - startTick < delayTicks);
+		
+		//const uint32_t delayTicks = us * (SystemCoreClock / 1'000'000);
+		//DWT->CYCCNT = 0;
+		//while (DWT->CYCCNT <= delayTicks);
+	}
+	
+	inline void DWT_Delay_ns(uint32_t ns)
+	{
+		const uint32_t startTick = DWT->CYCCNT, delayTicks = ns * (SystemCoreClock / 1'000'000) / 1000;
+		while (DWT->CYCCNT - startTick < delayTicks);
+		
+		//const uint32_t delayTicks = ns * (SystemCoreClock / 1'000'000) / 1000;
+		//DWT->CYCCNT = 0;
+		//while (DWT->CYCCNT <= delayTicks);
 	}
 	#endif
 	
