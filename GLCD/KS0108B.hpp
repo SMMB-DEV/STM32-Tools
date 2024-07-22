@@ -1,7 +1,6 @@
 // *** TODO: ADD LICENSE ***
 	
-#include <stm32f0xx_hal.h>
-#include <cstring>
+#include "main.h"
 
 enum State: uint8_t {initial=0, final, medial, isolated};
 
@@ -23,62 +22,32 @@ public:
 
 
 
-class GLCD
+/**
+* @note The RST pin of the LCD must be set high at least 1us after powering on the LCD.
+*/
+class KS0108B
 {
-public:
-	struct Config
-	{
-		GPIO_TypeDef * const Port_RS, * const Port_RW, * const Port_E, * const Port_RST, * const Port_CS1, * const Port_CS2, * const Port_CS3;
-		GPIO_TypeDef* Port_D[8];
-		
-		const uint16_t Pin_RS, Pin_RW, Pin_E, Pin_RST, Pin_CS1, Pin_CS2, Pin_CS3;
-		uint16_t Pin_D[8];
-		
-		Config(GPIO_TypeDef *Port_RS, GPIO_TypeDef *Port_RW, GPIO_TypeDef *Port_E, GPIO_TypeDef *Port_RST,
-			GPIO_TypeDef *Port_CS1, GPIO_TypeDef *Port_CS2, GPIO_TypeDef *Port_CS3, GPIO_TypeDef* Port_D[8],
-			uint16_t Pin_RS, uint16_t Pin_RW, uint16_t Pin_E, uint16_t Pin_RST, uint16_t Pin_CS1, uint16_t Pin_CS2, uint16_t Pin_CS3, uint16_t Pin_D[8]) :
-		
-			Port_RS(Port_RS), Port_RW(Port_RW), Port_E(Port_E), Port_RST(Port_RST), Port_CS1(Port_CS1), Port_CS2(Port_CS2), Port_CS3(Port_CS3),
-			Pin_RS(Pin_RS), Pin_RW(Pin_RW), Pin_E(Pin_E), Pin_RST(Pin_RST), Pin_CS1(Pin_CS1), Pin_CS2(Pin_CS2), Pin_CS3(Pin_CS3)
-		{
-			memcpy(this->Port_D, Port_D, sizeof(this->Port_D));
-			memcpy(this->Pin_D, Pin_D, sizeof(this->Pin_D));
-			
-			if (!Port_CS3)
-			{
-				Port_CS3 = Port_CS2;
-				Pin_CS3 = 0;
-			}
-		}
-	};
-
+	// todo: make cursor 16 bits in functions.
 private:
 	static constexpr uint8_t MAX_LINES = 8, MAX_CURSOR = 64, PIXELS_PER_LINE = 8, SCREEN_WIDTH = MAX_LINES * PIXELS_PER_LINE;
 
 	//Char *FontFa = nullptr;          //[36];
 	
-	const Config m_config;
-	const uint8_t m_pageCount;
-	const uint16_t m_screenlen;
-	uint8_t * const m_map;
-	
-	uint8_t m_cursor, m_row, m_line, m_page;
-
 	inline uint16_t MapIndex() const
 	{
-		return m_line * m_screenlen + m_page * MAX_CURSOR + m_cursor;
+		return m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor;
 	}
 	
 	__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t cursor) const
 	{
-		return m_line * m_screenlen + cursor;
+		return m_line * m_screenLen + cursor;
 	}
 	
 	__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t line, uint8_t cursor) const
 	{
-		return line * m_screenlen + cursor;
+		return line * m_screenLen + cursor;
 	}
-
+	
 	bool faset = false, Fa = false;
 	
 	void Command(const bool rs, const bool rw, uint8_t d7_0) const;
@@ -90,18 +59,45 @@ private:
 	void CheckCursor(const uint8_t lines = 1);
 	void Write(const uint8_t byte, const bool check = true, const uint8_t lines = 1);
 	void Write_H(const uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
-	void Write_L(const uint8_t byte, const uint8_t bits, const bool check = true, const uint8_t lines = 1);
-
+	void Write_L(const uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
+	
 	void Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
 	void Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
 	
+	
+	
+	
+	void (* const f_command)(uint8_t data, bool rw, bool rs);
+	void (* const f_setCS)(uint8_t);
+	
+	const uint8_t m_pageCount;
+	const uint16_t m_screenLen;
+	
+	uint8_t * const m_screenMap;
+	
+	uint8_t m_cursor = 0, m_row = 0, m_line = 0, m_page = 0;
+	
 public:
-	GLCD(const Config& config, const uint8_t pageCount = 2, const bool init = false);	//pageCount: 2-3
-	~GLCD();
+	
+	/**
+	* @param command - Function to set D0:7, RW, RS and EN pins according to the timing specifications on page 8 of the KS0108B datasheet.
+	*			A simplified version could set all the pins and then pulse the EN pin high and then low for a few microseconds.
+	* @param set_cs - Function to enable/disable LCD pages (controls CSx pins).
+	* @param page_count - Max. 8 pages.
+	*/
+	KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count = 2);
+	~KS0108B();
+	
 	//void SetFa();
 	
+	void Test();
+	
 	void Init();
-	void FillScreen(const bool fill = true);							//Fills or clears the Screen and goes to (0,0)
+	
+	/**
+	* @brief Fills or clears the Screen and goes to (0, 0)
+	*/
+	void ClearScreen(const bool fill = false);
 	void Gotoxy(const uint8_t x, const uint8_t y);
 	void Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
 	
@@ -111,7 +107,7 @@ public:
 	
 	void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 	
-	void PutChar(const uint8_t ch, bool big = false);
+	void PutChar(const uint8_t ch, bool big = false, bool interpret_specials = true);
 	void PutStr(const uint8_t* str, bool big = false);
 	void PutStr(const char* str, bool big = false);
 	void PutStr(const uint8_t* str, uint16_t n, bool big = false);
@@ -121,6 +117,11 @@ public:
 	//void PutCharFa(uint8_t ch, State s);								//Prints a character in Farsi. (ch:0-36   s:initial-medial-final-isolated)
 	//void PutStrFa(uint8_t *str);										//Prints a string in Farsi. (UTF-8 without signature)
 	//void PutStrFa(const char *str);
+	
+	/**
+	* @param bmp - The first four bytes contain two little endian shorts (length and width).
+	*/
+	void Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y);
 	
 	void Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw = true);
 	

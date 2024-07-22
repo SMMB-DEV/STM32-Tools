@@ -1,15 +1,11 @@
 // *** TODO: ADD LICENSE ***
 
-#include "GLCD.hpp"
-//#include "STR/STR.hpp"
+#include "KS0108B.hpp"
 
 #include <algorithm>
 
-#define REVERSE_CS
 
-
-extern void GLCD_Delay_us(uint8_t us);
-extern void GLCD_Delay_500ns();
+// todo: General cleanup, rename files
 
 
 static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
@@ -121,6 +117,7 @@ static constexpr uint8_t Font[MAX_CHARS][FONT_WIDTH] =
 	0x38, 0x44, 0x44, 0x48, 0x7F,	/*d*/
 	0x38, 0x54, 0x54, 0x54, 0x18,	/*e*/
 	0x08, 0x7E, 0x09, 0x01, 0x02,	/*f*/
+	//0x00, 0x4C, 0x52, 0x52, 0x3E,	/*g*/
 	0x08, 0x14, 0x54, 0x54, 0x3C,	/*g*/
 	0x7F, 0x08, 0x04, 0x04, 0x78,	/*h*/
 	0x00, 0x44, 0x7D, 0x40, 0x00,	/*i*/
@@ -275,72 +272,42 @@ const uint8_t* Char::getdl(State s)
 
 
 
-void GLCD::Command(const bool rs, const bool rw, uint8_t d7_0) const
-{
-	m_config.Port_RS->BSRR = m_config.Pin_RS << (16 * !rs);
-	m_config.Port_RW->BSRR = m_config.Pin_RW << (16 * !rw);
-	
-	d7_0 = ~d7_0;
-	m_config.Port_D[0]->BSRR = m_config.Pin_D[0] << ((d7_0 & 0b0000'0001) << 4);	//shifts by either 0 or 16
-	m_config.Port_D[1]->BSRR = m_config.Pin_D[1] << ((d7_0 & 0b0000'0010) << 3);
-	m_config.Port_D[2]->BSRR = m_config.Pin_D[2] << ((d7_0 & 0b0000'0100) << 2);
-	m_config.Port_D[3]->BSRR = m_config.Pin_D[3] << ((d7_0 & 0b0000'1000) << 1);
-	m_config.Port_D[4]->BSRR = m_config.Pin_D[4] << ((d7_0 & 0b0001'0000) << 0);
-	m_config.Port_D[5]->BSRR = m_config.Pin_D[5] << ((d7_0 & 0b0010'0000) >> 1);
-	m_config.Port_D[6]->BSRR = m_config.Pin_D[6] << ((d7_0 & 0b0100'0000) >> 2);
-	m_config.Port_D[7]->BSRR = m_config.Pin_D[7] << ((d7_0 & 0b1000'0000) >> 3);
-	
-	m_config.Port_E->BSRR = m_config.Pin_E;
-	GLCD_Delay_500ns();
-	//m_config.Port_E->BSRR = m_config.Pin_E << 16;
-	m_config.Port_E->BRR = m_config.Pin_E;
-	GLCD_Delay_500ns();
-}
-
-bool GLCD::SetPage(const uint8_t page, const bool force)
+bool KS0108B::SetPage(const uint8_t page, const bool force)
 {
 	if (!force && m_page == page % m_pageCount)
 		return false;
 	
 	m_page = page % m_pageCount;
 	
-#ifdef REVERSE_CS
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1 << (16u * (m_page == 0));
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2 << (16u * (m_page == 1));
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3 << (16u * (m_page == 2));
-#else
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1 << (16u * (m_page != 0));
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2 << (16u * (m_page != 1));
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3 << (16u * (m_page != 2));
-#endif
+	f_setCS(1 << m_page);
 	
 	return true;
 }
 
-void GLCD::SetLine(const uint8_t line, const bool force)
+void KS0108B::SetLine(const uint8_t line, const bool force)
 {
 	if (!force && m_line == line % MAX_LINES)
 		return;
 	
 	m_line = line % MAX_LINES;
-	Command(0, 0, m_line | 0b1011'1000);
+	f_command(m_line | 0b1011'1000, 0, 0);
 }
 
-void GLCD::SetCursor(const uint8_t cursor, const bool force)
+void KS0108B::SetCursor(const uint8_t cursor, const bool force)
 {
 	if (!force && m_cursor == cursor % MAX_CURSOR)
 		return;
 	
 	m_cursor = cursor % MAX_CURSOR;
-	Command(0, 0, m_cursor | 0b0100'0000);
+	f_command(m_cursor | 0b0100'0000, 0, 0);
 }
 
-void GLCD::Display(const bool display) const
+void KS0108B::Display(const bool display) const
 {
-	Command(0, 0, 0b0011'1110 | display);
+	f_command(0b0011'1110 | display, 0, 0);
 }
 
-void GLCD::Goto(const uint8_t cursor, const uint8_t line, const bool force)
+void KS0108B::Goto(const uint8_t cursor, const uint8_t line, const bool force)
 {
 	if (SetPage(cursor / MAX_CURSOR))
 	{
@@ -353,7 +320,7 @@ void GLCD::Goto(const uint8_t cursor, const uint8_t line, const bool force)
 	SetLine(line, force);
 }
 
-void GLCD::CheckCursor(const uint8_t lines)
+void KS0108B::CheckCursor(const uint8_t lines)
 {
 	if (++m_cursor >= MAX_CURSOR)
 	{
@@ -363,30 +330,31 @@ void GLCD::CheckCursor(const uint8_t lines)
 	}
 }
 
-void GLCD::Write(const uint8_t byte, const bool check, const uint8_t lines)
+// todo: Add WriteArr().
+void KS0108B::Write(const uint8_t byte, const bool check, const uint8_t lines)
 {
-	m_map[MapIndex()] = byte;
-	Command(1, 0, byte);
+	m_screenMap[MapIndex()] = byte;
+	f_command(byte, 0, 1);
 	
 	if (check)
 		CheckCursor(lines);
 }
 
-void GLCD::Write_H(const uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
-{
-	const uint16_t index = MapIndex();
-	m_map[index] = (m_map[index] & (0xFF >> (8 - shift))) | (byte << shift);
-	Command(1, 0, m_map[index]);
-	
-	if (check)
-		CheckCursor(lines);
-}
-
-void GLCD::Write_L(const uint8_t byte, const uint8_t bits, const bool check, const uint8_t lines)
+void KS0108B::Write_H(const uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
 {
 	const uint16_t index = MapIndex();
-	m_map[index] = (m_map[index] & (0xFF << bits)) | (byte >> (8 - bits));
-	Command(1, 0, m_map[index]);
+	m_screenMap[index] = (m_screenMap[index] & (0xFF >> (8 - shift))) | (byte << shift);
+	f_command(m_screenMap[index], 0, 1);
+	
+	if (check)
+		CheckCursor(lines);
+}
+
+void KS0108B::Write_L(const uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+{
+	const uint16_t index = MapIndex();
+	m_screenMap[index] = (m_screenMap[index] & (0xFF << shift)) | (byte >> (8 - shift));
+	f_command(m_screenMap[index], 0, 1);
 	
 	if (check)
 		CheckCursor(lines);
@@ -394,7 +362,7 @@ void GLCD::Write_L(const uint8_t byte, const uint8_t bits, const bool check, con
 
 
 
-void GLCD::Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
+void KS0108B::Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
 {
 	//assuming x and y are checked before calling this function
 	const uint8_t lineBegin = y / PIXELS_PER_LINE, lineEnd = (y + len) / PIXELS_PER_LINE, rowBegin = y % PIXELS_PER_LINE, rowEnd = (y + len) % PIXELS_PER_LINE;
@@ -404,13 +372,13 @@ void GLCD::Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const boo
 	if (lineBegin == lineEnd)
 	{
 		if (draw)
-			Write((bit_filter_table[rowEnd - rowBegin] << rowBegin) | m_map[MapIndex(lineBegin, x)]);
+			Write((bit_filter_table[rowEnd - rowBegin] << rowBegin) | m_screenMap[MapIndex(lineBegin, x)]);
 		else
-			Write(~(bit_filter_table[rowEnd - rowBegin] << rowBegin) & m_map[MapIndex(lineBegin, x)]);
+			Write(~(bit_filter_table[rowEnd - rowBegin] << rowBegin) & m_screenMap[MapIndex(lineBegin, x)]);
 	}
 	else
 	{
-		Write(draw ? ((0xFF << rowBegin) | m_map[MapIndex(lineBegin, x)]) : ((0xFF >> (PIXELS_PER_LINE - rowBegin)) & m_map[MapIndex(lineBegin, x)]), false);
+		Write(draw ? ((0xFF << rowBegin) | m_screenMap[MapIndex(lineBegin, x)]) : ((0xFF >> (PIXELS_PER_LINE - rowBegin)) & m_screenMap[MapIndex(lineBegin, x)]), false);
 		
 		const uint8_t _write = draw * 0xFF;
 		for (uint8_t line = lineBegin + 1; line < lineEnd; line++)
@@ -422,13 +390,13 @@ void GLCD::Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const boo
 		
 		SetLine(lineEnd);
 		SetCursor(x, true);
-		Write(draw ? (bit_filter_table[rowEnd] | m_map[MapIndex(lineEnd, x)]) : (~bit_filter_table[rowEnd] & m_map[MapIndex(lineEnd, x)]), false);
+		Write(draw ? (bit_filter_table[rowEnd] | m_screenMap[MapIndex(lineEnd, x)]) : (~bit_filter_table[rowEnd] & m_screenMap[MapIndex(lineEnd, x)]), false);
 		
 		CheckCursor();
 	}
 }
 
-void GLCD::Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
+void KS0108B::Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
 {
 	//assuming x and y are checked before calling this function
 	const uint8_t &begin = x, end = x + len, line = y / PIXELS_PER_LINE;
@@ -439,14 +407,14 @@ void GLCD::Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const boo
 	if (draw)
 	{
 		for (uint8_t i = begin; i <= end; i++)
-			Write(_write | m_map[MapIndex(line, i)]);
+			Write(_write | m_screenMap[MapIndex(line, i)]);
 	}
 	else
 	{
 		_write = ~_write;
 		
 		for (uint8_t i = begin; i <= end; i++)
-			Write(_write & m_map[MapIndex(line, i)]);
+			Write(_write & m_screenMap[MapIndex(line, i)]);
 	}
 }
 
@@ -456,31 +424,13 @@ void GLCD::Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const boo
 
 
 
-uint8_t CheckPageCount(const uint8_t pc)
-{
-	if (pc == 2 || pc == 3)
-		return pc;
-	else
-		//throw std::exception();
-		return 2;
-}
-
-GLCD::GLCD(const Config& config, const uint8_t pageCount, const bool init) :
-	m_config(config), m_pageCount(CheckPageCount(pageCount)), m_screenlen(pageCount * MAX_CURSOR), m_map(new uint8_t[MAX_LINES * m_screenlen])
-{
-	if (init)
-		Init();
-}
-
-GLCD::~GLCD()
-{
-	//if (FontFa!=0)
-	//	delete[] FontFa;
+KS0108B::KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count) :
+		f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, sizeof(uint32_t) * 8)), m_screenLen(m_pageCount * MAX_CURSOR),
+		m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
 	
-	delete[] m_map;
-}
+KS0108B::~KS0108B() { delete[] m_screenMap; }
 
-/*void GLCD::SetFa(void)
+/*void KS0108B::SetFa(void)
 {
 	if (!init)
 	{
@@ -688,39 +638,46 @@ GLCD::~GLCD()
 }*/
 
 
-void GLCD::Init()
+void KS0108B::Test()
 {
-	m_config.Port_E->BSRR = m_config.Pin_E;
-	m_config.Port_RST->BSRR = m_config.Pin_RST;
-	GLCD_Delay_us(1);
+	ClearScreen(true);
+	HAL_Delay(1000);
+	ClearScreen();
+	HAL_Delay(1000);
 	
-#ifdef    REVERSE_CS
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1 << 16;
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2 << 16;
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3 << 16;
-#else
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1;
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2;
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3;
-#endif
+	Gotoxy(100, 4);
+	WriteByte(0xFF);
+	WriteByte(0xAA);
+	WriteByte(0x55);
+	WriteByte(0x00);
 	
-	Display(1);
-	FillScreen(false);
+	Line(60, 40, 70, 25);
+	Rectangle(60, 45, 90, 55);
+	FillRectangle(80, 25, 90, 40);
+	Circle(110, 30, 8);
+	FillCircle(110, 52, 10);
+	
+	Gotoxy(0, 4);
+	PutStr("Normal");
+	NextLine(2);
+	PutStr("Big", true);
 }
 
-void GLCD::FillScreen(const bool fill)
+void KS0108B::Init()
 {
-#ifdef    REVERSE_CS
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1 << 16;
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2 << 16;
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3 << 16;
-#else
-	m_config.Port_CS1->BSRR = m_config.Pin_CS1;
-	m_config.Port_CS2->BSRR = m_config.Pin_CS2;
-	m_config.Port_CS3->BSRR = m_config.Pin_CS3;
-#endif
+	//m_config.Port_RST->BSRR = m_config.Pin_RST;
 	
-	const uint8_t _write = 255 * fill;
+	f_setCS(0xFF);
+	
+	Display(1);
+	ClearScreen();
+}
+
+void KS0108B::ClearScreen(const bool fill)
+{
+	f_setCS(0xFF);
+	
+	const uint8_t _write = 0xFF * fill;
 	
 	SetCursor(0);
 	for (uint8_t i = 0; i < MAX_LINES; i++)
@@ -728,7 +685,7 @@ void GLCD::FillScreen(const bool fill)
 		SetLine(i);
 		
 		for (uint8_t j = 0; j < MAX_CURSOR; j++)
-			Command(1, 0, _write);
+			f_command(_write, 0, 1);
 	}
 	
 	SetPage(0, true);	//ensure page change
@@ -736,23 +693,23 @@ void GLCD::FillScreen(const bool fill)
 	SetLine(0);
 	m_row = 0;
 	
-	memset(m_map, _write, MAX_LINES * m_screenlen);
+	memset(m_screenMap, _write, MAX_LINES * m_screenLen);
 }
 
-void GLCD::Gotoxy(const uint8_t x, const uint8_t y)
+void KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
 {
-	m_row = y % 8;
-	Goto(x, y / 8);
+	m_row = y % PIXELS_PER_LINE;
+	Goto(x, y / PIXELS_PER_LINE);
 }
 
-void GLCD::Movexy(const int16_t x, const int8_t y)
+void KS0108B::Movexy(const int16_t x, const int8_t y)
 {
 	static constexpr uint8_t MAX_PIXELS = PIXELS_PER_LINE * MAX_LINES;
 	
-	int32_t _x = (m_page * MAX_CURSOR + m_cursor + x) % m_screenlen, _y = (m_line * PIXELS_PER_LINE + m_row + y) % MAX_PIXELS;
+	int32_t _x = (m_page * MAX_CURSOR + m_cursor + x) % m_screenLen, _y = (m_line * PIXELS_PER_LINE + m_row + y) % MAX_PIXELS;
 	
 	if (_x < 0)
-		_x += (-_x / m_screenlen + 1) * m_screenlen;
+		_x += (-_x / m_screenLen + 1) * m_screenLen;
 	
 	if (_y < 0)
 		_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
@@ -760,7 +717,7 @@ void GLCD::Movexy(const int16_t x, const int8_t y)
 	Gotoxy(_x, _y);
 }
 
-void GLCD::WriteByte(const uint8_t byte)
+void KS0108B::WriteByte(const uint8_t byte)
 {
 	if (m_row == 0)
 		Write(byte);
@@ -775,13 +732,11 @@ void GLCD::WriteByte(const uint8_t byte)
 		//Top part
 		SetLine(line);
 		SetCursor(m_cursor, true);
-		Write_H(byte, m_row, false);
-		
-		CheckCursor();
+		Write_H(byte, m_row);
 	}
 }
 
-/*uint8_t GLCD::Read(void)
+/*uint8_t KS0108B::Read(void)
 {
 	if (init)
 	{
@@ -822,7 +777,7 @@ void GLCD::WriteByte(const uint8_t byte)
 	return 0;
 }*/
 
-void GLCD::NextLine(const uint8_t lines)
+void KS0108B::NextLine(const uint8_t lines)
 {
 	SetPage(0);
 	SetCursor(0);
@@ -831,9 +786,9 @@ void GLCD::NextLine(const uint8_t lines)
 	//SetLine(m_line+1+Fa);
 }
 
-void GLCD::Pixel(uint8_t x, uint8_t y, bool fill)
+void KS0108B::Pixel(uint8_t x, uint8_t y, bool fill)
 {
-	if (x >= m_screenlen || y >= SCREEN_WIDTH)
+	if (x >= m_screenLen || y >= SCREEN_WIDTH)
 		return;
 	
 	uint8_t row = y % PIXELS_PER_LINE;
@@ -841,47 +796,50 @@ void GLCD::Pixel(uint8_t x, uint8_t y, bool fill)
 	
 	Goto(x, y);
 	
-	Write(fill ? (m_map[MapIndex(y, x)] | (1 << row)) : (m_map[MapIndex(y, x)] & (~(1 << row))));
+	Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 }
 
-void GLCD::PutChar(const uint8_t ch, bool big)
+void KS0108B::PutChar(const uint8_t ch, bool big, bool interpret_specials)
 {
 	//todo: space between characters
 	
 	if (ch >= MAX_CHARS)
 		return;
 	
-	switch (ch)
+	if (interpret_specials)
 	{
-		case '\n':
-		case '\r':
+		switch (ch)
 		{
-			NextLine();
-			if (big)
+			case '\n':
+			case '\r':
+			{
 				NextLine();
+				if (big)
+					NextLine();
+				
+				return;
+			}
 			
-			return;
-		}
-		
-		case '\b':
-		{
-			const uint16_t s = Fa ? m_line * m_screenlen + m_cursor + 6 : m_line * m_screenlen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * (1 + big);
-			const uint8_t cursor = s % m_screenlen, line = s / m_screenlen;
+			case '\b':
+			{
+				const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * (1 + big);
+				const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
+				
+				Goto(cursor, line);
+				PutChar(' ', big);
+				Goto(cursor, line);
+				
+				return;
+			}
 			
-			Goto(cursor, line);
-			PutChar(' ', big);
-			Goto(cursor, line);
-			
-			return;
-		}
-		
-		case 127:	//DEL
-		{
-			uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
-			PutChar(' ', big);
-			Goto(cursor, line);
-			
-			return;
+			case 127:	//DEL
+			{
+				uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
+				PutChar(' ', big);
+				Goto(cursor, line);
+				
+				return;
+			}
 		}
 	}
 	
@@ -1013,39 +971,81 @@ void GLCD::PutChar(const uint8_t ch, bool big)
 	}
 }
 
-void GLCD::PutStr(const uint8_t* str, bool big)
+void KS0108B::PutStr(const uint8_t* str, bool big)
 {
 	while (*str)
 		PutChar(*str++, big);
 }
 
-void GLCD::PutStr(const char* str, bool big)
+void KS0108B::PutStr(const char* str, bool big)
 {
 	while (*str)
 		PutChar(*str++, big);
 }
 
-void GLCD::PutStr(const uint8_t* str, uint16_t n, bool big)
+void KS0108B::PutStr(const uint8_t* str, uint16_t n, bool big)
 {
 	for (uint16_t i = 0; i < n; i++)
 		PutChar(str[i], big);
 }
 
-/*void GLCD::PutNum(int32_t num)
+
+
+void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
+{
+	// todo: Specify a format for bmp and handle y % PIXELS_PER_LINE != 0.
+	
+	uint16_t bmp_x = *(uint16_t*)bmp, bmp_y = *((uint16_t*)(bmp) + 1);
+	
+	if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE || x + bmp_x > m_screenLen || x >= m_screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
+		return;
+	
+	bmp += 4;
+	
+	m_row = y % PIXELS_PER_LINE;
+	const uint8_t line1 = y / PIXELS_PER_LINE, line2 = (y + bmp_y) / PIXELS_PER_LINE;
+	
+	Goto(x, line1);
+	uint16_t index = MapIndex(line1, x);
+	
+	for (uint8_t i = 0; i < bmp_x; i++, index++)
+		Write((bmp[i] << m_row) | ((0xFF >> (PIXELS_PER_LINE - m_row)) & m_screenMap[index]));
+	
+	for (uint8_t line = line1 + 1; line < line2; line++)
+	{
+		Goto(x, line);
+		
+		for (uint8_t i = 0; i < bmp_x; i++)
+			Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row));
+		
+		bmp += bmp_x;
+	}
+	
+	if (m_row)
+	{
+		Goto(x, line2);
+		index = MapIndex(line2, x);
+		
+		for (uint8_t i = 0; i < bmp_x; i++, index++)
+			Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | ((0xFF << m_row) & m_screenMap[index]));
+	}
+}
+
+/*void KS0108B::PutNum(int32_t num)
 {
 	uint8_t n[11];
 	itoa(n,num);
 	PutStr(n);
 }
 
-void GLCD::PutNum(float num)
+void KS0108B::PutNum(float num)
 {
 	uint8_t n[20];
 	itoa(n,num);
 	PutStr(n);
 }*/
 
-/*void GLCD::PutCharFa(uint8_t ch, State s)
+/*void KS0108B::PutCharFa(uint8_t ch, State s)
 {
 	if (faset)
 	{
@@ -1054,7 +1054,7 @@ void GLCD::PutNum(float num)
 		const uint8_t *dh=FontFa[ch].getdh(s), *dl=FontFa[ch].getdl(s);
 		if (m_page==0 && m_cursor+1<w)
 		{
-			Goto(m_screenlen-1,m_line+2);
+			Goto(m_screenLen-1,m_line+2);
 		}
 		uint8_t l=m_line, c=64*m_page+m_cursor+1-w;
 		if (m_row==0)
@@ -1065,7 +1065,7 @@ void GLCD::PutNum(float num)
 				Goto(c,l+j);
 				for (i=0;i<w;i++)
 				{
-					Write(d[i] | m_map[m_line][c+i]);
+					Write(d[i] | m_screenMap[m_line][c+i]);
 				}
 				d=dl;
 			}
@@ -1075,7 +1075,7 @@ void GLCD::PutNum(float num)
 			Goto(c,l);
 			for (i=0;i<w;i++)
 			{
-				Write((dh[i]<<m_row) | m_map[m_line][c+i]);
+				Write((dh[i]<<m_row) | m_screenMap[m_line][c+i]);
 			}
 			l++;
 			Goto(c,l);
@@ -1087,13 +1087,13 @@ void GLCD::PutNum(float num)
 			Goto(c,l);
 			for (i=0;i<w;i++)
 			{
-				Write((dl[i]>>(8-m_row)) | m_map[m_line][c+i]);
+				Write((dl[i]>>(8-m_row)) | m_screenMap[m_line][c+i]);
 			}
 			l-=2;
 		}
 		if (c==0)
 		{
-			Goto(m_screenlen-1,l+2);
+			Goto(m_screenLen-1,l+2);
 		}
 		else
 		{
@@ -1103,7 +1103,7 @@ void GLCD::PutNum(float num)
 	}
 }
 
-void GLCD::PutStrFa(uint8_t *str)
+void KS0108B::PutStrFa(uint8_t *str)
 {
 	if (faset)
 	{
@@ -1130,7 +1130,7 @@ void GLCD::PutStrFa(uint8_t *str)
 				cp=40;
 				if (m_cursor+m_page*64+1<6)
 				{
-					Goto(m_screenlen-1,m_line+2);
+					Goto(m_screenLen-1,m_line+2);
 				}
 				Movexy(-6,5);
 				PutChar(str[i]);
@@ -1218,14 +1218,14 @@ void GLCD::PutStrFa(uint8_t *str)
 	}
 }
 
-void GLCD::PutStrFa(const char *str)
+void KS0108B::PutStrFa(const char *str)
 {
 	PutStrFa((uint8_t*)str);
 }*/
 
-void GLCD::Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
+void KS0108B::Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 {
-	if (x1 >= m_screenlen || x2 >= m_screenlen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+	if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 		return;
 	
 	int16_t dy = y2 - y1, dx = x2 - x1;
@@ -1345,9 +1345,9 @@ void GLCD::Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 }
 
 
-void GLCD::Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
+void KS0108B::Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 {
-	if (x1 >= m_screenlen || x2 >= m_screenlen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+	if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 		return;
 	
 	sort(x1, x2);
@@ -1395,24 +1395,24 @@ void GLCD::Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 	{
 		if (d)
 		{
-			Write(corner | m_map[MapIndex(y, x1)]);
+			Write(corner | m_screenMap[MapIndex(y, x1)]);
 			
 			for (uint8_t x = x1 + 1; x < x2; x++)
-				Write(write | m_map[MapIndex(y, x)]);
+				Write(write | m_screenMap[MapIndex(y, x)]);
 			
-			Write(corner | m_map[MapIndex(y, x2)]);
+			Write(corner | m_screenMap[MapIndex(y, x2)]);
 		}
 		else
 		{
 			write = ~write;
 			corner = ~corner;
 			
-			Write(corner & m_map[MapIndex(y, x1)]);
+			Write(corner & m_screenMap[MapIndex(y, x1)]);
 			
 			for (uint8_t x = x1 + 1; x < x2; x++)
-				Write(write & m_map[MapIndex(y, x)]);
+				Write(write & m_screenMap[MapIndex(y, x)]);
 			
-			Write(corner & m_map[MapIndex(y, x2)]);
+			Write(corner & m_screenMap[MapIndex(y, x2)]);
 		}
 		
 		if (j == jmax - 1)
@@ -1426,9 +1426,9 @@ void GLCD::Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 }
 
 
-void GLCD::FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool fill)
+void KS0108B::FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool fill)
 {
-	if (x1 >= m_screenlen || x2 >= m_screenlen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+	if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 		return;
 	
 	sort(x1, x2);
@@ -1442,12 +1442,12 @@ void GLCD::FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool fi
 	if (line1 == line2)
 	{
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write(fill ? ((bit_filter_table[row2 - row1] << row1) | m_map[index]) : (~(bit_filter_table[row2 - row1] << row1) & m_map[index]));
+			Write(fill ? ((bit_filter_table[row2 - row1] << row1) | m_screenMap[index]) : (~(bit_filter_table[row2 - row1] << row1) & m_screenMap[index]));
 	}
 	else
 	{
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write(fill ? ((0xFF << row1) | m_map[index]) : ((0xFF >> (PIXELS_PER_LINE - row1)) & m_map[index]));
+			Write(fill ? ((0xFF << row1) | m_screenMap[index]) : ((0xFF >> (PIXELS_PER_LINE - row1)) & m_screenMap[index]));
 		
 		const uint8_t _write = fill * 0xFF;
 		for (uint8_t line = line1 + 1; line < line2; line++)
@@ -1462,91 +1462,13 @@ void GLCD::FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool fi
 		index = MapIndex(line2, x1);
 		
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write(fill ? (bit_filter_table[row2] | m_map[index]) : (~bit_filter_table[row2] & m_map[index]));
+			Write(fill ? (bit_filter_table[row2] | m_screenMap[index]) : (~bit_filter_table[row2] & m_screenMap[index]));
 	}
-	
-	
-	
-	/*uint8_t row1 = y1 % 8, row2 = y2 % 8, write = 255 * fill, y, ymax;
-	y1 /= 8;
-	y2 /= 8;
-	y = y1 + 1;
-	ymax = y2;
-	
-	if (row1 == 0)
-		y--;
-	
-	if (row2 == 7)
-		ymax++;
-	
-	for (; y < ymax; y++)
-	{
-		Goto(x1, y);
-		for (uint8_t x = x1; x <= x2; x++)
-			Write(write);
-	}
-	
-	if (y1 != y2)
-	{
-		Goto(x1, y1);
-		if (row1 != 0)
-		{
-			if (fill)
-			{
-				write <<= row1;
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(write | m_map[MapIndex(y1, x)]);
-			}
-			else
-			{
-				write = 255 >> (8 - row1);
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(m_map[MapIndex(y1, x)] & write);
-			}
-		}
-		
-		write = 255;
-		Goto(x1, y2);
-		if (row2 != 7)
-		{
-			if (fill)
-			{
-				write >>= 7 - row2;
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(write | m_map[MapIndex(y2, x)]);
-			}
-			else
-			{
-				write <<= row2 + 1;
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(m_map[MapIndex(y2, x)] & write);
-			}
-		}
-	}
-	else
-	{
-		if (row1 != 0 || row2 != 7)
-		{
-			Goto(x1, y1);
-			write = 255 >> (7 - row2 + row1) << row1;
-			if (fill)
-			{
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(write | m_map[MapIndex(y1, x)]);
-			}
-			else
-			{
-				write = ~write;
-				for (uint8_t x = x1; x <= x2; x++)
-					Write(write & m_map[MapIndex(y1, x)]);
-			}
-		}
-	}*/
 }
 
-void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+void KS0108B::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
-	if (x1 >= m_screenlen || x2 >= m_screenlen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+	if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 		return;
 	
 	sort(x1, x2);
@@ -1560,14 +1482,14 @@ void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 	if (line1 == line2)
 	{
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write(((bit_filter_table[row2 - row1] << row1) & ~m_map[index]) | (~(bit_filter_table[row2 - row1] << row1) & m_map[index]));
+			Write(((bit_filter_table[row2 - row1] << row1) & ~m_screenMap[index]) | (~(bit_filter_table[row2 - row1] << row1) & m_screenMap[index]));
 	}
 	else
 	{
 		static constexpr uint8_t bit_filter_row1[8] = { 0b1111'1111, 0b1111'1110, 0b1111'1100, 0b1111'1000, 0b1111'0000, 0b1110'0000, 0b1100'0000, 0b1000'0000 };
 		
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write((bit_filter_row1[row1] & ~m_map[index]) | (~bit_filter_row1[row1] & m_map[index]));
+			Write((bit_filter_row1[row1] & ~m_screenMap[index]) | (~bit_filter_row1[row1] & m_screenMap[index]));
 		
 		for (uint8_t line = line1 + 1; line < line2; line++)
 		{
@@ -1575,14 +1497,14 @@ void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 			index = MapIndex(line, x1);
 			
 			for (uint8_t x = x1; x <= x2; ++x, ++index)
-				Write(~m_map[index]);
+				Write(~m_screenMap[index]);
 		}
 		
 		Goto(x1, line2);
 		index = MapIndex(line2, x1);
 		
 		for (uint8_t x = x1; x <= x2; ++x, ++index)
-			Write((bit_filter_table[row2] & ~m_map[index]) | (~bit_filter_table[row2] & m_map[index]));
+			Write((bit_filter_table[row2] & ~m_screenMap[index]) | (~bit_filter_table[row2] & m_screenMap[index]));
 	}
 	
 	
@@ -1601,7 +1523,7 @@ void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 	{
 		Goto(x1,y);
 		for (uint8_t x=x1;x<=x2;x++)
-			Write(~m_map[MapIndex(y, x)]);
+			Write(~m_screenMap[MapIndex(y, x)]);
 	}
 	if (y1!=y2)
 	{
@@ -1610,14 +1532,14 @@ void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 		{
 			_xor=255<<row1;
 			for (uint8_t x=x1;x<=x2;x++)
-				Write(m_map[MapIndex(y1, x)] ^ _xor);
+				Write(m_screenMap[MapIndex(y1, x)] ^ _xor);
 		}
 		Goto(x1,y2);
 		if (row2!=7)
 		{
 			_xor=255>>(7-row2);
 			for (uint8_t x=x1;x<=x2;x++)
-				Write(m_map[MapIndex(y2, x)]^_xor);
+				Write(m_screenMap[MapIndex(y2, x)]^_xor);
 		}
 	}
 	else
@@ -1627,14 +1549,14 @@ void GLCD::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 			Goto(x1,y1);
 			_xor=255>>(7-row2+row1)<<row1;
 			for (uint8_t x=x1;x<=x2;x++)
-				Write(m_map[MapIndex(y1, x)]^_xor);
+				Write(m_screenMap[MapIndex(y1, x)]^_xor);
 		}
 	}*/
 }
 
-void GLCD::Circle(uint8_t x, uint8_t y, uint8_t r, bool draw)
+void KS0108B::Circle(uint8_t x, uint8_t y, uint8_t r, bool draw)
 {
-	if (x >= m_screenlen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenlen - x || r >= SCREEN_WIDTH - y)
+	if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
 		return;
 	
 	if (r == 0)
@@ -1670,9 +1592,9 @@ void GLCD::Circle(uint8_t x, uint8_t y, uint8_t r, bool draw)
 	}
 }
 
-void GLCD::FillCircle(uint8_t x, uint8_t y, uint8_t r, bool fill)
+void KS0108B::FillCircle(uint8_t x, uint8_t y, uint8_t r, bool fill)
 {
-	if (x >= m_screenlen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenlen - x || r >= SCREEN_WIDTH - y)
+	if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
 		return;
 	
 	if (r == 0)
@@ -1705,9 +1627,9 @@ void GLCD::FillCircle(uint8_t x, uint8_t y, uint8_t r, bool fill)
 	}
 }
 
-void GLCD::FillCircleNew(uint8_t x, uint8_t y, uint8_t r, bool fill)
+void KS0108B::FillCircleNew(uint8_t x, uint8_t y, uint8_t r, bool fill)
 {
-	if (x >= m_screenlen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenlen - x || r >= SCREEN_WIDTH - y)
+	if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
 		return;
 	
 	if (r == 0)
