@@ -10,7 +10,7 @@ void my_glcd_cmd(uint8_t data, const bool rw, const bool rs)
 {
     HAL_GPIO_WritePin(LCD_RS_GPIO_Port, LCD_RS_Pin, rs);
     HAL_GPIO_WritePin(LCD_RW_GPIO_Port, LCD_RW_Pin, rw);
-    STM32T::DWT_Delay_ns(1750);			// (Increased) Address Set-Up Time
+    STM32T::DWT_Delay_ns(150);			// Address Set-Up Time
     HAL_GPIO_WritePin(LCD_EN_GPIO_Port, LCD_EN_Pin, GPIO_PIN_SET);
     
     
@@ -22,10 +22,10 @@ void my_glcd_cmd(uint8_t data, const bool rw, const bool rs)
     HAL_GPIO_WritePin(LCD_D5_GPIO_Port, LCD_D5_Pin, data & 0b0010'0000);
     HAL_GPIO_WritePin(LCD_D6_GPIO_Port, LCD_65_Pin, data & 0b0100'0000);
     HAL_GPIO_WritePin(LCD_D7_GPIO_Port, LCD_D7_Pin, data & 0b1000'0000);
-    STM32T::DWT_Delay_ns(250);			// (Increased) Data Set-Up Time
+    STM32T::DWT_Delay_ns(500);			// Data Set-Up Time & E cycle
     HAL_GPIO_WritePin(LCD_EN_GPIO_Port, LCD_EN_Pin, GPIO_PIN_RESET);
     
-    STM32T::DWT_Delay_ns(3000);			// (Increased) Address & Data Hold Time
+    STM32T::DWT_Delay_ns(6000);			// Address & Data Hold Time + Busy time; Alternatively, check the busy state of the LCD
 }
 
 

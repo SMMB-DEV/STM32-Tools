@@ -3,6 +3,8 @@
 #include "KS0108B.hpp"
 
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>		// vsnprintf
 
 
 // todo: General cleanup, rename files
@@ -663,6 +665,12 @@ namespace STM32T
 		PutStr("Normal");
 		NextLine(2);
 		PutStr("Big", true);
+		
+		while (1)
+		{
+			HAL_Delay(1000);
+			NegateRectangle(0, 4, 6 * 6, 4 + 7);
+		}
 	}
 
 	void KS0108B::Init()
@@ -979,26 +987,56 @@ namespace STM32T
 		}
 	}
 
-	void KS0108B::PutStr(const uint8_t* str, bool big)
-	{
-		while (*str)
-			PutChar(*str++, big);
-	}
-
 	void KS0108B::PutStr(const char* str, bool big)
 	{
 		while (*str)
 			PutChar(*str++, big);
 	}
 
-	void KS0108B::PutStr(const uint8_t* str, uint16_t n, bool big)
+	void KS0108B::PutStrn(const char* str, uint16_t n, bool big)
 	{
 		for (uint16_t i = 0; i < n; i++)
 			PutChar(str[i], big);
 	}
-
-
-
+	
+	/*void KS0108B::PutStrf(const char* fmt, ...)
+	{
+		char buf[64];
+		
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, args);
+		va_end(args);
+		
+		PutStr(buf);
+	}*/
+	
+	void KS0108B::PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...)
+	{
+		char buf[64];
+		
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, args);
+		va_end(args);
+		
+		PutStrxl(x, line, buf);
+	}
+	
+	void KS0108B::PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...)
+	{
+		char buf[64];
+		
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, args);
+		va_end(args);
+		
+		PutStrxy(x, y, buf);
+	}
+	
+	
+	
 	void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
 	{
 		// todo: Specify a format for bmp and handle y % PIXELS_PER_LINE != 0.

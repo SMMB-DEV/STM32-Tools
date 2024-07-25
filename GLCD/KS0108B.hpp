@@ -115,9 +115,30 @@ namespace STM32T
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		
 		void PutChar(const uint8_t ch, bool big = false, bool interpret_specials = true);
-		void PutStr(const uint8_t* str, bool big = false);
 		void PutStr(const char* str, bool big = false);
-		void PutStr(const uint8_t* str, uint16_t n, bool big = false);
+		void PutStrn(const char* str, uint16_t n, bool big = false);
+		//void PutStrf(const char* fmt, ...);
+		void PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...);
+		void PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...);
+		
+		void PutStrxl(const uint8_t x, const uint8_t line, const char* str)
+		{
+			Gotoxl(x, line);
+			PutStr(str);
+		}
+		
+		void PutStrxy(const uint8_t x, const uint8_t y, const char* str)
+		{
+			Gotoxy(x, y);
+			PutStr(str);
+		}
+		
+		void PutStrnxl(const uint8_t x, const uint8_t line, const char* str, uint16_t n)
+		{
+			Gotoxl(x, line);
+			PutStrn(str, n);
+		}
+		
 		//void PutNum(int32_t num);
 		//void PutNum(float num);
 		
