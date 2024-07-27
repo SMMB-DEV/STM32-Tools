@@ -31,14 +31,6 @@ namespace STM32T
 		return x * 1024;
 	}
 	
-	inline void Hang(void (* const action) ())
-	{
-		while (true)
-		{
-			action();
-		}
-	}
-	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
 	{
 		//assuming view is null-terminated.
