@@ -1043,7 +1043,7 @@ namespace STM32T
 		
 		uint16_t bmp_x = *(uint16_t*)bmp, bmp_y = *((uint16_t*)(bmp) + 1);
 		
-		if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE || x + bmp_x > m_screenLen || x >= m_screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
+		if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE)	// || x + bmp_x > m_screenLen || x >= m_screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
 			return;
 		
 		bmp += 4;
