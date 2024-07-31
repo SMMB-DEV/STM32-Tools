@@ -429,8 +429,9 @@ namespace STM32T
 
 
 	KS0108B::KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count) :
-			f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, sizeof(uint32_t) * 8)), m_screenLen(m_pageCount * MAX_CURSOR),
+			f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
 			m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
+			//m_screenMap(nullptr) {}
 		
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
 
@@ -675,8 +676,6 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
-		//m_config.Port_RST->BSRR = m_config.Pin_RST;
-		
 		f_setCS(0xFF);
 		
 		Display(1);
@@ -999,7 +998,7 @@ namespace STM32T
 			PutChar(str[i], big);
 	}
 	
-	/*void KS0108B::PutStrf(const char* fmt, ...)
+	void KS0108B::PutStrf(const char* fmt, ...)
 	{
 		char buf[64];
 		
@@ -1009,7 +1008,7 @@ namespace STM32T
 		va_end(args);
 		
 		PutStr(buf);
-	}*/
+	}
 	
 	void KS0108B::PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...)
 	{

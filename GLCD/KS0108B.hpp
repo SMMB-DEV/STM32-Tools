@@ -117,7 +117,7 @@ namespace STM32T
 		void PutChar(const uint8_t ch, bool big = false, bool interpret_specials = true);
 		void PutStr(const char* str, bool big = false);
 		void PutStrn(const char* str, uint16_t n, bool big = false);
-		//void PutStrf(const char* fmt, ...);
+		void PutStrf(const char* fmt, ...);
 		void PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...);
 		void PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...);
 		
