@@ -54,6 +54,11 @@ namespace STM32T
 		while (DWT->CYCCNT - startTick < delayTicks);	// < because delayTicks is usually accurate (when SystemCoreClock is divisible by 1'000'000).
 	}
 	
+	inline uint32_t DWT_GetTick()
+	{
+		return DWT->CYCCNT / (SystemCoreClock / 1'000'000);
+	}
+	
 	inline void DWT_Delay_ns(uint16_t ns)
 	{
 		const uint32_t startTick = DWT->CYCCNT, delayTicks = ns * (SystemCoreClock / 1'000'000) / 1000;

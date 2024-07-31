@@ -32,6 +32,12 @@ namespace STM32T
 		const bool active_low;
 		
 	public:
+		template <typename T>
+		using TickFuncPtr = T (* const)();
+		
+		template <typename T>
+		using DelayFuncPtr = void (* const)(const T);
+		
 		const uint16_t Pin;
 		
 		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
@@ -68,7 +74,7 @@ namespace STM32T
 		}
 		
 		template<typename T>
-		void Timed(const T time, void (* const delay)(const T delay) = HAL_Delay)
+		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
@@ -86,8 +92,19 @@ namespace STM32T
 			}
 		}
 		
+		/**
+		* @param mode - Must be a value of @ref GPIO_mode_define
+		* @param pull - Must be a value of @ref GPIO_pull_define
+		* @param speed - Must be a value of @ref GPIO_speed_define
+		*/
+		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
+		{
+			GPIO_InitTypeDef init{ .Pin = Pin, .Mode = mode, .Pull = pull, .Speed = speed };
+			HAL_GPIO_Init(Port, &init);
+		}
+		
 		template <typename T>
-		bool Wait(const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
+		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
@@ -102,18 +119,23 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		bool Poll(const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
+		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
+			T elapsed = 0;
 			const T startTime = get_tick();
+			
 			while (Read() == desired_state)
 			{
-				if (get_tick() - startTime > timeout)
-					return true;
+				if ((elapsed = get_tick() - startTime) > max)
+					return 0;
 			}
 			
-			return false;
+			if (elapsed < min)
+				return 0;
+			
+			return elapsed;
 		}
 	};
 }
