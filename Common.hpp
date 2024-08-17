@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 #include <functional>
+#include <type_traits>
 
 
 
@@ -29,6 +30,71 @@ namespace STM32T
 	constexpr size_t operator"" _Ki(long double x) noexcept
 	{
 		return x * 1024;
+	}
+	
+	template<typename T, typename BUF_TYPE = char*>
+	T pack_be(BUF_TYPE buf)
+	{
+		{
+			using namespace std;
+			
+			static_assert(is_same_v<make_unsigned_t<remove_const_t<remove_pointer_t<BUF_TYPE>>>, unsigned char>);
+			static_assert(!is_same_v<T, bool> && is_integral_v<T>);
+		}
+		
+		T val = 0;
+		for (size_t i = 0; i < sizeof(T); i++)
+		{
+			val <<= 8;
+			val |= *buf++;
+		}
+		
+		return val;
+	}
+	
+	template<typename T, typename BUF_TYPE = char*>
+	T pack_le(BUF_TYPE buf)
+	{
+		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		
+		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+		{
+			T val = 0;
+			buf += sizeof(T);
+			for (size_t i = 0; i < sizeof(T); i++)
+			{
+				val <<= 8;
+				val |= *--buf;
+			}
+		}
+		else
+			return *(T*)buf;
+	}
+	
+	template<typename T, typename BUF_TYPE = char*>
+	void unpack_be(BUF_TYPE buf, T val)
+	{
+		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		
+		for (int i = sizeof(T) - 1; i >= 0; i--)
+			*buf++ = val >> (i * 8);
+	}
+	
+	template<typename T, typename BUF_TYPE = char*>
+	void unpack_le(BUF_TYPE buf, T val)
+	{
+		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		
+		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+		{
+			for (size_t i = 0; i < sizeof(T); i++)
+				*buf++ = val >> (i * 8);
+		}
+		else
+			*(T*)buf = val;
 	}
 	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
