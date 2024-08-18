@@ -1,7 +1,7 @@
 #pragma once
 
 #include "main.h"
-#include <cstdio>
+
 #include <string_view>
 #include <vector>
 #include <functional>
@@ -9,78 +9,13 @@
 
 
 
-#ifndef COM_LOG
-constexpr bool _LOG = false;
-#else
-constexpr bool _LOG = true;
-#endif
-
-
-
-
-inline void LOG(void (*f)())
-{
-	if constexpr (_LOG)
-		f();
-}
-
-template <class... Args>
-inline void LOGF(const char *fmt, Args... args)
-{
-	if constexpr (_LOG)
-		printf(fmt, args...);
-}
-
-template <class... Args>
-inline void LOGFI(const size_t indent, const char *fmt, Args... args)
-{
-	if constexpr (_LOG)
-	{
-		printf("%*s", indent * 4, "");
-		printf(fmt, args...);
-	}
-}
-
-template <class... Args>
-inline bool LOGFC(const bool c, const char *fmt, Args... args)
-{
-	if (c)
-		LOGF(fmt, args...);
-	
-	return c;
-}
-
-inline void LOGSEP()
-{
-	if constexpr (_LOG)
-		printf("--------------------------------------------------------------------------------\n");
-}
-
-
-//#define LOGFI(indent, fmt, ...)		{ if constexpr (_LOG) { printf("%*s" fmt, indent * 4, "", ##__VA_ARGS__); } }
-#define LOGT(__msg__, __min_time__, ...) \
-{ \
-	if constexpr (_LOG) \
-	{ \
-		volatile uint32_t __start__ = HAL_GetTick(); \
-		__VA_ARGS__ \
-		uint32_t __elapsed__ = HAL_GetTick() - __start__; \
-		if (__elapsed__ >= __min_time__) \
-			printf(__msg__ ": %ums\n", __elapsed__); \
-	} \
-	else \
-	{ \
-		__VA_ARGS__ \
-	} \
-}
-
 #define _countof(arr)				(sizeof(arr) / sizeof(arr[0]))
 
 
 
 using std::operator"" sv;
 
-namespace COM
+namespace STM32T
 {
 	using strv = std::string_view;
 
@@ -97,49 +32,29 @@ namespace COM
 		return x * 1024;
 	}
 	
-	inline void Hang(void (* const action) ())
+	template<typename T, typename BUF_TYPE = char*>
+	void unpack_be(BUF_TYPE buf, T val)
 	{
-		while (true)
-		{
-			action();
-		}
-	}
-	
-	inline void Startup()
-	{
-		LOG([]()
-		{
-			printf("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
-		
-			const uint32_t version = HAL_GetHalVersion();
-			
-			// major.minor.patch-rc
-			printf("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n", version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF);
-			printf("RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n", HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
-			printf("HCLK: %.1f MHz\n", HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
-			printf("\n");
-		});
-	}
-	
-	template <typename T>
-	inline bool WaitOnPin(GPIO_TypeDef* const port, uint16_t pin, const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
-	{
-		const T startTime = get_tick();
-		while (HAL_GPIO_ReadPin(port, pin) != desired_state)
-		{
-			if (get_tick() - startTime > timeout)
-				return false;
-		}
-		
-		return true;
-	}
-	
-	template <typename T>
-	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
-	{
+		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 		
-		while (get_tick() - start < wait);
+		for (int i = sizeof(T) - 1; i >= 0; i--)
+			*buf++ = val >> (i * 8);
+	}
+	
+	template<typename T, typename BUF_TYPE = char*>
+	void unpack_le(BUF_TYPE buf, T val)
+	{
+		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		
+		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+		{
+			for (int i = 0; i < sizeof(T); i++)
+				*buf++ = val >> (i * 8);
+		}
+		else
+			*(T*)buf = val;
 	}
 	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
@@ -420,70 +335,4 @@ namespace COM
 		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
-	
-	class SingleOutput
-	{
-		uint32_t lastEndTime = 0, lastStartTime = 0;
-		GPIO_TypeDef* const Port;
-		const uint16_t Pin;
-		const bool active_low;
-		
-		static constexpr uint32_t GPIO_NUMBER = 16;
-		
-	public:
-		SingleOutput(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
-		{
-			assert_param(IS_GPIO_PIN(Pin));
-		}
-		
-		~SingleOutput() {}
-		
-		__attribute__((always_inline)) void Set(bool state = true)
-		{
-			Port->BSRR = Pin << ((active_low ? state : !state) * GPIO_NUMBER);
-		}
-		
-		__attribute__((always_inline)) void Reset()
-		{
-			Set(false);
-		}
-		
-		__attribute__((always_inline)) void Toggle()
-		{
-			const uint32_t odr = Port->ODR;
-			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);
-		}
-		
-		template<typename T>
-		void Timed(const T time, void (* const delay)(const T delay) = HAL_Delay)
-		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
-			
-			Set();
-			delay(time);
-			Reset();
-		}
-		
-		/*void Delayed(const uint32_t time, const uint32_t delay, const bool waitAfter = false)
-		{
-			//uint32_t now = HAL_GetTick();
-			//if (now - lastEndTime < delay)
-			//	HAL_Delay(delay - (now - lastEndTime));
-			WaitAfter(lastEndTime, delay);
-			
-			Timed(time);
-			
-			if (waitAfter)
-				HAL_Delay(delay);
-		}*/
-		
-		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
-		{
-			for (uint8_t i = 0; i < n ; i++)
-			{
-				Timed(time1);
-				HAL_Delay(time2);
-			}
-		}
-	};
 }
