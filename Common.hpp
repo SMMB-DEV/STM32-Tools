@@ -14,11 +14,10 @@
 
 
 using std::operator"" sv;
+using strv = std::string_view;
 
 namespace STM32T
 {
-	using strv = std::string_view;
-
 	template <class T>
 	using vec = std::vector<T>;
 
