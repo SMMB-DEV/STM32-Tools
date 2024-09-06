@@ -1,8 +1,8 @@
 // *** TODO: ADD LICENSE ***
 
 #pragma once
-	
-#include "main.h"
+
+#include "../Common.hpp"
 
 namespace STM32T
 {
@@ -137,6 +137,11 @@ namespace STM32T
 		{
 			Gotoxl(x, line);
 			PutStrn(str, n);
+		}
+		
+		void PutStrvxl(const uint8_t x, const uint8_t line, strv view)
+		{
+			PutStrnxl(x, line, view.data(), view.length());
 		}
 		
 		//void PutNum(int32_t num);

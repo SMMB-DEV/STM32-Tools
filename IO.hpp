@@ -10,7 +10,7 @@ namespace STM32T
 {
 	template <typename T>
 	[[deprecated("Use IO::Wait() instead.")]]
-	inline bool WaitOnPin(GPIO_TypeDef* const port, uint16_t pin, const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
+	inline bool __attribute__((deprecated)) WaitOnPin(GPIO_TypeDef* const port, uint16_t pin, const bool desired_state, const T timeout, T(* const get_tick)() = HAL_GetTick)
 	{
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 		
