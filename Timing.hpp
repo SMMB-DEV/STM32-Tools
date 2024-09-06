@@ -48,23 +48,28 @@ namespace STM32T
 		}
 	}
 	
+	
+	#ifndef DWT_DELAY_CLK
+	#define DWT_DELAY_CLK	(SystemCoreClock)
+	#endif
+	
 	inline void DWT_Delay(uint16_t us)
 	{
-		const uint32_t startTick = DWT->CYCCNT, delayTicks = us * (SystemCoreClock / 1'000'000);
+		const uint32_t startTick = DWT->CYCCNT, delayTicks = us * (DWT_DELAY_CLK / 1'000'000);
 		while (DWT->CYCCNT - startTick < delayTicks);	// < because delayTicks is usually accurate (when SystemCoreClock is divisible by 1'000'000).
 	}
 	
 	inline uint32_t DWT_GetTick()
 	{
-		return DWT->CYCCNT / (SystemCoreClock / 1'000'000);
+		return DWT->CYCCNT / (DWT_DELAY_CLK / 1'000'000);
 	}
 	
 	inline void DWT_Delay_ns(uint16_t ns)
 	{
-		const uint32_t startTick = DWT->CYCCNT, delayTicks = ns * (SystemCoreClock / 1'000'000) / 1000;
+		const uint32_t startTick = DWT->CYCCNT, delayTicks = ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
 		while (DWT->CYCCNT - startTick <= delayTicks);	// <= because delayTicks isn't always accurate.
 	}
-	#endif
+	#endif	// DWT
 	
 	template <typename T>
 	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
