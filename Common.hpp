@@ -20,6 +20,9 @@ namespace STM32T
 {
 	template <class T>
 	using vec = std::vector<T>;
+	
+	template <class F>
+	using func = std::function<F>;
 
 	constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
@@ -135,14 +138,14 @@ namespace STM32T
 			if (end == strv::npos)
 			{
 				if (!ignoreSingleEnded)
-					tokens.push_back(view);
+					tokens.push_back(view);		// This is why the view must be null-terminated.
 			
 				return;
 			}
 			
 			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
 			{
-				((char*)view.data())[end] = '\0';	//no problems with C string functions
+				((char*)view.data())[end] = '\0';	// no problems with C string functions. todo: use std::span
 				tokens.push_back(view.substr(0, end));
 			}
 			
@@ -150,7 +153,7 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv& sep, const std::function<void (strv)>& op, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv& sep, const func<void (strv)>& op, const bool ignoreSingleEnded)
 	{
 		//note: assuming view is null-terminated.
 		//todo: handle {sep} inside string literals

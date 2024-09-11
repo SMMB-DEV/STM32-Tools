@@ -2,4 +2,7 @@
 
 
 
-
+namespace STM32T
+{
+	
+}

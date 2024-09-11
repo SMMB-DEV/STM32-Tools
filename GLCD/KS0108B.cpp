@@ -7,13 +7,11 @@
 #include <cstdio>		// vsnprintf
 
 
-// todo: General cleanup, rename files
-
 
 namespace STM32T
 {
 	static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
-
+	
 	static constexpr uint8_t MAX_CHARS = 130, FONT_WIDTH = 5;
 
 	static constexpr uint8_t Font[MAX_CHARS][FONT_WIDTH] =
