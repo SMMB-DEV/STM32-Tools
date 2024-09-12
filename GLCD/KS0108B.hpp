@@ -6,9 +6,9 @@
 
 namespace STM32T
 {
-	enum State: uint8_t {initial=0, final, medial, isolated};
+	enum State: uint8_t { initial = 0, final, medial, isolated };
 
-	class Char
+	struct Char
 	{
 	private:
 		uint8_t statecount, *width;
