@@ -161,16 +161,21 @@ namespace STM32T
 				if (tokens.size() != expectedTokens)
 					return Standard(tokens);
 				
-				const bool cmp = CompareAndRemove(tokens[0], cmd) && CompareAndRemove(tokens[0], ": "sv);
-				if (!cmp || tokens.back() != "OK"sv)
+				bool ok = CompareAndRemove(tokens[0], cmd) && CompareAndRemove(tokens[0], ": "sv);
+				
+				if (expectedTokens > 1)
+				{
+					ok &= tokens.back() == "OK"sv;
+					tokens.pop_back();
+				}
+				
+				if (!ok)
 				{
 					for (const auto& token : tokens)
 						addURC(token);
 					
 					return ErrorCode::UNKNOWN;
 				}
-				
-				tokens.pop_back();
 				
 				//return op ? op(tokens) : Standard(tokens);
 				return op ? op(tokens) : ErrorCode::OK;
