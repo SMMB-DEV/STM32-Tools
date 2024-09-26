@@ -50,6 +50,7 @@ namespace STM32T
 	
 	
 	#ifndef DWT_DELAY_CLK
+	#warning "DWT_DELAY_CLK not defined!"
 	#define DWT_DELAY_CLK	(SystemCoreClock)
 	#endif
 	
