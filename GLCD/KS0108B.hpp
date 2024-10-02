@@ -139,9 +139,20 @@ namespace STM32T
 			PutStrn(str, n);
 		}
 		
+		void PutStrnxy(const uint8_t x, const uint8_t y, const char* str, uint16_t n)
+		{
+			Gotoxy(x, y);
+			PutStrn(str, n);
+		}
+		
 		void PutStrvxl(const uint8_t x, const uint8_t line, strv view)
 		{
 			PutStrnxl(x, line, view.data(), view.length());
+		}
+		
+		void PutStrvxy(const uint8_t x, const uint8_t y, strv view)
+		{
+			PutStrnxy(x, y, view.data(), view.length());
 		}
 		
 		//void PutNum(int32_t num);

@@ -429,7 +429,7 @@ namespace STM32T
 	KS0108B::KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count) :
 			f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
 			m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
-		
+	
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
 
 	/*void KS0108B::SetFa(void)
