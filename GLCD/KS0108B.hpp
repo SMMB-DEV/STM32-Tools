@@ -54,6 +54,11 @@ namespace STM32T
 			return line * m_screenLen + cursor;
 		}
 		
+		__attribute__((always_inline)) inline uint8_t LongCursor() const
+		{
+			return m_cursor + MAX_CURSOR * m_page;
+		}
+		
 		bool faset = false, Fa = false;
 		
 		void Command(const bool rs, const bool rw, uint8_t d7_0) const;
@@ -84,6 +89,8 @@ namespace STM32T
 		uint8_t m_cursor = 0, m_row = 0, m_line = 0, m_page = 0;
 		
 	public:
+		KS0108B(const KS0108B&) = delete;
+		KS0108B(KS0108B&&) = delete;
 		
 		/**
 		* @param command - Function to set D0:7, RW, RS and EN pins according to the timing specifications on page 8 of the KS0108B datasheet.
@@ -104,11 +111,14 @@ namespace STM32T
 		* @brief Fills or clears the Screen and goes to (0, 0)
 		*/
 		void ClearScreen(const bool fill = false);
-		void Gotoxy(const uint8_t x, const uint8_t y);
-		void Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
-		void Gotoxl(const uint8_t x, const uint8_t line);
+		KS0108B& Gotoxy(const uint8_t x, const uint8_t y);
+		KS0108B& Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
+		KS0108B& Gotoxl(const uint8_t x, const uint8_t line);
 		
-		void WriteByte(const uint8_t byte);
+		__attribute__((always_inline)) KS0108B& xy(const uint8_t x, const uint8_t y) { return Gotoxy(x, y); }
+		__attribute__((always_inline)) KS0108B& xl(const uint8_t x, const uint8_t line) { return Gotoxl(x, line); }
+		
+		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
 		//uint8_t Read(void);
 		void NextLine(const uint8_t lines = 1);								//Goes to the next line and sets the cursor to 0.
 		
@@ -118,41 +128,10 @@ namespace STM32T
 		void PutStr(const char* str, bool big = false);
 		void PutStrn(const char* str, uint16_t n, bool big = false);
 		void PutStrf(const char* fmt, ...);
-		void PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...);
-		void PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...);
 		
-		void PutStrxl(const uint8_t x, const uint8_t line, const char* str)
+		void PutStrv(strv view)
 		{
-			Gotoxl(x, line);
-			PutStr(str);
-		}
-		
-		void PutStrxy(const uint8_t x, const uint8_t y, const char* str)
-		{
-			Gotoxy(x, y);
-			PutStr(str);
-		}
-		
-		void PutStrnxl(const uint8_t x, const uint8_t line, const char* str, uint16_t n)
-		{
-			Gotoxl(x, line);
-			PutStrn(str, n);
-		}
-		
-		void PutStrnxy(const uint8_t x, const uint8_t y, const char* str, uint16_t n)
-		{
-			Gotoxy(x, y);
-			PutStrn(str, n);
-		}
-		
-		void PutStrvxl(const uint8_t x, const uint8_t line, strv view)
-		{
-			PutStrnxl(x, line, view.data(), view.length());
-		}
-		
-		void PutStrvxy(const uint8_t x, const uint8_t y, strv view)
-		{
-			PutStrnxy(x, y, view.data(), view.length());
+			PutStrn(view.data(), view.length());
 		}
 		
 		//void PutNum(int32_t num);

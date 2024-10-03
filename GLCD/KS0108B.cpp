@@ -702,13 +702,14 @@ namespace STM32T
 		memset(m_screenMap, _write, MAX_LINES * m_screenLen);
 	}
 
-	void KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
+	KS0108B& KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
 	{
 		m_row = y % PIXELS_PER_LINE;
 		Goto(x, y / PIXELS_PER_LINE);
+		return *this;
 	}
 
-	void KS0108B::Movexy(const int16_t x, const int8_t y)
+	KS0108B& KS0108B::Movexy(const int16_t x, const int8_t y)
 	{
 		static constexpr uint8_t MAX_PIXELS = PIXELS_PER_LINE * MAX_LINES;
 		
@@ -721,30 +722,38 @@ namespace STM32T
 			_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
 		
 		Gotoxy(_x, _y);
+		return *this;
 	}
 
-	void KS0108B::Gotoxl(const uint8_t x, const uint8_t line)
+	KS0108B& KS0108B::Gotoxl(const uint8_t x, const uint8_t line)
 	{
 		m_row = 0;
 		Goto(x, line);
+		return *this;
 	}
 
-	void KS0108B::WriteByte(const uint8_t byte)
+	void KS0108B::WriteByte(const uint8_t byte, const uint8_t repeat)
 	{
 		if (m_row == 0)
-			Write(byte);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write(byte);
 		else
 		{
-			const uint8_t line = m_line, cursor = m_cursor + MAX_CURSOR * m_page;
+			const uint8_t line = m_line, cursor = LongCursor();
+			
+			// todo: Do all the L & H writes in one page, then move to the next page.
 			
 			//Bottom part
 			SetLine(line + 1);
-			Write_L(byte, m_row, false);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write_L(byte, m_row, i < repeat - 1);	// Don't check for the last byte
 			
 			//Top part
-			SetLine(line);
-			SetCursor(m_cursor, true);
-			Write_H(byte, m_row);
+			//SetLine(line);
+			//SetCursor(m_cursor, true);
+			Goto(cursor, line, true);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write_H(byte, m_row);
 		}
 	}
 
@@ -1014,32 +1023,6 @@ namespace STM32T
 		
 		PutStr(buf);
 	}
-	
-	void KS0108B::PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStrxl(x, line, buf);
-	}
-	
-	void KS0108B::PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStrxy(x, y, buf);
-	}
-	
-	
 	
 	void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
 	{
