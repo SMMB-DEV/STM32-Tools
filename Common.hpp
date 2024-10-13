@@ -126,7 +126,7 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv& sep, vec<strv>& tokens, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded)
 	{
 		//assuming view is null-terminated.
 		

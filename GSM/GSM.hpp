@@ -16,6 +16,7 @@
 
 namespace STM32T
 {
+#ifdef HAL_UART_MODULE_ENABLED
 	class GSM
 	{
 	public:
@@ -32,7 +33,7 @@ namespace STM32T
 		
 	protected:
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 200, DEFAULT_IDLE_TIMEOUT = 10;
-		static constexpr size_t DEFAULT_RESPONSE_LEN = 32, DEFAULT_ARG_LEN = 32;
+		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
 		
 		
 		UART_HandleTypeDef* const p_huart;
@@ -284,4 +285,5 @@ namespace STM32T
 			return Tokens(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, strv());
 		}
 	};
+#endif	// HAL_UART_MODULE_ENABLED
 }
