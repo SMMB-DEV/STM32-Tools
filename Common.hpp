@@ -99,6 +99,23 @@ namespace STM32T
 			*(T*)buf = val;
 	}
 	
+	template<typename T>
+	T le2be(const T t)
+	{
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
+		
+		union
+		{
+			T t;
+			uint8_t _u8[sizeof(T)];
+		} _t{t};
+		
+		for (uint8_t i = 0; i < sizeof(T) / 2; i++)
+			std::swap(_t._u8[i], _t._u8[sizeof(T) - 1 - i]);
+		
+		return _t.t;
+	}
+	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
 	{
 		//assuming view is null-terminated.

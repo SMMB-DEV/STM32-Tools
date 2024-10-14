@@ -73,7 +73,7 @@ namespace STM32T
 			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);
 		}
 		
-		template<typename T>
+		template<typename T = uint32_t>
 		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
