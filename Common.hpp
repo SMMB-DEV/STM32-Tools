@@ -34,6 +34,13 @@ namespace STM32T
 		return x * 1024;
 	}
 	
+	template<class T>
+	union share_arr
+	{
+		uint8_t arr[sizeof(T)];
+		T val;
+	};
+	
 	template<typename T, typename BUF_TYPE = char*>
 	T pack_be(BUF_TYPE buf)
 	{
@@ -57,8 +64,12 @@ namespace STM32T
 	template<typename T, typename BUF_TYPE = char*>
 	T pack_le(BUF_TYPE buf)
 	{
-		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		{
+			using namespace std;
+			
+			static_assert(is_same_v<BUF_TYPE, char*> || is_same_v<BUF_TYPE, uint8_t*>);
+			static_assert(!is_same_v<T, bool> && is_integral_v<T>, "");
+		}
 		
 		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
 		{
@@ -69,6 +80,8 @@ namespace STM32T
 				val <<= 8;
 				val |= *--buf;
 			}
+			
+			return val;
 		}
 		else
 			return *(T*)buf;
