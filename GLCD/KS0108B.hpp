@@ -4,6 +4,8 @@
 
 #include "../Common.hpp"
 
+#include <utility>	// pair
+
 namespace STM32T
 {
 	enum State: uint8_t { initial = 0, final, medial, isolated };
@@ -117,6 +119,9 @@ namespace STM32T
 		
 		__attribute__((always_inline)) KS0108B& xy(const uint8_t x, const uint8_t y) { return Gotoxy(x, y); }
 		__attribute__((always_inline)) KS0108B& xl(const uint8_t x, const uint8_t line) { return Gotoxl(x, line); }
+		
+		std::pair<uint8_t, uint8_t> Getxy() { return { m_cursor + MAX_CURSOR * m_page, m_line * PIXELS_PER_LINE + m_row }; }
+		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
 		
 		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
 		//uint8_t Read(void);
