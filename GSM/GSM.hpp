@@ -80,7 +80,7 @@ namespace STM32T
 		*/
 		virtual ErrorCode ReceiveUART(char *buffer, uint16_t& len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
 		
-		ErrorCode Command(const uint32_t timeout, const CommandType type, const strv& cmd, const strv& args, char* buffer, uint16_t& len)
+		ErrorCode Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, uint16_t& len)
 		{
 			if (type != CommandType::Bare)
 			{
@@ -111,7 +111,7 @@ namespace STM32T
 			return ErrorCode::OK;
 		}
 		
-		ErrorCode Command(vec<strv>& tokens, char* buffer, uint16_t len, const uint32_t timeout, const CommandType type, const strv& cmd, const strv& args = strv(), const bool allowSingleEnded = false)
+		ErrorCode Command(vec<strv>& tokens, char* buffer, uint16_t len, const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const bool allowSingleEnded = false)
 		{
 			if (type != CommandType::Bare)
 			{
@@ -304,6 +304,12 @@ namespace STM32T
 		ErrorCode AT()
 		{
 			return Tokens(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, strv());
+		}
+		
+		void Custom(strv command)
+		{
+			uint16_t temp;
+			Command(0, CommandType::Execute, command, strv(), nullptr, temp);
 		}
 	};
 #endif	// HAL_UART_MODULE_ENABLED
