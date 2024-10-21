@@ -38,7 +38,7 @@ namespace STM32T
 		
 		UART_HandleTypeDef* const p_huart;
 		
-		virtual void addURC(const strv& token) = 0;
+		virtual void addURC(const strv token) = 0;
 		
 		enum class CommandType : uint8_t
 		{

@@ -7,6 +7,9 @@
 
 namespace STM32T
 {
+	/**
+	* @brief The name is very specific because there are subtle differences between the different W25Q variants. This was written for W25Q128JVSQ but should work on other variants.
+	*/
 	class W25Q128JV
 	{
 		enum CMD : uint8_t

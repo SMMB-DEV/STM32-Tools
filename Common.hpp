@@ -216,12 +216,12 @@ namespace STM32T
 	{
 		// 24-Hour/Binary Format
 		
-		if (sec == 0 || sec > 2'419'200 || sec < -2'419'200)	// max 28 days; don't want to deal with calculating number of months more than 1
+		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
 			return;
 		
-		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	//February can be 29
+		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
 		
-		//These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
+		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
 		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
 		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
 		
@@ -290,14 +290,14 @@ namespace STM32T
 				days--;
 			}
 			
-			const uint8_t lastMonth = date.Month == 1 ? 12 : date.Month - 1;
+			const uint8_t prevMonth = date.Month == 1 ? 12 : date.Month - 1;
 			date.Date += days;
 			if (date.Date == 0 || date.Date > monthDays)	//underflow
 			{
-				date.Date = MONTH_DAYS[lastMonth - 1] + (lastMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
-				date.Month = lastMonth;
+				date.Date = MONTH_DAYS[prevMonth - 1] + (prevMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
+				date.Month = prevMonth;
 				
-				if (lastMonth == 12)
+				if (prevMonth == 12)
 				{
 					date.Year--;
 					if (date.Year > 100)	//underflow
@@ -306,7 +306,7 @@ namespace STM32T
 			}
 		}
 		
-		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
+		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
 	
 	inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
