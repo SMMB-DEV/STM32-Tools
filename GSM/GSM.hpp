@@ -31,6 +31,27 @@ namespace STM32T
 			UNKNOWN
 		};
 		
+		class URC : public strv
+		{
+		public:
+			uint32_t timestamp;
+			
+			URC() : strv(), timestamp(0) {}
+			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), timestamp(timestamp) {}
+			URC(const strv& other, const uint32_t timestamp) : strv(other), timestamp(timestamp) {}
+			
+			bool compare_remove(const std::string_view& remove)
+			{
+				if (compare(0, remove.size(), remove) == 0)
+				{
+					remove_prefix(remove.size());
+					return true;
+				}
+
+				return false;
+			}
+		};
+		
 	protected:
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 200, DEFAULT_IDLE_TIMEOUT = 10;
 		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
