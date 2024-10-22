@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "../Common.hpp"
+#include "./ILCD.hpp"
 
 #include <utility>	// pair
 
@@ -31,7 +31,7 @@ namespace STM32T
 	/**
 	* @note The RST pin of the LCD must be set high at least 1us after powering on the LCD.
 	*/
-	class KS0108B
+	class KS0108B : public ILCD
 	{
 		// todo: make cursor 16 bits in functions.
 		
@@ -124,25 +124,15 @@ namespace STM32T
 		
 		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
 		//uint8_t Read(void);
-		void NextLine(const uint8_t lines = 1);								//Goes to the next line and sets the cursor to 0.
+		void NextLine(const uint8_t lines = 1);								// Goes to the next line and sets the cursor to 0.
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		
-		void PutChar(const uint8_t ch, bool interpret_specials = true);
+		void PutChar(const uint8_t ch, bool interpret_specials = true) override;
+		
 		void PutCharBig(const uint8_t ch, bool interpret_specials = true);
-		
-		void PutStr(const char* str);
 		void PutStrBig(const char* str);
-		
-		void PutStrn(const char* str, uint16_t n);
 		void PutStrnBig(const char* str, uint16_t n);
-		
-		void PutStrf(const char* fmt, ...);
-		
-		void PutStrv(strv view)
-		{
-			PutStrn(view.data(), view.length());
-		}
 		
 		//void PutNum(int32_t num);
 		//void PutNum(float num);

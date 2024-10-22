@@ -1,0 +1,47 @@
+#pragma once
+
+#include "../Common.hpp"
+
+#include <cstdint>
+#include <cstdarg>
+#include <cstdio>		// vsnprintf
+
+
+
+namespace STM32T
+{
+	class ILCD
+	{
+	public:
+		virtual void PutChar(const uint8_t ch, bool interpret_specials = true) = 0;
+		
+		void PutStr(const char* str)
+		{
+			while (*str)
+				PutChar(*str++);
+		}
+		
+		void PutStrn(const char* str, uint16_t n)
+		{
+			for (uint16_t i = 0; i < n; i++)
+				PutChar(str[i]);
+		}
+		
+		void PutStrv(strv view)
+		{
+			PutStrn(view.data(), view.length());
+		}
+		
+		void PutStrf(const char* fmt, ...)
+		{
+			char buf[64];
+			
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+			
+			PutStr(buf);
+		}
+	};
+}

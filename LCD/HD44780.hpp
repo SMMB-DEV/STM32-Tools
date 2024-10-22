@@ -1,12 +1,13 @@
 #pragma once
 
 #include "../Timing.hpp"
+#include "./ILCD.hpp"
 
 
 
 namespace STM32T
 {
-	class HD44780
+	class HD44780 : public ILCD
 	{
 		void (* const f_write)(bool rs, uint8_t data);
 		uint8_t (* const f_read)(bool rs);
@@ -78,6 +79,9 @@ namespace STM32T
 			Write(0, 0b0000'1100);			// Display on, Cursor off, Blink off
 			Write(0, 0b0000'0001, 1600);	// Display clear
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
+		}
+		void PutChar(const uint8_t ch, bool interpret_specials = true) override
+		{
 		}
 	};
 }

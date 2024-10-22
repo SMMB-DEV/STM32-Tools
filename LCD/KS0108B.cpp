@@ -1,10 +1,8 @@
 // *** TODO: ADD LICENSE ***
 
-#include "KS0108B.hpp"
+#include "./KS0108B.hpp"
 
 #include <algorithm>
-#include <cstdarg>
-#include <cstdio>		// vsnprintf
 
 
 
@@ -662,7 +660,7 @@ namespace STM32T
 		Gotoxy(0, 4);
 		PutStr("Normal");
 		NextLine(2);
-		PutStr("Big", true);
+		PutStrBig("Big");
 		
 		while (1)
 		{
@@ -1053,40 +1051,16 @@ namespace STM32T
 		}
 	}
 
-	void KS0108B::PutStr(const char* str)
-	{
-		while (*str)
-			PutChar(*str++);
-	}
-	
 	void KS0108B::PutStrBig(const char* str)
 	{
 		while (*str)
 			PutCharBig(*str++);
 	}
 
-	void KS0108B::PutStrn(const char* str, uint16_t n)
-	{
-		for (uint16_t i = 0; i < n; i++)
-			PutChar(str[i]);
-	}
-	
 	void KS0108B::PutStrnBig(const char* str, uint16_t n)
 	{
 		for (uint16_t i = 0; i < n; i++)
 			PutCharBig(str[i]);
-	}
-	
-	void KS0108B::PutStrf(const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStr(buf);
 	}
 	
 	void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
