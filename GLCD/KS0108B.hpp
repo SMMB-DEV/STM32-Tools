@@ -63,7 +63,6 @@ namespace STM32T
 		
 		bool faset = false, Fa = false;
 		
-		void Command(const bool rs, const bool rw, uint8_t d7_0) const;
 		bool SetPage(const uint8_t page, const bool force = false);
 		void SetLine(const uint8_t line, const bool force = true);		//Lines:0-7
 		void SetCursor(const uint8_t cursor, const bool force = true);	//0-63

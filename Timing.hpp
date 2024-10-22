@@ -50,16 +50,19 @@ namespace STM32T
 	
 	
 	#ifndef DWT_DELAY_CLK
-	#warning "DWT_DELAY_CLK not defined!"
+	#warning "DWT_DELAY_CLK not defined! Defaulting to SystemCoreClock."
 	#define DWT_DELAY_CLK	(SystemCoreClock)
 	#endif
 	
 	inline void DWT_Delay(uint16_t us)
 	{
-		const uint32_t startTick = DWT->CYCCNT, delayTicks = us * (DWT_DELAY_CLK / 1'000'000);
-		while (DWT->CYCCNT - startTick < delayTicks);	// < because delayTicks is usually accurate (when SystemCoreClock is divisible by 1'000'000).
+		const uint32_t start = DWT->CYCCNT, delay = us * (DWT_DELAY_CLK / 1'000'000);
+		while (DWT->CYCCNT - start < delay);	// < because delay is usually accurate (when DWT_DELAY_CLK is divisible by 1'000'000).
 	}
 	
+	/**
+	* @note Doesn't overflow at UINT32_MAX. Be careful when using this function for time difference measurement.
+	*/
 	inline uint32_t DWT_GetTick()
 	{
 		return DWT->CYCCNT / (DWT_DELAY_CLK / 1'000'000);
@@ -67,8 +70,8 @@ namespace STM32T
 	
 	inline void DWT_Delay_ns(uint16_t ns)
 	{
-		const uint32_t startTick = DWT->CYCCNT, delayTicks = ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
-		while (DWT->CYCCNT - startTick <= delayTicks);	// <= because delayTicks isn't always accurate.
+		const uint32_t start = DWT->CYCCNT, delay = ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
+		while (DWT->CYCCNT - start <= delay);	// <= because delay isn't always accurate.
 	}
 	#endif	// DWT
 	

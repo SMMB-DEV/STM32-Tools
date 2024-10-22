@@ -34,7 +34,7 @@ namespace STM32T
 		class URC : public strv
 		{
 		public:
-			uint32_t timestamp;
+			const uint32_t timestamp;
 			
 			URC() : strv(), timestamp(0) {}
 			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), timestamp(timestamp) {}
