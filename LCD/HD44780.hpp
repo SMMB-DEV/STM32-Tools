@@ -11,6 +11,7 @@ namespace STM32T
 	{
 		void (* const f_write)(bool rs, uint8_t data);
 		uint8_t (* const f_read)(bool rs);
+		uint8_t m_addressCounter = 0;
 		bool m_twoLines, m_4Bit;
 		
 		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = 50)
@@ -21,6 +22,9 @@ namespace STM32T
 				f_write(rs, data << 4);
 			
 			BusyWait(timeout_us);
+			
+			if (rs)
+				DWT_Delay(4);	// tADD
 		}
 		
 		uint8_t Read(const bool rs)
@@ -29,6 +33,14 @@ namespace STM32T
 			
 			if (m_4Bit)
 				data |= (f_read(rs) >> 4);
+			
+			if (rs)
+			{
+				BusyWait(50);
+				DWT_Delay(4);	// tADD
+			}
+			else
+				m_addressCounter = data & 0b0111'1111;
 			
 			return data;
 		}
@@ -43,6 +55,11 @@ namespace STM32T
 			}
 			
 			return true;
+		}
+		
+		void SetAddress(uint8_t addr)
+		{
+			Write(0, 0b1000'0000 | addr);
 		}
 		
 	public:
@@ -77,11 +94,76 @@ namespace STM32T
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
 			
 			Write(0, 0b0000'1100);			// Display on, Cursor off, Blink off
-			Write(0, 0b0000'0001, 1600);	// Display clear
+			ClearScreen();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
 		}
+		
+		void ClearScreen()
+		{
+			Write(0, 0b0000'0001, 1600);	// Display clear
+		}
+		
+		void NextLine()
+		{
+			if (m_twoLines)
+				SetAddress((m_addressCounter & 0x40) + 0x40);	// 0x00 or 0x40
+		}
+		
+		void Gotoxl(uint8_t x, uint8_t l)
+		{
+			if (m_twoLines)
+				SetAddress(l * 0x40 + x % 0x40);
+			else
+				SetAddress(x);
+		}
+		
+		__attribute__((always_inline)) HD44780& xl(uint8_t x, uint8_t l) { Gotoxl(x, l); return *this; }
+		
 		void PutChar(const uint8_t ch, bool interpret_specials = true) override
 		{
+			if (interpret_specials)
+			{
+				switch (ch)
+				{
+					case '\n':
+					case '\r':
+					{
+						NextLine();
+						return;
+					}
+					
+					/*case '\b':
+					{
+						const uint16_t s = m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1);
+						const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
+						
+						Goto(cursor, line);
+						PutChar(' ');
+						Goto(cursor, line);
+						
+						return;
+					}*/
+					
+					case '\t':
+					{
+						PutChar(' ');
+						PutChar(' ');
+						
+						return;
+					}
+					
+					/*case 127:	//DEL
+					{
+						uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
+						PutChar(' ');
+						Goto(cursor, line);
+						
+						return;
+					}*/
+				}
+			}
+			
+			Write(1, ch);
 		}
 	};
 }
