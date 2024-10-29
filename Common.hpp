@@ -34,11 +34,26 @@ namespace STM32T
 		return x * 1024;
 	}
 	
+	static constexpr uint8_t operator"" _u8(unsigned long long x) noexcept
+	{
+		return x;
+	}
+
+	static constexpr uint16_t operator"" _u16(unsigned long long x) noexcept
+	{
+		return x;
+	}
+	
 	template<class T>
 	union share_arr
 	{
+		static_assert(!std::is_same_v<T, uint8_t>);
+		
 		uint8_t arr[sizeof(T)];
 		T val;
+		
+		share_arr() = default;
+		share_arr(const T& val) : val(val) {}
 	};
 	
 	template<typename T, typename BUF_TYPE = char*>

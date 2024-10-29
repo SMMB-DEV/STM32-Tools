@@ -45,14 +45,12 @@ namespace STM32T
 			assert_param(IS_GPIO_PIN(Pin));
 		}
 		
-		~IO() {}
-		
 		__attribute__((always_inline)) bool Read()
 		{
 			return (bool)(Port->IDR & Pin) ^ active_low;
 		}
 		
-		__attribute__((always_inline)) bool OutGet()
+		__attribute__((always_inline)) bool Check()
 		{
 			return (bool)(Port->ODR & Pin) ^ active_low;
 		}
@@ -74,13 +72,13 @@ namespace STM32T
 		}
 		
 		template<typename T = uint32_t>
-		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay)
+		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
-			Set();
+			Set(state);
 			delay(time);
-			Reset();
+			Set(!state);
 		}
 		
 		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
