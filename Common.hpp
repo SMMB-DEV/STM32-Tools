@@ -24,22 +24,22 @@ namespace STM32T
 	template <class F>
 	using func = std::function<F>;
 
-	constexpr size_t operator"" _Ki(unsigned long long x) noexcept
+	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
 		return x * 1024;
 	}
 	
-	constexpr size_t operator"" _Ki(long double x) noexcept
+	inline constexpr size_t operator"" _Ki(long double x) noexcept
 	{
 		return x * 1024;
 	}
 	
-	static constexpr uint8_t operator"" _u8(unsigned long long x) noexcept
+	inline constexpr uint8_t operator"" _u8(unsigned long long x) noexcept
 	{
 		return x;
 	}
 
-	static constexpr uint16_t operator"" _u16(unsigned long long x) noexcept
+	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept
 	{
 		return x;
 	}
@@ -57,7 +57,7 @@ namespace STM32T
 	};
 	
 	template<typename T, typename BUF_TYPE = char*>
-	T pack_be(BUF_TYPE buf)
+	inline T pack_be(BUF_TYPE buf)
 	{
 		{
 			using namespace std;
@@ -77,7 +77,7 @@ namespace STM32T
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	T pack_le(BUF_TYPE buf)
+	inline T pack_le(BUF_TYPE buf)
 	{
 		{
 			using namespace std;
@@ -103,7 +103,7 @@ namespace STM32T
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	void unpack_be(BUF_TYPE buf, T val)
+	inline void unpack_be(BUF_TYPE buf, T val)
 	{
 		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
@@ -113,7 +113,7 @@ namespace STM32T
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	void unpack_le(BUF_TYPE buf, T val)
+	inline void unpack_le(BUF_TYPE buf, T val)
 	{
 		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
@@ -128,7 +128,7 @@ namespace STM32T
 	}
 	
 	template<typename T>
-	T le2be(const T t)
+	inline T le2be(const T t)
 	{
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
 		
@@ -422,4 +422,17 @@ namespace STM32T
 		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
+	
+	/**
+	* @param TABLE - Must have 256 values.
+	* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
+	*/
+	template <const uint8_t * TABLE>
+	inline uint8_t CRC8(const uint8_t * const data, const size_t len, uint8_t crc_init = 0)
+	{
+		for (size_t i = 0; i < len; i++)
+			crc_init = TABLE[data[i] ^ crc_init];
+
+		return crc_init;
+	}
 }
