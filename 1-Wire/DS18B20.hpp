@@ -1,8 +1,8 @@
 #pragma once
 
-#include "./IO.hpp"
-#include "./Timing.hpp"
-#include "./Common.hpp"
+#include "../IO.hpp"
+#include "../Timing.hpp"
+#include "../Common.hpp"
 
 #include <optional>
 
@@ -49,7 +49,7 @@ namespace STM32T
 		};
 		
 		// Reflected
-		static constexpr uint8_t CRC8_TABLE[256] =
+		static constexpr uint8_t TABLE[256] =
 		{
 			0x00, 0x5E, 0xBC, 0xE2, 0x61, 0x3F, 0xDD, 0x83, 0xC2, 0x9C, 0x7E, 0x20, 0xA3, 0xFD, 0x1F, 0x41,
 			0x9D, 0xC3, 0x21, 0x7F, 0xFC, 0xA2, 0x40, 0x1E, 0x5F, 0x01, 0xE3, 0xBD, 0x3E, 0x60, 0x82, 0xDC,
@@ -75,19 +75,6 @@ namespace STM32T
 		
 		IO m_dq;
 		uint8_t m_bits = 12;
-		
-		
-		/**
-		* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html
-		*/
-		static uint8_t CRC8(const uint8_t * data, const uint8_t len)
-		{
-			uint8_t crc = 0;
-			for (uint8_t i = 0; i < len; i++)
-				crc = CRC8_TABLE[data[i] ^ crc];
-
-			return crc;
-		}
 		
 		bool Init()
 		{
@@ -179,7 +166,7 @@ namespace STM32T
 			SendCmd(CMD::READ_SCRATCHPAD);
 			ReadBytes(buf, 9);
 			
-			return CRC8(buf, 9) == 0;
+			return CRC8<TABLE>(buf, 9) == 0;
 		}
 		
 	public:
@@ -198,7 +185,7 @@ namespace STM32T
 			share_arr<uint64_t> id;
 			ReadBytes(id.arr, sizeof(id));
 			
-			if (CRC8(id.arr, sizeof(id)) != 0)
+			if (CRC8<TABLE>(id.arr, sizeof(id)) != 0)
 				return std::nullopt;
 			
 			return id.val;
