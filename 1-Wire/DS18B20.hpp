@@ -173,7 +173,7 @@ namespace STM32T
 		/**
 		* @param dq - Must be open-drain and pulled up.
 		*/
-		DS18B20(STM32T::IO dq) : m_dq(dq) {}
+		DS18B20(IO dq) : m_dq(dq) {}
 		
 		std::optional<uint64_t> ReadSingleID()
 		{
