@@ -51,9 +51,6 @@ namespace STM32T
 		
 		uint8_t arr[sizeof(T)];
 		T val;
-		
-		share_arr() = default;
-		share_arr(const T& val) : val(val) {}
 	};
 	
 	template<typename T, typename BUF_TYPE = char*>
