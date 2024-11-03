@@ -60,7 +60,6 @@ namespace STM32T
 			m_sda.Reset();
 			HAL_Delay(BEGIN_MS);
 			m_sda.Set();
-			//DWT_Delay(20);
 			
 			// Response signal
 			if (!m_sda.Wait(false, RESP_DELAY_MAX, DWT_GetTick) ||

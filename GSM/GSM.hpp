@@ -53,7 +53,7 @@ namespace STM32T
 		};
 		
 	protected:
-		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 200, DEFAULT_IDLE_TIMEOUT = 10;
+		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 300, DEFAULT_IDLE_TIMEOUT = 20;
 		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
 		
 		
@@ -170,6 +170,24 @@ namespace STM32T
 			return ErrorCode::UNKNOWN;
 		}
 		
+		ErrorCode Error(const vec<strv>& tokens)
+		{
+			for (size_t i = 0; i < tokens.size(); i++)
+			{
+				if (tokens[i].find("ERROR"sv) != strv::npos)
+				{
+					for (i = i + 1; i < tokens.size(); i++)
+						addURC(tokens[i]);
+					
+					return ErrorCode::ERR;
+				}
+				
+				addURC(tokens[i]);
+			}
+			
+			return ErrorCode::UNKNOWN;
+		}
+		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv& cmd, const func<ErrorCode (strv)>& handler, const strv& args = strv())
 		{
@@ -253,6 +271,7 @@ namespace STM32T
 				if (tokens.size() != expectedTokens)
 					return Standard(tokens);
 				
+				const auto first = tokens[0];
 				bool ok = CompareAndRemove(tokens[0], cmd) && CompareAndRemove(tokens[0], ": "sv);
 				
 				if (expectedTokens > 1)
@@ -263,6 +282,8 @@ namespace STM32T
 				
 				if (!ok)
 				{
+					tokens[0] = first;
+					
 					for (const auto& token : tokens)
 						addURC(token);
 					
@@ -270,7 +291,7 @@ namespace STM32T
 				}
 				
 				//return op ? op(tokens) : Standard(tokens);
-				return op ? op(tokens) : ErrorCode::OK;
+				return op ? op(tokens) : ErrorCode::OK;		// fixme: Doesn't handle URCs!
 			});
 		}
 		
@@ -298,6 +319,34 @@ namespace STM32T
 			return FirstLastToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode StrToken(char * const buf, const size_t max_len, const strv& cmd, const CommandType type, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT, const strv& args = strv())
+		{
+			return Tokens<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
+			{
+				if (tokens.size() < 2 || tokens.back() != "OK"sv)
+					return Error(tokens);
+				
+				tokens.pop_back();
+				
+				size_t len = 0;
+				for (auto& token : tokens)
+				{
+					const size_t copy_len = std::min(token.size(), (max_len - 1) - len - 2 /*\r\n*/);
+					
+					memcpy(buf + len, token.data(), copy_len);
+					len += copy_len;
+					
+					buf[len++] = '\r';
+					buf[len++] = '\n';
+				}
+				
+				buf[len - 2] = 0;	// Ignore last \r\n
+				
+				return ErrorCode::OK;
+			});
+		}
+		
 	public:
 		GSM(UART_HandleTypeDef* uart) : p_huart(uart) {}
 		
@@ -310,6 +359,26 @@ namespace STM32T
 		{
 			uint16_t temp;
 			Command(0, CommandType::Execute, command, strv(), nullptr, temp);
+		}
+		
+		ErrorCode GetBrand(char * const buf, const size_t max_len)
+		{
+			return StrToken(buf, max_len, "+CGMI"sv, CommandType::Execute);
+		}
+		
+		ErrorCode GetModel(char * const buf, const size_t max_len)
+		{
+			return StrToken(buf, max_len, "+CGMM"sv, CommandType::Execute);
+		}
+		
+		ErrorCode GetRevision(char * const buf, const size_t max_len)
+		{
+			return StrToken(buf, max_len, "+CGMR"sv, CommandType::Execute);
+		}
+		
+		ErrorCode GetIMEI(char * const buf, const size_t max_len)
+		{
+			return StrToken(buf, max_len, "+CGSN"sv, CommandType::Execute);
 		}
 	};
 #endif	// HAL_UART_MODULE_ENABLED
