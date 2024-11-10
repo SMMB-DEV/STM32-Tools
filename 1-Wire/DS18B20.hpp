@@ -182,7 +182,7 @@ namespace STM32T
 			
 			SendCmd(CMD::READ_ROM);
 			
-			share_arr<uint64_t> id;
+			shared_arr<uint64_t> id;
 			ReadBytes(id.arr, sizeof(id));
 			
 			if (CRC8<TABLE>(id.arr, sizeof(id)) != 0)

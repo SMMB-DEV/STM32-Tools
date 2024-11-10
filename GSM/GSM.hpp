@@ -319,32 +319,23 @@ namespace STM32T
 			return FirstLastToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
+		/**
+		* @param len - Must be at least {size of str} + 10.
+		*/
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode StrToken(char * const buf, const size_t max_len, const strv& cmd, const CommandType type, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT, const strv& args = strv())
+		ErrorCode StrToken(char * const buf, uint16_t len, const strv& cmd, const CommandType type, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT, const strv& args = strv())
 		{
-			return Tokens<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
-			{
-				if (tokens.size() < 2 || tokens.back() != "OK"sv)
-					return Error(tokens);
-				
-				tokens.pop_back();
-				
-				size_t len = 0;
-				for (auto& token : tokens)
-				{
-					const size_t copy_len = std::min(token.size(), (max_len - 1) - len - 2 /*\r\n*/);
-					
-					memcpy(buf + len, token.data(), copy_len);
-					len += copy_len;
-					
-					buf[len++] = '\r';
-					buf[len++] = '\n';
-				}
-				
-				buf[len - 2] = 0;	// Ignore last \r\n
-				
-				return ErrorCode::OK;
-			});
+			ErrorCode code = Command(timeout, type, cmd, args, buf, len);
+			if (code != ErrorCode::OK)
+				return code;
+			
+			if (strncmp(buf + len - 8, "\r\n\r\nOK\r\n", 8) != 0 || strncmp(buf, "\r\n", 2) != 0)
+				return ErrorCode::UNKNOWN;
+			
+			memmove(buf, buf + 2, len - 10);
+			buf[len - 10] = 0;
+			
+			return ErrorCode::OK;
 		}
 		
 	public:

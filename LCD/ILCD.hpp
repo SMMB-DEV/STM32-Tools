@@ -43,5 +43,13 @@ namespace STM32T
 			
 			PutStr(buf);
 		}
+		
+		template <typename T>
+		void PutNum(const T t)
+		{
+			static_assert(std::is_scalar_v<T>);
+			
+			PutStrf(std::is_signed_v<T> ? "%d" : "%u", t);
+		}
 	};
 }

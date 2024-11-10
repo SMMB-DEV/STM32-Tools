@@ -45,7 +45,7 @@ namespace STM32T
 	}
 	
 	template<class T>
-	union share_arr
+	union shared_arr
 	{
 		static_assert(!std::is_same_v<T, uint8_t>);
 		
