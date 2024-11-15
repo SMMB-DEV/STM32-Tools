@@ -116,13 +116,13 @@ namespace STM32T
 			{
 				uint16_t len2 = len - 1;	// Hopefully len isn't 0.
 				ErrorCode stat = ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT);
-				if (stat != ErrorCode::OK)
+				if (stat != OK)
 					return stat;
 				
 				buffer[len = len2] = 0;		// Make it safe for C str functions
 			}
 			
-			return ErrorCode::OK;
+			return OK;
 		}
 		
 		[[deprecated]] ErrorCode Command(vec<strv>& tokens, char* buffer, uint16_t len, const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const bool allowSingleEnded = false)
@@ -146,14 +146,14 @@ namespace STM32T
 			
 			len--;		// Hopefully len isn't 0.
 			ErrorCode stat = ReceiveUART(buffer, len, timeout, DEFAULT_IDLE_TIMEOUT);
-			if (stat != ErrorCode::OK)
+			if (stat != OK)
 				return stat;
 			
 			buffer[len] = 0;	// make it safe for C str functions
 			
 			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
 			
-			return ErrorCode::OK;
+			return OK;
 		}
 		
 		bool CompareAndRemove(strv& token, const strv& remove)
@@ -206,13 +206,16 @@ namespace STM32T
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const strv args = strv())
 		{
+			if (!handler)
+				return INVALID_PARAM;
+			
 			char buffer[LEN];
 			uint16_t len = sizeof(buffer);
 			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
 			if (code != ErrorCode::OK)
 				return code;
 			
-			return handler ? handler(strv(buffer, len)) : ErrorCode::INVALID_PARAM;
+			return handler(strv(buffer, len));
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -243,13 +246,35 @@ namespace STM32T
 			const func<ErrorCode (vec<strv>&)>& op = nullptr, const bool allowSingleEnded = false)
 		{
 			char buffer[LEN];
-			vec<strv> tokens;
-			ErrorCode code = Command(tokens, buffer, sizeof(buffer), timeout, type, cmd, args, allowSingleEnded);
-			if (code != ErrorCode::OK)
+			uint16_t len = sizeof(buffer);
+			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
+			if (code != OK)
 				return code;
+			
+			vec<strv> tokens;
+			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
 			
 			// fixme: Standard() might not return the correct code.
 			return op ? op(tokens) : Standard(tokens);
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args,
+			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded = false)
+		{
+			if (!op)
+				return INVALID_PARAM;
+			
+			char buffer[LEN];
+			uint16_t len = sizeof(buffer);
+			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
+			if (code != OK)
+				return code;
+			
+			vec<strv> tokens;
+			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
+			
+			return op(tokens);
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -282,16 +307,19 @@ namespace STM32T
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const strv token = "OK"sv, const bool allowSingleEnded = false)
 		{
-			return Tokens(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
-			{
-				if (tokens.size() != 1 || tokens[0] != token)
-				{
-					addURCs(tokens);
-					return WRONG_FORMAT;
-				}
-				
-				return OK;
-			}, allowSingleEnded);
+			char buffer[LEN];
+			uint16_t len = sizeof(buffer);
+			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
+			if (code != OK)
+				return code;
+			
+			vec<strv> tokens;
+			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
+			
+			if (tokens.size() != 1 || tokens[0] != token)
+				return Error(tokens);
+			
+			return OK;
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -358,7 +386,7 @@ namespace STM32T
 			const func<ErrorCode (vec<strv>&)>& op, const char* const fmt, ...)
 		{
 			if (!fmt)
-				return ErrorCode::INVALID_PARAM;
+				return INVALID_PARAM;
 			
 			char args[ARG_LEN];
 			
@@ -367,24 +395,27 @@ namespace STM32T
 			
 			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			if (argsLen < 0)
-				return ErrorCode::UNKNOWN;
+				return INVALID_PARAM;
 			
 			va_end(print_args);
 			
 			if (argsLen > sizeof(args))	// Did not fit inside {args}
 			{
 				Error_Handler();
-				return ERR;
+				return INVALID_PARAM;
 			}
 			
 			return FirstLastToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const size_t ok_pos = SIZE_MAX,
-			const func<ErrorCode (vec<strv>&)>& op = nullptr)
+		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
+			const func<ErrorCode (vec<strv>&)>& op)
 		{
-			return Tokens<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
+			if (!op)
+				return INVALID_PARAM;
+			
+			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
 			{
 				bool ok = tokens.size() == expectedTokens;
 				
@@ -413,13 +444,75 @@ namespace STM32T
 			});
 		}
 		
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const size_t ok_pos,
+			const func<ErrorCode (vec<strv>&)>& op, const char * const fmt, ...)
+		{
+			if (!fmt)
+				return INVALID_PARAM;
+			
+			char args[ARG_LEN];
+			
+			va_list print_args;
+			va_start(print_args, fmt);
+			
+			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			if (argsLen < 0)
+				return INVALID_PARAM;
+			
+			va_end(print_args);
+			
+			if (argsLen > sizeof(args))		// Did not fit inside {args}
+			{
+				Error_Handler();
+				return INVALID_PARAM;
+			}
+			
+			return ResponseToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), ok_pos, op);
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv& cmd, const strv args, const func<ErrorCode (strv)>& op)
+		{
+			ErrorCode code = SingleToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, cmd, args);
+			if (code != OK)
+				return code;
+			
+			return ResponseToken<LEN>(1, timeout, CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
+		}
+		
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv& cmd, const func<ErrorCode (strv)>& op, const char * const fmt, ...)
+		{
+			if (!fmt)
+				return INVALID_PARAM;
+			
+			char args[ARG_LEN];
+			
+			va_list print_args;
+			va_start(print_args, fmt);
+			
+			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			if (argsLen < 0)
+				return INVALID_PARAM;
+			
+			va_end(print_args);
+			
+			if (argsLen > sizeof(args))		// Did not fit inside {args}
+			{
+				Error_Handler();
+				return INVALID_PARAM;
+			}
+			
+			return DelayedResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op);
+		}
+		
 		/**
 		* @param len - Must be at least {size of str} + 10.
 		*/
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode StrToken(char * const buf, uint16_t len, const strv cmd, const CommandType type, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT, const strv args = strv())
+		ErrorCode StrToken(char * const buf, uint16_t len, const strv cmd, const CommandType type, const strv args = strv())
 		{
-			ErrorCode code = Command(timeout, type, cmd, args, buf, len);
+			ErrorCode code = Command(DEFAUL_RECEIVE_TIMEOUT, type, cmd, args, buf, len);
 			if (code != ErrorCode::OK)
 				return code;
 			
