@@ -44,6 +44,14 @@ namespace STM32T
 		return x;
 	}
 	
+	template <typename T>
+	inline constexpr T ceil(T x, T y)
+	{
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+		
+		return x / y + (x % y != 0);
+	}
+	
 	template<class T>
 	union shared_arr
 	{

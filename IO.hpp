@@ -104,7 +104,7 @@ namespace STM32T
 		template <typename T>
 		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
 			const T startTime = get_tick();
 			while (Read() != desired_state)
@@ -119,7 +119,7 @@ namespace STM32T
 		template <typename T>
 		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
 			T elapsed = 0;
 			const T startTime = get_tick();

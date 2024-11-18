@@ -12,6 +12,10 @@ namespace STM32T
 	*/
 	class W25Q128JV
 	{
+	public:
+		using addr_t = uint32_t;
+		
+	private:
 		enum CMD : uint8_t
 		{
 			READ_JEDEC_ID = 0x9F,
@@ -48,7 +52,7 @@ namespace STM32T
 			}
 		};
 		
-		static constexpr uint32_t MAX_ADDRESS = 0x00FF'FFFF, NO_ADDRESS = 0xFFFF'FFFF;
+		static constexpr addr_t MAX_ADDRESS = 0x00FF'FFFF, NO_ADDRESS = 0xFFFF'FFFF;
 		
 		
 		
@@ -92,7 +96,7 @@ namespace STM32T
 		/**
 		* @brief Performs a write operation with an optional 24-bit address and optional data.
 		*/
-		bool Write(const CMD cmd, const uint32_t addr, const uint8_t * const buf, const uint16_t len)
+		bool Write(const CMD cmd, const addr_t addr, const uint8_t * const buf, const uint16_t len)
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 			
@@ -167,14 +171,14 @@ namespace STM32T
 		* @param addr - 24-bit address for data.
 		* @retval True if len bytes were successfully read.
 		*/
-		bool ReadData(const uint32_t addr, uint8_t * const data, const uint16_t len)
+		bool ReadData(const addr_t addr, uint8_t * const data, const uint16_t len)
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 			return addr <= MAX_ADDRESS and Read(READ_DATA, data, len, strv((char *)_addr, sizeof(_addr)));
 		}
 		
 		template <class T>
-		bool Read(const uint32_t addr, T& t)
+		bool Read(const addr_t addr, T& t)
 		{
 			return ReadData(addr, (uint8_t *)&t, sizeof(T));
 		}
@@ -193,15 +197,15 @@ namespace STM32T
 		}
 		
 		/**
-		* @param len - Max. 256 (PAGE_SIZE)
+		* @param len - If zero, considered 256. Int narrowing will take care of making sure it's not more than 256 (W25Q page size).
 		*/
-		bool WriteData(const uint32_t addr, const uint8_t * const data, const uint16_t len)
+		bool WriteData(const addr_t addr, const uint8_t * const data, const uint8_t len)
 		{
-			return len <= PAGE_SIZE and SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len) and BusyWait(3);
+			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len ? len : 256) and BusyWait(3);
 		}
 		
 		template <class T>
-		bool Write(const uint32_t addr, const T& t)
+		bool Write(const addr_t addr, const T& t)
 		{
 			return WriteData(addr, (uint8_t *)&t, sizeof(T));
 		}
@@ -212,7 +216,7 @@ namespace STM32T
 			return SingleByte(WRITE_ENABLE) and Write(WRITE_STATUS1, NO_ADDRESS, (uint8_t *)&status, 2) and Write(WRITE_STATUS3, NO_ADDRESS, (uint8_t *)(&status) + 2, 1) and BusyWait(15);
 		}
 		
-		bool Erase(const uint32_t addr, const ET erase_type)
+		bool Erase(const addr_t addr, const ET erase_type)
 		{
 			static constexpr uint32_t DELAY[16] = { 400, 0, 1600, 0, 0, 0, 0, 200'000, 2000, 0 };	// lookup table for max delay
 			return SingleByte(WRITE_ENABLE) and Write((CMD)erase_type, addr, nullptr, 0) and BusyWait(DELAY[(uint8_t)erase_type & 0x0F]);
