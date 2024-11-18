@@ -54,7 +54,7 @@ namespace STM32T
 		
 	protected:
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 300, DEFAULT_IDLE_TIMEOUT = 20;
-		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
+		static constexpr size_t DEFAULT_RESPONSE_LEN = 63, DEFAULT_ARG_LEN = 63;
 		
 		
 		UART_HandleTypeDef* const p_huart;
@@ -115,9 +115,8 @@ namespace STM32T
 			if (buffer)
 			{
 				uint16_t len2 = len - 1;	// Hopefully len isn't 0.
-				ErrorCode stat = ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT);
-				if (stat != OK)
-					return stat;
+				if (ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT) != OK)
+					return UART_ERR;
 				
 				buffer[len = len2] = 0;		// Make it safe for C str functions
 			}
@@ -145,9 +144,8 @@ namespace STM32T
 				SendUART("\r"sv);
 			
 			len--;		// Hopefully len isn't 0.
-			ErrorCode stat = ReceiveUART(buffer, len, timeout, DEFAULT_IDLE_TIMEOUT);
-			if (stat != OK)
-				return stat;
+			if (ReceiveUART(buffer, len, timeout, DEFAULT_IDLE_TIMEOUT) != OK)
+				return UART_ERR;
 			
 			buffer[len] = 0;	// make it safe for C str functions
 			
@@ -185,22 +183,22 @@ namespace STM32T
 			return ErrorCode::UNKNOWN;
 		}
 		
-		ErrorCode Error(const vec<strv>& tokens)
+		ErrorCode Error(vec<strv>& tokens)
 		{
+			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
 				if (tokens[i].find("ERROR"sv) != strv::npos)
 				{
-					for (i = i + 1; i < tokens.size(); i++)
-						addURC(tokens[i]);
-					
-					return ErrorCode::ERR;
+					tokens.erase(tokens.begin() + i);
+					ret = ERR;
+					break;
 				}
-				
-				addURC(tokens[i]);
 			}
 			
-			return ErrorCode::UNKNOWN;
+			addURCs(tokens);
+			
+			return ret;
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -209,7 +207,7 @@ namespace STM32T
 			if (!handler)
 				return INVALID_PARAM;
 			
-			char buffer[LEN];
+			char buffer[LEN + 1];
 			uint16_t len = sizeof(buffer);
 			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
 			if (code != ErrorCode::OK)
@@ -224,7 +222,7 @@ namespace STM32T
 			if (!fmt)
 				return ErrorCode::INVALID_PARAM;
 			
-			char args[ARG_LEN];
+			char args[ARG_LEN + 1];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
@@ -245,7 +243,7 @@ namespace STM32T
 		[[deprecated]] ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(),
 			const func<ErrorCode (vec<strv>&)>& op = nullptr, const bool allowSingleEnded = false)
 		{
-			char buffer[LEN];
+			char buffer[LEN + 1];
 			uint16_t len = sizeof(buffer);
 			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
 			if (code != OK)
@@ -265,7 +263,7 @@ namespace STM32T
 			if (!op)
 				return INVALID_PARAM;
 			
-			char buffer[LEN];
+			char buffer[LEN + 1];
 			uint16_t len = sizeof(buffer);
 			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
 			if (code != OK)
@@ -284,7 +282,7 @@ namespace STM32T
 			if (!fmt)
 				return ErrorCode::INVALID_PARAM;
 			
-			char args[ARG_LEN];
+			char args[ARG_LEN + 1];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
@@ -307,19 +305,13 @@ namespace STM32T
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const strv token = "OK"sv, const bool allowSingleEnded = false)
 		{
-			char buffer[LEN];
-			uint16_t len = sizeof(buffer);
-			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
-			if (code != OK)
-				return code;
-			
-			vec<strv> tokens;
-			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
-			
-			if (tokens.size() != 1 || tokens[0] != token)
-				return Error(tokens);
-			
-			return OK;
+			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
+			{
+				if (tokens.size() != 1 || tokens[0] != token)
+					return Error(tokens);
+				
+				return OK;
+			});
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -328,7 +320,7 @@ namespace STM32T
 			if (!fmt)
 				return ErrorCode::INVALID_PARAM;
 			
-			char args[ARG_LEN];
+			char args[ARG_LEN + 1];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
@@ -358,7 +350,7 @@ namespace STM32T
 					return Standard(tokens);
 				
 				const auto first = tokens[0];
-				bool ok = CompareAndRemove(tokens[0], cmd) && CompareAndRemove(tokens[0], ": "sv);
+				bool ok = CompareAndRemove(tokens[0], cmd) && (CompareAndRemove(tokens[0], ": "sv) || CompareAndRemove(tokens[0], ":"sv));
 				
 				if (expectedTokens > 1)
 				{
@@ -388,7 +380,7 @@ namespace STM32T
 			if (!fmt)
 				return INVALID_PARAM;
 			
-			char args[ARG_LEN];
+			char args[ARG_LEN + 1];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
@@ -429,18 +421,53 @@ namespace STM32T
 				if (ok)
 				{
 					const auto first = tokens[0];
-					ok &= CompareAndRemove(tokens[0], cmd) && CompareAndRemove(tokens[0], ": "sv);
+					ok &= CompareAndRemove(tokens[0], cmd) && (CompareAndRemove(tokens[0], ": "sv) || CompareAndRemove(tokens[0], ":"sv));
 					if (!ok)
 						tokens[0] = first;
 				}
 				
-				if (!ok || !op)
+				if (!ok)
 				{
 					addURCs(tokens);
 					return ok ? OK : UNKNOWN;
 				}
 				
 				return op(tokens);
+			});
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos, const func<ErrorCode (strv)>& op)
+		{
+			if (!op)
+				return INVALID_PARAM;
+			
+			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
+			{
+				bool ok = tokens.size() == expectedTokens;
+				
+				if (ok && ok_pos < expectedTokens)
+				{
+					ok &= tokens[ok_pos] == "OK"sv;
+					if (ok)
+						tokens.erase(tokens.begin() + ok_pos);
+				}
+				
+				if (ok)
+				{
+					const auto first = tokens[0];
+					ok &= CompareAndRemove(tokens[0], cmd) && (CompareAndRemove(tokens[0], ": "sv) || CompareAndRemove(tokens[0], ":"sv));
+					if (!ok)
+						tokens[0] = first;
+				}
+				
+				if (!ok)
+				{
+					addURCs(tokens);
+					return UNKNOWN;
+				}
+				
+				return op(tokens[0]);
 			});
 		}
 		
@@ -451,7 +478,7 @@ namespace STM32T
 			if (!fmt)
 				return INVALID_PARAM;
 			
-			char args[ARG_LEN];
+			char args[ARG_LEN + 1];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
@@ -472,9 +499,9 @@ namespace STM32T
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv& cmd, const strv args, const func<ErrorCode (strv)>& op)
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
-			ErrorCode code = SingleToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, cmd, args);
+			ErrorCode code = SingleToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, args);
 			if (code != OK)
 				return code;
 			
@@ -482,7 +509,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv& cmd, const func<ErrorCode (strv)>& op, const char * const fmt, ...)
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& op, const char * const fmt, ...)
 		{
 			if (!fmt)
 				return INVALID_PARAM;

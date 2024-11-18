@@ -45,12 +45,12 @@ namespace STM32T
 			assert_param(IS_GPIO_PIN(Pin));
 		}
 		
-		__attribute__((always_inline)) bool Read()
+		__attribute__((always_inline)) bool Read() const
 		{
 			return (bool)(Port->IDR & Pin) ^ active_low;
 		}
 		
-		__attribute__((always_inline)) bool Check()
+		__attribute__((always_inline)) bool Check() const
 		{
 			return (bool)(Port->ODR & Pin) ^ active_low;
 		}
@@ -102,7 +102,7 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick)
+		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
@@ -117,7 +117,7 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick)
+		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
