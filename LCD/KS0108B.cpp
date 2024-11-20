@@ -671,6 +671,8 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
+		//DWT_Init();
+		
 		f_setCS(0xFF);
 		
 		Display(1);

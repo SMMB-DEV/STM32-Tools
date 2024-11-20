@@ -25,9 +25,11 @@ namespace STM32T
 			OK,
 			INVALID_PARAM,
 			UART_ERR,
+			TIMEOUT,
 			WRONG_FORMAT,	// In response
 			ERR,
 			FAIL,			// To execute command (received data was OK)
+			BUF_FULL,
 			UNKNOWN
 		};
 		
