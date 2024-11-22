@@ -329,7 +329,7 @@ namespace STM32T
 		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
 	
-	inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
+	[[deprecated]] inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
 	{
 		// 24-Hour/Binary Format
 		

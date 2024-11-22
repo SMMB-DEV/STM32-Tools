@@ -8,15 +8,14 @@
 
 
 
-#ifndef HAL_UART_TIMEOUT_VALUE
-#define HAL_UART_TIMEOUT_VALUE		(HAL_MAX_DELAY)
-#endif
-
-
-
 namespace STM32T
 {
 #ifdef HAL_UART_MODULE_ENABLED
+	
+#ifndef HAL_UART_TIMEOUT_VALUE
+#define HAL_UART_TIMEOUT_VALUE		(HAL_MAX_DELAY)
+#endif
+	
 	class GSM
 	{
 	public:
@@ -301,7 +300,7 @@ namespace STM32T
 				return ERR;
 			}
 			
-			return Tokens2<LEN>(timeout, type, cmd, strv(args, argsLen), op, allowSingleEnded);
+			return Tokens<LEN>(timeout, type, cmd, strv(args, argsLen), op, allowSingleEnded);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -477,6 +476,33 @@ namespace STM32T
 			return ResponseToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), ok_pos, op);
 		}
 		
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd,
+			const func<ErrorCode (strv)>& op, const bool ok_last, const char * const fmt, ...)
+		{
+			if (!fmt)
+				return INVALID_PARAM;
+			
+			char args[ARG_LEN];
+			
+			va_list print_args;
+			va_start(print_args, fmt);
+			
+			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			if (argsLen < 0)
+				return INVALID_PARAM;
+			
+			va_end(print_args);
+			
+			if (argsLen > sizeof(args))		// Did not fit inside {args}
+			{
+				Error_Handler();
+				return INVALID_PARAM;
+			}
+			
+			return ResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op, ok_last);
+		}
+		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
@@ -535,6 +561,43 @@ namespace STM32T
 		}
 		
 	public:
+		struct DateTime
+		{
+			static constexpr uint8_t MonthDays[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
+			
+			uint8_t yy, MM, dd, hh, mm, ss;
+			int8_t zz;
+			
+			static bool Parse(DateTime& dt, const strv view)
+			{
+				return 7 == sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
+			}
+			
+			static bool ParseNTP(DateTime& dt, const strv view)
+			{
+				return 7 == sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
+			}
+			
+			static bool IsLeapYear(uint8_t yy)
+			{
+				// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
+				return yy % 4 == 0 && yy != 0;
+			}
+			
+			bool IsSet() const
+			{
+				return yy <= 99 && MM >= 1 && MM <= 12 && dd >= 1 && dd <= MonthDays[MM - 1] + (MM == 2 && IsLeapYear(yy)) && hh <= 23 && mm <= 59 && ss <= 60 && zz >= -47 && zz <= 48;
+			}
+			
+			const char* Format() const
+			{
+				static char fmt[2 + 7 * 3] = { 0 };
+				
+				sprintf(fmt, "20%02hhu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+hhd", yy, MM, dd, hh, mm, ss, zz);
+				return fmt;
+			}
+		};
+		
 		GSM(UART_HandleTypeDef* uart) : p_huart(uart) {}
 		
 		ErrorCode AT()
