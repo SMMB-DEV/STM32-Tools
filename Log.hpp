@@ -55,6 +55,27 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	if (fh != FH_STDOUT) \
 		return fh == FH_STDERR ? 0 : -1; \
 	\
+	if ((ITM_TCR & ITM_TCR_ITMENA_Msk) && /* ITM enabled */ (ITM_TER & (1UL << 0))) /* ITM Port #0 enabled */\
+	{\
+		for (uint32_t i = 0; i < len; i++)\
+		{\
+			while (ITM_PORT0_U32 != 0);\
+			ITM_PORT0_U8 = buf[i];\
+		}\
+		return 0;\
+	}\
+	return -2;\
+}
+
+
+
+#define STM32T_SYS_WRITE_ITM() \
+extern "C" int stdout_putchar(int ch) { return ch; } \
+extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
+{ \
+	if (fh != FH_STDOUT) \
+		return fh == FH_STDERR ? 0 : -1; \
+	\
 	return HAL_UART_Transmit((PHUART), buf, len, HAL_MAX_DELAY) == HAL_OK ? 0 : -1; \
 }
 
@@ -70,7 +91,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	\
 	uint8_t res = USBD_FAIL; \
 	uint32_t start = HAL_GetTick(); \
-	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
+	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100);\
 	return -res; \
 }
 

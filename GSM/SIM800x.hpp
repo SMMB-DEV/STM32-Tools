@@ -6,16 +6,14 @@
 
 #include "GSM.hpp"
 
-#include <Common/Common.hpp>
-
 #include <cstdarg>
 
 
 
 /* The module's echo option must be disabled before using this library. To do this:
-Send "ATE0\r" to the module via the serial port and then send "AT&W" to save the configurations.*/
+Send "ATE0&W\r" to the module via the serial port.*/
 
-class SIM800x : public GSM
+class SIM800x : public STM32T::GSM
 {
 private:
 	static constexpr uint8_t H2D[] =
@@ -127,38 +125,9 @@ public:
 	
 	//todo: replace std::string_view with std::span
 	
-protected:
-	static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 100;	// > 2048 * 10 / 115200
-	static constexpr size_t DEFAULT_RESPONSE_LEN = 32, DEFAULT_ARG_LEN = 32;
-
-	ErrorCode Standard(const vect<strv>& tokens);
-	
-	ErrorCode Command(vect<strv>& tokens, char* buffer, uint16_t len, const uint32_t timeout, const CommandType type, const strv& cmd, const strv& args = strv(), const bool allowSingleEnded = false);
-	
-
-
-	template <size_t LEN = DEFAULT_RESPONSE_LEN>
-	ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv& cmd,
-		const strv& args = strv(), const func<ErrorCode (vect<strv>&)>& op = nullptr, const bool allowSingleEnded = false);
-	
-	template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-	ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv& cmd,
-		const func<ErrorCode (vect<strv>&)>& op, const bool allowSingleEnded = false, const char* const fmt = "", ...);
-	
-	
-	
-	template <size_t LEN = DEFAULT_RESPONSE_LEN>
-	ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv& cmd,
-		const strv& args = strv(), const func<ErrorCode (vect<strv>&)>& op = nullptr);
-	
-	template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-	ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv& cmd,
-		const func<ErrorCode (vect<strv>&)>& op, const char* const fmt = "", ...);
-	
 public:
-	UART_HandleTypeDef* const phuart;
 
-	SIM800x(UART_HandleTypeDef* UART) : phuart(UART) {}
+	SIM800x(UART_HandleTypeDef* UART) : GSM(UART) {}
 	
 	
 	void handleURCs(void (* const handler)(URC urc));
@@ -169,24 +138,24 @@ public:
 		
 		//__HAL_UART_DISABLE(phuart);
 		//__HAL_UART_ENABLE(phuart);	//clears USART_ISR
-		__HAL_UART_CLEAR_FLAG(phuart, UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
+		__HAL_UART_CLEAR_FLAG(p_huart, UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
 		//__HAL_UART_CLEAR_FLAG(phuart, UART_CLEAR_OREF);
 		//__HAL_UART_CLEAR_FLAG(phuart, 0xFFFFFFFF);
 		//HAL_UART_Init(phuart);
 		
-		HAL_StatusTypeDef stat = HAL_UARTEx_ReceiveToIdle_DMA(phuart, (uint8_t*)Buffer, sizeof(Buffer) - 1);	// null termination in ListItem
-		__HAL_DMA_DISABLE_IT(phuart->hdmarx, DMA_IT_HT);	//Disable half transfer interrupt; It is enabled in HAL_UARTEx_ReceiveToIdle_DMA()
+		HAL_StatusTypeDef stat = HAL_UARTEx_ReceiveToIdle_DMA(p_huart, (uint8_t*)Buffer, sizeof(Buffer) - 1);	// null termination in ListItem
+		__HAL_DMA_DISABLE_IT(p_huart->hdmarx, DMA_IT_HT);	//Disable half transfer interrupt; It is enabled in HAL_UARTEx_ReceiveToIdle_DMA()
 		
 		return stat;
 	}
 	
 	HAL_StatusTypeDef cancelURC() __attribute__((always_inline))
 	{
-		return HAL_UART_DMAStop(phuart);
+		return HAL_UART_DMAStop(p_huart);
 	}
 	
 private:
-	void addURC(const strv& token)
+	void addURC(const strv& token) override
 	{
 		if (List)
 		{
@@ -220,8 +189,6 @@ public:
 	
 	
 	ErrorCode Setup();
-	
-	ErrorCode AT(const uint32_t timeout = 10);
 	
 	ErrorCode GetSignalQuality(int8_t& rssi, uint8_t& ber, const uint32_t timeout = 15);
 	

@@ -1,19 +1,15 @@
 // *** TODO: ADD LICENSE ***
 
-#include "KS0108B.hpp"
+#include "./KS0108B.hpp"
 
 #include <algorithm>
-#include <cstdarg>
-#include <cstdio>		// vsnprintf
 
-
-// todo: General cleanup, rename files
 
 
 namespace STM32T
 {
 	static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
-
+	
 	static constexpr uint8_t MAX_CHARS = 130, FONT_WIDTH = 5;
 
 	static constexpr uint8_t Font[MAX_CHARS][FONT_WIDTH] =
@@ -431,8 +427,7 @@ namespace STM32T
 	KS0108B::KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count) :
 			f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
 			m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
-			//m_screenMap(nullptr) {}
-		
+	
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
 
 	/*void KS0108B::SetFa(void)
@@ -665,7 +660,7 @@ namespace STM32T
 		Gotoxy(0, 4);
 		PutStr("Normal");
 		NextLine(2);
-		PutStr("Big", true);
+		PutStrBig("Big");
 		
 		while (1)
 		{
@@ -676,6 +671,8 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
+		//DWT_Init();
+		
 		f_setCS(0xFF);
 		
 		Display(1);
@@ -705,13 +702,14 @@ namespace STM32T
 		memset(m_screenMap, _write, MAX_LINES * m_screenLen);
 	}
 
-	void KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
+	KS0108B& KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
 	{
 		m_row = y % PIXELS_PER_LINE;
 		Goto(x, y / PIXELS_PER_LINE);
+		return *this;
 	}
 
-	void KS0108B::Movexy(const int16_t x, const int8_t y)
+	KS0108B& KS0108B::Movexy(const int16_t x, const int8_t y)
 	{
 		static constexpr uint8_t MAX_PIXELS = PIXELS_PER_LINE * MAX_LINES;
 		
@@ -724,30 +722,38 @@ namespace STM32T
 			_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
 		
 		Gotoxy(_x, _y);
+		return *this;
 	}
 
-	void KS0108B::Gotoxl(const uint8_t x, const uint8_t line)
+	KS0108B& KS0108B::Gotoxl(const uint8_t x, const uint8_t line)
 	{
 		m_row = 0;
 		Goto(x, line);
+		return *this;
 	}
 
-	void KS0108B::WriteByte(const uint8_t byte)
+	void KS0108B::WriteByte(const uint8_t byte, const uint8_t repeat)
 	{
 		if (m_row == 0)
-			Write(byte);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write(byte);
 		else
 		{
-			const uint8_t line = m_line, cursor = m_cursor + MAX_CURSOR * m_page;
+			const uint8_t line = m_line, cursor = LongCursor();
+			
+			// todo: Do all the L & H writes in one page, then move to the next page.
 			
 			//Bottom part
 			SetLine(line + 1);
-			Write_L(byte, m_row, false);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write_L(byte, m_row, i < repeat - 1);	// Don't check for the last byte
 			
 			//Top part
-			SetLine(line);
-			SetCursor(m_cursor, true);
-			Write_H(byte, m_row);
+			//SetLine(line);
+			//SetCursor(m_cursor, true);
+			Goto(cursor, line, true);
+			for (uint8_t i = 0; i < repeat; i++)
+				Write_H(byte, m_row);
 		}
 	}
 
@@ -814,7 +820,7 @@ namespace STM32T
 		Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 	}
 
-	void KS0108B::PutChar(const uint8_t ch, bool big, bool interpret_specials)
+	void KS0108B::PutChar(const uint8_t ch, bool interpret_specials)
 	{
 		//todo: space between characters
 		
@@ -829,20 +835,26 @@ namespace STM32T
 				case '\r':
 				{
 					NextLine();
-					if (big)
-						NextLine();
 					
 					return;
 				}
 				
 				case '\b':
 				{
-					const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * (1 + big);
+					const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1);
 					const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
 					
 					Goto(cursor, line);
-					PutChar(' ', big);
+					PutChar(' ');
 					Goto(cursor, line);
+					
+					return;
+				}
+				
+				case '\t':
+				{
+					PutChar(' ');
+					PutChar(' ');
 					
 					return;
 				}
@@ -850,7 +862,7 @@ namespace STM32T
 				case 127:	//DEL
 				{
 					uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
-					PutChar(' ', big);
+					PutChar(' ');
 					Goto(cursor, line);
 					
 					return;
@@ -858,183 +870,200 @@ namespace STM32T
 			}
 		}
 		
-		uint8_t writeSpace = 1 + big;
+		uint8_t writeSpace = 1;
 		
 		if (m_page == m_pageCount - 1)
 		{
-			uint8_t maxCursor = MAX_CURSOR - (FONT_WIDTH) * (1 + big);
+			uint8_t maxCursor = MAX_CURSOR - FONT_WIDTH;
 			if (m_cursor > maxCursor)
-			{
 				NextLine();
-				if (big)
-					NextLine();
-			}
 			else
-				writeSpace = std::min(1 + big, maxCursor - m_cursor);
+				writeSpace = std::min(1, maxCursor - m_cursor);
 		}
 		
 		const uint8_t line = m_line, cursor = m_page * MAX_CURSOR + m_cursor;
 		
-		if (big)
+		if (m_row == 0)
 		{
-			uint16_t bigCh[FONT_WIDTH] = { 0 };
 			for (uint8_t i = 0; i < FONT_WIDTH; i++)
-			{
-				for (uint8_t j = 0; j < 8; j++)
-					bigCh[i] |= (Font[ch][i] & (1 << j)) << j;
+				Write(Font[ch][i]);
 			
-				bigCh[i] |= bigCh[i] << 1;
-			}
-			
-			
-			if (m_row == 0)
-			{
-				//Low
-				SetLine(line + 1);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-				{
-					Write(bigCh[i] >> PIXELS_PER_LINE);
-					Write(bigCh[i] >> PIXELS_PER_LINE);
-				}
-				
-				if (writeSpace >= 1)
-					Write(0);
-				
-				if (writeSpace == 2)
-					Write(0, false);
-				
-				//High
-				Goto(cursor, line, true);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-				{
-					Write(bigCh[i]);
-					Write(bigCh[i], true, 2);
-				}
-				
-				for (uint8_t i = 0; i < writeSpace; i++)
-					Write(0, true, 2);
-			}
-			else
-			{
-				//Low
-				SetLine(line + 2);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-				{
-					Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
-					Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
-				}
-				
-				if (writeSpace >= 1)
-					Write_L(0, m_row);
-				
-				if (writeSpace == 2)
-					Write_L(0, m_row, false);
-				
-				//Mid
-				Goto(cursor, line + 1, true);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-				{
-					Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
-					Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
-				}
-				
-				if (writeSpace >= 1)
-					Write(0);
-				
-				if (writeSpace == 2)
-					Write(0, false);
-				
-				//High
-				Goto(cursor, line, true);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-				{
-					Write_H(bigCh[i], m_row);
-					Write_H(bigCh[i], m_row, true, 2);
-				}
-				
-				for (uint8_t i = 0; i < writeSpace; i++)
-					Write_H(0, m_row, true, 2);
-			}
+			if (writeSpace)
+				Write(0);
 		}
 		else
 		{
-			if (m_row == 0)
+			SetLine(line + 1);
+			
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+				Write_L(Font[ch][i], m_row);
+			
+			if (writeSpace)
+				Write_L(0, m_row, false);
+			
+			Goto(cursor, line, true);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+				Write_H(Font[ch][i], m_row);
+			
+			if (writeSpace)
+				Write_H(0, m_row);
+		}
+	}
+	
+	void KS0108B::PutCharBig(const uint8_t ch, bool interpret_specials)
+	{
+		//todo: space between characters
+		
+		if (ch >= MAX_CHARS)
+			return;
+		
+		if (interpret_specials)
+		{
+			switch (ch)
 			{
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-					Write(Font[ch][i]);
+				case '\n':
+				case '\r':
+				{
+					NextLine(2);
+					
+					return;
+				}
 				
-				if (writeSpace)
-					Write(0);
+				case '\b':
+				{
+					const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * 2;
+					const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
+					
+					Goto(cursor, line);
+					PutCharBig(' ');
+					Goto(cursor, line);
+					
+					return;
+				}
+				
+				case '\t':
+				{
+					PutCharBig(' ');
+					PutCharBig(' ');
+					
+					return;
+				}
+				
+				case 127:	//DEL
+				{
+					uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
+					PutCharBig(' ');
+					Goto(cursor, line);
+					
+					return;
+				}
 			}
+		}
+		
+		uint8_t writeSpace = 2;
+		
+		if (m_page == m_pageCount - 1)
+		{
+			uint8_t maxCursor = MAX_CURSOR - (FONT_WIDTH) * 2;
+			if (m_cursor > maxCursor)
+				NextLine(2);
 			else
+				writeSpace = std::min(2, maxCursor - m_cursor);
+		}
+		
+		const uint8_t line = m_line, cursor = m_page * MAX_CURSOR + m_cursor;
+		
+		uint16_t bigCh[FONT_WIDTH] = { 0 };
+		for (uint8_t i = 0; i < FONT_WIDTH; i++)
+		{
+			for (uint8_t j = 0; j < 8; j++)
+				bigCh[i] |= (Font[ch][i] & (1 << j)) << j;
+		
+			bigCh[i] |= bigCh[i] << 1;
+		}
+		
+		
+		if (m_row == 0)
+		{
+			//Low
+			SetLine(line + 1);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
-				SetLine(line + 1);
-				
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-					Write_L(Font[ch][i], m_row);
-				
-				if (writeSpace)
-					Write_L(0, m_row, false);
-				
-				Goto(cursor, line, true);
-				for (uint8_t i = 0; i < FONT_WIDTH; i++)
-					Write_H(Font[ch][i], m_row);
-				
-				if (writeSpace)
-					Write_H(0, m_row);
+				Write(bigCh[i] >> PIXELS_PER_LINE);
+				Write(bigCh[i] >> PIXELS_PER_LINE);
 			}
+			
+			if (writeSpace >= 1)
+				Write(0);
+			
+			if (writeSpace == 2)
+				Write(0, false);
+			
+			//High
+			Goto(cursor, line, true);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			{
+				Write(bigCh[i]);
+				Write(bigCh[i], true, 2);
+			}
+			
+			for (uint8_t i = 0; i < writeSpace; i++)
+				Write(0, true, 2);
+		}
+		else
+		{
+			//Low
+			SetLine(line + 2);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			{
+				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
+				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
+			}
+			
+			if (writeSpace >= 1)
+				Write_L(0, m_row);
+			
+			if (writeSpace == 2)
+				Write_L(0, m_row, false);
+			
+			//Mid
+			Goto(cursor, line + 1, true);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			{
+				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
+				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
+			}
+			
+			if (writeSpace >= 1)
+				Write(0);
+			
+			if (writeSpace == 2)
+				Write(0, false);
+			
+			//High
+			Goto(cursor, line, true);
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			{
+				Write_H(bigCh[i], m_row);
+				Write_H(bigCh[i], m_row, true, 2);
+			}
+			
+			for (uint8_t i = 0; i < writeSpace; i++)
+				Write_H(0, m_row, true, 2);
 		}
 	}
 
-	void KS0108B::PutStr(const char* str, bool big)
+	void KS0108B::PutStrBig(const char* str)
 	{
 		while (*str)
-			PutChar(*str++, big);
+			PutCharBig(*str++);
 	}
 
-	void KS0108B::PutStrn(const char* str, uint16_t n, bool big)
+	void KS0108B::PutStrnBig(const char* str, uint16_t n)
 	{
 		for (uint16_t i = 0; i < n; i++)
-			PutChar(str[i], big);
+			PutCharBig(str[i]);
 	}
-	
-	void KS0108B::PutStrf(const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStr(buf);
-	}
-	
-	void KS0108B::PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStrxl(x, line, buf);
-	}
-	
-	void KS0108B::PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...)
-	{
-		char buf[64];
-		
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buf, sizeof(buf), fmt, args);
-		va_end(args);
-		
-		PutStrxy(x, y, buf);
-	}
-	
-	
 	
 	void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
 	{

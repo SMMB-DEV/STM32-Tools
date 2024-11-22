@@ -45,14 +45,12 @@ namespace STM32T
 			assert_param(IS_GPIO_PIN(Pin));
 		}
 		
-		~IO() {}
-		
-		__attribute__((always_inline)) bool Read()
+		__attribute__((always_inline)) bool Read() const
 		{
 			return (bool)(Port->IDR & Pin) ^ active_low;
 		}
 		
-		__attribute__((always_inline)) bool OutGet()
+		__attribute__((always_inline)) bool Check() const
 		{
 			return (bool)(Port->ODR & Pin) ^ active_low;
 		}
@@ -73,14 +71,14 @@ namespace STM32T
 			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);
 		}
 		
-		template<typename T>
-		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay)
+		template<typename T = uint32_t>
+		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
 			
-			Set();
+			Set(state);
 			delay(time);
-			Reset();
+			Set(!state);
 		}
 		
 		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
@@ -104,9 +102,9 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick)
+		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
 			const T startTime = get_tick();
 			while (Read() != desired_state)
@@ -119,9 +117,9 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick)
+		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
 			T elapsed = 0;
 			const T startTime = get_tick();
@@ -137,5 +135,15 @@ namespace STM32T
 			
 			return elapsed;
 		}
+	};
+	
+	
+	
+	struct ScopeIO
+	{
+		IO m_io;
+		
+		ScopeIO(IO io) : m_io(io) { m_io.Set(); }
+		~ScopeIO() { m_io.Reset(); }
 	};
 }

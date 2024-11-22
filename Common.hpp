@@ -20,19 +20,57 @@ namespace STM32T
 {
 	template <class T>
 	using vec = std::vector<T>;
+	
+	template <class F>
+	using func = std::function<F>;
 
-	constexpr size_t operator"" _Ki(unsigned long long x) noexcept
+	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
 		return x * 1024;
 	}
 	
-	constexpr size_t operator"" _Ki(long double x) noexcept
+	inline constexpr size_t operator"" _Ki(long double x) noexcept
 	{
 		return x * 1024;
 	}
+	
+	inline constexpr uint8_t operator"" _u8(unsigned long long x) noexcept
+	{
+		return x;
+	}
+
+	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept
+	{
+		return x;
+	}
+	
+	template <typename T>
+	inline constexpr T ceil(T x, T y)
+	{
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+		
+		return x / y + (x % y != 0);
+	}
+	
+	template<class T>
+	union shared_arr
+	{
+		static_assert(!std::is_same_v<T, uint8_t>);
+		
+		uint8_t arr[sizeof(T)];
+		T val;
+	};
+	
+	struct ScopeAction
+	{
+		const func<void ()>& m_end;
+		
+		ScopeAction(const func<void ()>& end) : m_end(end) {}
+		~ScopeAction() { m_end(); }
+	};
 	
 	template<typename T, typename BUF_TYPE = char*>
-	T pack_be(BUF_TYPE buf)
+	inline T pack_be(BUF_TYPE buf)
 	{
 		{
 			using namespace std;
@@ -52,10 +90,14 @@ namespace STM32T
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	T pack_le(BUF_TYPE buf)
+	inline T pack_le(BUF_TYPE buf)
 	{
-		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		{
+			using namespace std;
+			
+			static_assert(is_same_v<BUF_TYPE, char*> || is_same_v<BUF_TYPE, uint8_t*>);
+			static_assert(!is_same_v<T, bool> && is_integral_v<T>, "");
+		}
 		
 		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
 		{
@@ -66,13 +108,15 @@ namespace STM32T
 				val <<= 8;
 				val |= *--buf;
 			}
+			
+			return val;
 		}
 		else
 			return *(T*)buf;
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	void unpack_be(BUF_TYPE buf, T val)
+	inline void unpack_be(BUF_TYPE buf, T val)
 	{
 		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
@@ -82,7 +126,7 @@ namespace STM32T
 	}
 	
 	template<typename T, typename BUF_TYPE = char*>
-	void unpack_le(BUF_TYPE buf, T val)
+	inline void unpack_le(BUF_TYPE buf, T val)
 	{
 		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
@@ -94,6 +138,23 @@ namespace STM32T
 		}
 		else
 			*(T*)buf = val;
+	}
+	
+	template<typename T>
+	inline T le2be(const T t)
+	{
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
+		
+		union
+		{
+			T t;
+			uint8_t _u8[sizeof(T)];
+		} _t{t};
+		
+		for (uint8_t i = 0; i < sizeof(T) / 2; i++)
+			std::swap(_t._u8[i], _t._u8[sizeof(T) - 1 - i]);
+		
+		return _t.t;
 	}
 	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
@@ -123,7 +184,7 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv& sep, vec<strv>& tokens, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded)
 	{
 		//assuming view is null-terminated.
 		
@@ -135,14 +196,14 @@ namespace STM32T
 			if (end == strv::npos)
 			{
 				if (!ignoreSingleEnded)
-					tokens.push_back(view);
+					tokens.push_back(view);		// This is why the view must be null-terminated.
 			
 				return;
 			}
 			
 			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
 			{
-				((char*)view.data())[end] = '\0';	//no problems with C string functions
+				((char*)view.data())[end] = '\0';	// no problems with C string functions. todo: use std::span
 				tokens.push_back(view.substr(0, end));
 			}
 			
@@ -150,7 +211,7 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv& sep, const std::function<void (strv)>& op, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv& sep, const func<void (strv)>& op, const bool ignoreSingleEnded)
 	{
 		//note: assuming view is null-terminated.
 		//todo: handle {sep} inside string literals
@@ -183,12 +244,12 @@ namespace STM32T
 	{
 		// 24-Hour/Binary Format
 		
-		if (sec == 0 || sec > 2'419'200 || sec < -2'419'200)	// max 28 days; don't want to deal with calculating number of months more than 1
+		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
 			return;
 		
-		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	//February can be 29
+		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
 		
-		//These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
+		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
 		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
 		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
 		
@@ -257,14 +318,14 @@ namespace STM32T
 				days--;
 			}
 			
-			const uint8_t lastMonth = date.Month == 1 ? 12 : date.Month - 1;
+			const uint8_t prevMonth = date.Month == 1 ? 12 : date.Month - 1;
 			date.Date += days;
 			if (date.Date == 0 || date.Date > monthDays)	//underflow
 			{
-				date.Date = MONTH_DAYS[lastMonth - 1] + (lastMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
-				date.Month = lastMonth;
+				date.Date = MONTH_DAYS[prevMonth - 1] + (prevMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
+				date.Month = prevMonth;
 				
-				if (lastMonth == 12)
+				if (prevMonth == 12)
 				{
 					date.Year--;
 					if (date.Year > 100)	//underflow
@@ -273,10 +334,10 @@ namespace STM32T
 			}
 		}
 		
-		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
+		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
 	
-	inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
+	[[deprecated]] inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
 	{
 		// 24-Hour/Binary Format
 		
@@ -374,4 +435,17 @@ namespace STM32T
 		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
+	
+	/**
+	* @param TABLE - Must have 256 values.
+	* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
+	*/
+	template <const uint8_t * TABLE>
+	inline uint8_t CRC8(const uint8_t * const data, const size_t len, uint8_t crc_init = 0)
+	{
+		for (size_t i = 0; i < len; i++)
+			crc_init = TABLE[data[i] ^ crc_init];
+
+		return crc_init;
+	}
 }

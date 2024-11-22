@@ -2,13 +2,15 @@
 
 #pragma once
 
-#include "../Common.hpp"
+#include "./ILCD.hpp"
+
+#include <utility>	// pair
 
 namespace STM32T
 {
-	enum State: uint8_t {initial=0, final, medial, isolated};
+	enum State: uint8_t { initial = 0, final, medial, isolated };
 
-	class Char
+	struct Char
 	{
 	private:
 		uint8_t statecount, *width;
@@ -29,7 +31,7 @@ namespace STM32T
 	/**
 	* @note The RST pin of the LCD must be set high at least 1us after powering on the LCD.
 	*/
-	class KS0108B
+	class KS0108B : public ILCD
 	{
 		// todo: make cursor 16 bits in functions.
 		
@@ -54,9 +56,13 @@ namespace STM32T
 			return line * m_screenLen + cursor;
 		}
 		
+		__attribute__((always_inline)) inline uint8_t LongCursor() const
+		{
+			return m_cursor + MAX_CURSOR * m_page;
+		}
+		
 		bool faset = false, Fa = false;
 		
-		void Command(const bool rs, const bool rw, uint8_t d7_0) const;
 		bool SetPage(const uint8_t page, const bool force = false);
 		void SetLine(const uint8_t line, const bool force = true);		//Lines:0-7
 		void SetCursor(const uint8_t cursor, const bool force = true);	//0-63
@@ -84,6 +90,8 @@ namespace STM32T
 		uint8_t m_cursor = 0, m_row = 0, m_line = 0, m_page = 0;
 		
 	public:
+		KS0108B(const KS0108B&) = delete;
+		KS0108B(KS0108B&&) = delete;
 		
 		/**
 		* @param command - Function to set D0:7, RW, RS and EN pins according to the timing specifications on page 8 of the KS0108B datasheet.
@@ -104,45 +112,27 @@ namespace STM32T
 		* @brief Fills or clears the Screen and goes to (0, 0)
 		*/
 		void ClearScreen(const bool fill = false);
-		void Gotoxy(const uint8_t x, const uint8_t y);
-		void Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
-		void Gotoxl(const uint8_t x, const uint8_t line);
+		KS0108B& Gotoxy(const uint8_t x, const uint8_t y);
+		KS0108B& Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
+		KS0108B& Gotoxl(const uint8_t x, const uint8_t line);
 		
-		void WriteByte(const uint8_t byte);
+		__attribute__((always_inline)) KS0108B& xy(const uint8_t x, const uint8_t y) { return Gotoxy(x, y); }
+		__attribute__((always_inline)) KS0108B& xl(const uint8_t x, const uint8_t line) { return Gotoxl(x, line); }
+		
+		std::pair<uint8_t, uint8_t> Getxy() { return { m_cursor + MAX_CURSOR * m_page, m_line * PIXELS_PER_LINE + m_row }; }
+		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
+		
+		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
 		//uint8_t Read(void);
-		void NextLine(const uint8_t lines = 1);								//Goes to the next line and sets the cursor to 0.
+		void NextLine(const uint8_t lines = 1);								// Goes to the next line and sets the cursor to 0.
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		
-		void PutChar(const uint8_t ch, bool big = false, bool interpret_specials = true);
-		void PutStr(const char* str, bool big = false);
-		void PutStrn(const char* str, uint16_t n, bool big = false);
-		void PutStrf(const char* fmt, ...);
-		void PutStrfxl(const uint8_t x, const uint8_t line, const char* fmt, ...);
-		void PutStrfxy(const uint8_t x, const uint8_t y, const char* fmt, ...);
+		void PutChar(const uint8_t ch, bool interpret_specials = true) override;
 		
-		void PutStrxl(const uint8_t x, const uint8_t line, const char* str)
-		{
-			Gotoxl(x, line);
-			PutStr(str);
-		}
-		
-		void PutStrxy(const uint8_t x, const uint8_t y, const char* str)
-		{
-			Gotoxy(x, y);
-			PutStr(str);
-		}
-		
-		void PutStrnxl(const uint8_t x, const uint8_t line, const char* str, uint16_t n)
-		{
-			Gotoxl(x, line);
-			PutStrn(str, n);
-		}
-		
-		void PutStrvxl(const uint8_t x, const uint8_t line, strv view)
-		{
-			PutStrnxl(x, line, view.data(), view.length());
-		}
+		void PutCharBig(const uint8_t ch, bool interpret_specials = true);
+		void PutStrBig(const char* str);
+		void PutStrnBig(const char* str, uint16_t n);
 		
 		//void PutNum(int32_t num);
 		//void PutNum(float num);
