@@ -116,8 +116,8 @@ namespace STM32T
 			if (buffer)
 			{
 				uint16_t len2 = len - 1;	// Hopefully len isn't 0.
-				if (ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT) != OK)
-					return UART_ERR;
+				if (const ErrorCode code = ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT); code != OK)
+					return code;
 				
 				buffer[len = len2] = 0;		// Make it safe for C str functions
 			}
@@ -539,25 +539,26 @@ namespace STM32T
 			return DelayedResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
-		/**
-		* @param len - Must be at least {size of str} + 10.
-		*/
-		ErrorCode StrToken(char * const buf, uint16_t len, const strv cmd, const CommandType type, const strv args = strv())
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode StrToken(char * const buf, size_t max_len, const strv cmd, const CommandType type, const strv args = strv())
 		{
-			ErrorCode code = Command(DEFAUL_RECEIVE_TIMEOUT, type, cmd, args, buf, len);
-			if (code != ErrorCode::OK)
-				return code;
-			
-			if (strncmp(buf + len - 8, "\r\n\r\nOK\r\n", 8) != 0 || strncmp(buf, "\r\n", 2) != 0)
+			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
 			{
-				addURCFromBuf(strv(buf, len));
-				return ErrorCode::UNKNOWN;
-			}
-			
-			memmove(buf, buf + 2, len - 10);
-			buf[len - 10] = 0;
-			
-			return ErrorCode::OK;
+				if (str.length() <= 10 || str.compare(str.length() - 8, strv::npos, "\r\n\r\nOK\r\n"sv) != 0 || str.compare(0, 2, "\r\n"sv) != 0)
+				{
+					addURCFromBuf(str);
+					return UNKNOWN;
+				}
+				
+				str.remove_suffix(8);
+				str.remove_prefix(2);
+				
+				const size_t len = std::min(str.length(), max_len - 1);
+				memcpy(buf, str.data(), len);
+				buf[len] = 0;
+				
+				return OK;
+			}, args);
 		}
 		
 	public:
