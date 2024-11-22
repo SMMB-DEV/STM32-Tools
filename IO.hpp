@@ -136,4 +136,14 @@ namespace STM32T
 			return elapsed;
 		}
 	};
+	
+	
+	
+	struct ScopeIO
+	{
+		IO m_io;
+		
+		ScopeIO(IO io) : m_io(io) { m_io.Set(); }
+		~ScopeIO() { m_io.Reset(); }
+	};
 }

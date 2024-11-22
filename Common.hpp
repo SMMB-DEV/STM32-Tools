@@ -61,6 +61,14 @@ namespace STM32T
 		T val;
 	};
 	
+	struct ScopeAction
+	{
+		const func<void ()>& m_end;
+		
+		ScopeAction(const func<void ()>& end) : m_end(end) {}
+		~ScopeAction() { m_end(); }
+	};
+	
 	template<typename T, typename BUF_TYPE = char*>
 	inline T pack_be(BUF_TYPE buf)
 	{
