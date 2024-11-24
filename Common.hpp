@@ -63,9 +63,9 @@ namespace STM32T
 	
 	struct ScopeAction
 	{
-		const func<void ()>& m_end;
+		void (* const m_end)();
 		
-		ScopeAction(const func<void ()>& end) : m_end(end) {}
+		ScopeAction(void (* end)()) : m_end(end) {}
 		~ScopeAction() { m_end(); }
 	};
 	
