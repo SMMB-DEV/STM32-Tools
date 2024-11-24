@@ -5,6 +5,7 @@
 #include "../Common.hpp"
 
 #include <memory>	// unique_ptr
+#include <optional>
 
 
 
@@ -569,14 +570,66 @@ namespace STM32T
 			uint8_t yy, MM, dd, hh, mm, ss;
 			int8_t zz;
 			
-			static bool Parse(DateTime& dt, const strv view)
+			[[deprecated]] static bool Parse(DateTime& dt, const strv view)
 			{
 				return 7 == sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
 			}
 			
-			static bool ParseNTP(DateTime& dt, const strv view)
+			static std::optional<DateTime> Parse(strv view)
 			{
-				return 7 == sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
+				DateTime dt;
+				
+				if (int n; sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					view.remove_prefix(n);
+					if (sscanf(view.data(), "%3hhd\"", &dt.zz) != 1)
+					{
+						if (view == "\""sv)
+							dt.zz = 0;
+						else
+							return std::nullopt;
+					}
+					
+					if (dt.IsSet())
+						return dt;
+				}
+				
+				return std::nullopt;
+			}
+			
+			[[deprecated]] static bool ParseNTP(DateTime& dt, const strv view)
+			{
+				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
+						dt.zz = 0;
+					
+					return dt.IsSet();
+				}
+				
+				return false;
+			}
+			
+			static std::optional<DateTime> ParseNTP(strv view)
+			{
+				DateTime dt;
+				
+				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					view.remove_prefix(n);
+					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
+					{
+						if (view.empty())
+							dt.zz = 0;
+						else
+							return std::nullopt;
+					}
+					
+					if (dt.IsSet())
+						return dt;
+				}
+				
+				return std::nullopt;
 			}
 			
 			static bool IsLeapYear(uint8_t yy)
