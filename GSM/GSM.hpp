@@ -278,7 +278,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd,
+		[[deprecated]] ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd,
 			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded, const char* const fmt, ...)
 		{
 			if (!fmt)
@@ -376,7 +376,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd,
+		[[deprecated]] ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd,
 			const func<ErrorCode (vec<strv>&)>& op, const char* const fmt, ...)
 		{
 			if (!fmt)
