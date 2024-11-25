@@ -37,20 +37,7 @@ namespace STM32T
 			ERASE_CHIP = 0xC7,
 		};
 		
-		struct IOFlag
-		{
-			STM32T::IO m_io;
-			
-			IOFlag(STM32T::IO io) : m_io(io)
-			{
-				m_io.Set();
-			}
-			
-			~IOFlag()
-			{
-				m_io.Reset();
-			}
-		};
+		
 		
 		static constexpr addr_t MAX_ADDRESS = 0x00FF'FFFF, NO_ADDRESS = 0xFFFF'FFFF;
 		
@@ -79,7 +66,7 @@ namespace STM32T
 		*/
 		bool Read(const CMD cmd, uint8_t * const buf, const uint16_t len, const strv args = strv())
 		{
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			if (HAL_SPI_Transmit(p_hspi, (uint8_t *)&cmd, 1, HAL_MAX_DELAY) != HAL_OK)
 				return false;
@@ -100,7 +87,7 @@ namespace STM32T
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 			
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			if (HAL_SPI_Transmit(p_hspi, (uint8_t *)&cmd, 1, HAL_MAX_DELAY) != HAL_OK)
 				return false;
@@ -119,7 +106,7 @@ namespace STM32T
 		*/
 		bool BusyWait(const uint32_t timeout)
 		{
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			const uint32_t start = HAL_GetTick();
 			
