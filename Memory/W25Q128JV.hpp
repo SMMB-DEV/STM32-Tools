@@ -184,11 +184,44 @@ namespace STM32T
 		}
 		
 		/**
+		* @param data - Must be at least 256 bytes (W25Q page size).
+		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
+		*/
+		bool WritePage(const addr_t addr, const uint8_t * const data)
+		{
+			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, 256) and BusyWait(3);
+		}
+		
+		/**
 		* @param len - If zero, considered 256. Int narrowing will take care of making sure it's not more than 256 (W25Q page size).
 		*/
-		bool WriteData(const addr_t addr, const uint8_t * const data, const uint8_t len)
+		bool WriteData(const addr_t addr, const uint8_t * const data, const uint16_t len)
 		{
-			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len ? len : 256) and BusyWait(3);
+			uint16_t written = 0;
+			const addr_t offset = addr % PAGE_SIZE;
+			
+			if (offset != 0)
+			{
+				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
+				if (!(SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr + written, data + written, write_size) and BusyWait(3)))
+					return false;
+				
+				written += write_size;
+			}
+			
+			uint16_t rem = len - written;
+			if (!rem)
+				return true;
+			
+			for (; rem > PAGE_SIZE; rem = len - written)
+			{
+				if (!WritePage(addr + written, data + written))
+					return false;
+				
+				written += PAGE_SIZE;
+			}
+			
+			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr + written, data + written, rem) and BusyWait(3);
 		}
 		
 		template <class T>
