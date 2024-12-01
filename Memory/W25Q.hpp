@@ -8,9 +8,9 @@
 namespace STM32T
 {
 	/**
-	* @brief The name is very specific because there are subtle differences between the different W25Q variants. This was written for W25Q128JVSQ but should work on other variants.
+	* @note There are subtle differences between the different W25Q variants. This was written for W25Q128JVSQ but should work on other variants.
 	*/
-	class W25Q128JV
+	class W25Q
 	{
 	public:
 		using addr_t = uint32_t;
@@ -39,12 +39,13 @@ namespace STM32T
 		
 		
 		
-		static constexpr addr_t MAX_ADDRESS = 0x00FF'FFFF, NO_ADDRESS = 0xFFFF'FFFF;
+		static constexpr addr_t NO_ADDRESS = 0xFFFF'FFFF;
 		
 		
 		
 		SPI_HandleTypeDef* const p_hspi;
 		STM32T::IO m_CS;
+		const addr_t c_MaxAddress;
 		
 		/**
 		* @brief Send a single-byte instruction with no data.
@@ -92,7 +93,7 @@ namespace STM32T
 			if (HAL_SPI_Transmit(p_hspi, (uint8_t *)&cmd, 1, HAL_MAX_DELAY) != HAL_OK)
 				return false;
 			
-			if (addr <= MAX_ADDRESS and HAL_SPI_Transmit(p_hspi, _addr, sizeof(_addr), HAL_MAX_DELAY) != HAL_OK)
+			if (addr <= c_MaxAddress and HAL_SPI_Transmit(p_hspi, _addr, sizeof(_addr), HAL_MAX_DELAY) != HAL_OK)
 				return false;
 			
 			if (len > 0 and HAL_SPI_Transmit(p_hspi, buf, len, HAL_MAX_DELAY) != HAL_OK)
@@ -131,8 +132,9 @@ namespace STM32T
 		
 		/**
 		* @param CS - This is usually active low and must be configured as such. The class won't handle the polarity of the pin.
+		* @param size - The size of memory in Mbits.
 		*/
-		W25Q128JV(SPI_HandleTypeDef* hspi, STM32T::IO CS) : p_hspi(hspi), m_CS(CS) {}
+		W25Q(SPI_HandleTypeDef* hspi, STM32T::IO CS, uint16_t size) : p_hspi(hspi), m_CS(CS), c_MaxAddress(size * 1_Ki * 1_Ki / 8 - 1) {}
 		
 		/**
 		* @retval JEDEC ID of the device or 0 in case of failure.
@@ -161,7 +163,7 @@ namespace STM32T
 		bool ReadData(const addr_t addr, uint8_t * const data, const uint16_t len)
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
-			return addr <= MAX_ADDRESS and Read(READ_DATA, data, len, strv((char *)_addr, sizeof(_addr)));
+			return addr <= c_MaxAddress and Read(READ_DATA, data, len, strv((char *)_addr, sizeof(_addr)));
 		}
 		
 		template <class T>
