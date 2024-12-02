@@ -74,7 +74,7 @@ namespace STM32T
 		template<typename T = uint32_t>
 		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
 			Set(state);
 			delay(time);
