@@ -53,7 +53,7 @@ namespace STM32T::HC
 	/**
 	* @brief Converts a one-based byte index to a zero-based Hamming index.
 	*/
-	inline uint32_t hamming_index(uint16_t byte_index)
+	inline size_t hamming_index(uint16_t byte_index)
 	{
 		return byte_index * 8 + parity_bits(byte_index);
 	}
@@ -75,7 +75,7 @@ namespace STM32T::HC
 	*/
 	inline uint8_t mask(const uint16_t byte_index, const uint8_t parity_index)
 	{
-		uint32_t index = hamming_index(byte_index);
+		size_t index = hamming_index(byte_index);
 		
 		uint8_t mask = 0;
 		for (uint8_t bit = 0b1; bit; bit <<= 1)
@@ -158,7 +158,7 @@ namespace STM32T::HC
 		for (uint8_t p = 0; p < parity_count; p++)
 		{
 			uint8_t _xor = 0;
-			for (uint8_t i = 0; i < data.length(); i++)
+			for (size_t i = 0; i < data.length(); i++)
 				_xor ^= data[i] & mask(i, p);
 			
 			bits |= !(parity(_xor) == odd) << p;
