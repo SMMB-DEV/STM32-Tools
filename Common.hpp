@@ -47,7 +47,7 @@ namespace STM32T
 	/**
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
 	*/
-	inline bool is_power_2(uint8_t val)
+	inline bool is_power_2(uint32_t val)
 	{
 		return val && !(val & (val - 1));
 	}
@@ -55,11 +55,8 @@ namespace STM32T
 	/**
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 	*/
-	template <typename T>
-	inline uint8_t bit_count(T val)
+	inline uint8_t bit_count(uint32_t val)
 	{
-		static_assert(std::is_integral_v<T>);
-		
 		uint8_t c;
 		for (c = 0; val; c++)
 			val &= val - 1;		//clear the least significant bit set

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "./Common.hpp"
+//#include "./Log.hpp"
 
 
 
@@ -50,7 +51,7 @@ namespace STM32T::HC
 	}
 	
 	/**
-	* @brief Converts a zero-based byte index to a zero-based Hamming index.
+	* @brief Converts a one-based byte index to a zero-based Hamming index.
 	*/
 	inline uint32_t hamming_index(uint16_t byte_index)
 	{
@@ -74,10 +75,10 @@ namespace STM32T::HC
 	*/
 	inline uint8_t mask(const uint16_t byte_index, const uint8_t parity_index)
 	{
-		uint32_t index = hamming_index(byte_index) + 1;
+		uint32_t index = hamming_index(byte_index);
 		
 		uint8_t mask = 0;
-		for (uint8_t bit = 0b1000'0000; bit; bit >>= 1)
+		for (uint8_t bit = 0b1; bit; bit <<= 1)
 		{
 			index++;	// convert to one-based index for comparisons
 			while (is_power_2(index))
@@ -99,6 +100,47 @@ namespace STM32T::HC
 		static_assert(std::is_integral_v<T>);
 		
 		T _xor = 0;
+		
+		if constexpr (sizeof(T) < sizeof(uint32_t))
+		{
+			uint16_t len2 = sizeof(uint32_t) - (size_t)data % sizeof(uint32_t);		// Might be 4 which is ok.
+			if (len2 <= len)
+			{
+				len -= len2;
+				while (len2)
+				{
+					_xor ^= *data++;
+					len2 -= sizeof(T);
+				}
+			}
+			
+			// Aligned to 32 bits
+			constexpr size_t FACTOR = sizeof(uint32_t) / sizeof(T);
+			
+			len2 = len / FACTOR;
+			len -= len2 * FACTOR;
+			
+			uint32_t _xor2 = 0;
+			while (len2--)
+			{
+				_xor2 ^= *(uint32_t*)data;
+				data += FACTOR;
+			}
+			
+			// shrink _xor2 to make sure it fits inside _xor
+			_xor2 ^= _xor2 >> 16;
+			
+			if (sizeof(T) == sizeof(uint16_t))
+			{
+				_xor ^= _xor2 & 0xFFFF;
+			}
+			else	// 8 bits
+			{
+				_xor2 ^= _xor2 >> 8;
+				_xor ^= _xor2 & 0xFF;
+			}
+		}
+		
 		while (len--)
 			_xor ^= *data++;
 		
@@ -108,15 +150,15 @@ namespace STM32T::HC
 	/**
 	* @retval { hamming code parity bits, number of parity bits }
 	*/
-	inline std::pair<uint16_t, uint8_t> calculate_normal(const uint8_t * const data, const uint16_t len, bool odd = false)
+	inline std::pair<uint16_t, uint8_t> calculate_normal(const strv data, bool odd = false)
 	{
-		const uint8_t parity_count = parity_bits(len);
+		const uint8_t parity_count = parity_bits(data.length());
 		
 		uint16_t bits = 0;
 		for (uint8_t p = 0; p < parity_count; p++)
 		{
 			uint8_t _xor = 0;
-			for (uint8_t i = 0; i < len; i++)
+			for (uint8_t i = 0; i < data.length(); i++)
 				_xor ^= data[i] & mask(i, p);
 			
 			bits |= !(parity(_xor) == odd) << p;
@@ -128,12 +170,12 @@ namespace STM32T::HC
 	/**
 	* @retval { extended hamming code parity bits, number of parity bits (excluding the extended bit) }
 	*/
-	inline std::pair<uint16_t, uint8_t> calculate_extended(const uint8_t * const data, const uint16_t len, bool odd = false)
+	inline std::pair<uint16_t, uint8_t> calculate_extended(const strv data, bool odd = false)
 	{
-		auto [bits, count] = calculate_normal(data, len, odd);
+		auto [bits, count] = calculate_normal(data, odd);
 		
 		// extended parity bit
-		uint16_t _xor = bits ^ fold(data, len);
+		uint16_t _xor = bits ^ fold(data.data(), data.length());
 		bits |= !(parity(_xor) == odd) << count;
 		
 		return { bits, count };
@@ -141,7 +183,7 @@ namespace STM32T::HC
 	
 	inline bool correct_extended(uint8_t * const data, const uint16_t len, const uint16_t parity, bool odd = false)
 	{
-		auto [calc, count] = calculate_normal(data, len, odd);
+		auto [calc, count] = calculate_normal(strv((char *)data, len), odd);
 		
 		uint16_t common = fold(data, len) ^ (parity & ~POW_2[count]);
 		common = !(STM32T::parity(common) == odd) << count;
