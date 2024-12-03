@@ -189,9 +189,9 @@ namespace STM32T
 		* @param data - Must be at least 256 bytes (W25Q page size).
 		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
 		*/
-		bool WritePage(const addr_t addr, const uint8_t * const data)
+		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = 256)
 		{
-			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, 256) and BusyWait(3);
+			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len) and BusyWait(3);
 		}
 		
 		/**
@@ -205,7 +205,7 @@ namespace STM32T
 			if (offset != 0)
 			{
 				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
-				if (!(SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr + written, data + written, write_size) and BusyWait(3)))
+				if (!WritePage(addr + written, data + written, write_size))
 					return false;
 				
 				written += write_size;
@@ -223,7 +223,7 @@ namespace STM32T
 				written += PAGE_SIZE;
 			}
 			
-			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr + written, data + written, rem) and BusyWait(3);
+			return WritePage(addr + written, data + written, rem);
 		}
 		
 		template <class T>
