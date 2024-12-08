@@ -163,7 +163,7 @@ inline void LOGSEP()
 }
 
 
-//#define LOGFI(indent, fmt, ...)		{ if constexpr (_LOG) { printf("%*s" fmt, indent * 4, "", ##__VA_ARGS__); } }
+
 #define LOGT(__msg__, __min_time__, ...) \
 { \
 	if constexpr (_LOG) \
