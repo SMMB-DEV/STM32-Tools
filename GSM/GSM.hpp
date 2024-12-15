@@ -313,7 +313,7 @@ namespace STM32T
 					return Error(tokens);
 				
 				return OK;
-			});
+			}, allowSingleEnded);
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
