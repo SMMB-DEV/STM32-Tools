@@ -3,6 +3,7 @@
 #include "../IO.hpp"
 #include "../Timing.hpp"
 #include "../Common.hpp"
+#include "../Error Checking.hpp"
 
 #include <optional>
 
@@ -166,7 +167,7 @@ namespace STM32T
 			SendCmd(CMD::READ_SCRATCHPAD);
 			ReadBytes(buf, 9);
 			
-			return CRC8<TABLE>(buf, 9) == 0;
+			return CRCx::CRC8<TABLE>(buf, 9) == 0;
 		}
 		
 	public:
@@ -185,7 +186,7 @@ namespace STM32T
 			shared_arr<uint64_t> id;
 			ReadBytes(id.arr, sizeof(id));
 			
-			if (CRC8<TABLE>(id.arr, sizeof(id)) != 0)
+			if (CRCx::CRC8<TABLE>(id.arr, sizeof(id)) != 0)
 				return std::nullopt;
 			
 			return id.val;
