@@ -5,6 +5,7 @@
 #include "../Common.hpp"
 
 #include <memory>	// unique_ptr
+#include <optional>
 
 
 
@@ -277,7 +278,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd,
+		[[deprecated]] ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd,
 			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded, const char* const fmt, ...)
 		{
 			if (!fmt)
@@ -312,7 +313,7 @@ namespace STM32T
 					return Error(tokens);
 				
 				return OK;
-			});
+			}, allowSingleEnded);
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -375,7 +376,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd,
+		[[deprecated]] ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd,
 			const func<ErrorCode (vec<strv>&)>& op, const char* const fmt, ...)
 		{
 			if (!fmt)
@@ -506,8 +507,32 @@ namespace STM32T
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
-			ErrorCode code = SingleToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, args);
-			if (code != OK)
+			bool done = false;
+			
+			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
+			{
+				if (tokens.size() < 1  || tokens.size() > 2 || tokens[0] != "OK"sv)
+					return Error(tokens);
+				
+				if (tokens.size() == 2)		// In case the response wasn't actually delayed
+				{
+					done = true;
+					
+					const auto t = tokens[1];
+					const bool ok = CompareAndRemove(tokens[1], cmd) && (CompareAndRemove(tokens[1], ": "sv) || CompareAndRemove(tokens[1], ":"sv));
+					if (!ok)
+					{
+						addURC(t);
+						return UNKNOWN;
+					}
+					
+					return op(tokens[1]);
+				}
+				
+				return OK;
+			});
+			
+			if (code != OK || done)
 				return code;
 			
 			return ResponseToken<LEN>(1, timeout, CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
@@ -569,14 +594,66 @@ namespace STM32T
 			uint8_t yy, MM, dd, hh, mm, ss;
 			int8_t zz;
 			
-			static bool Parse(DateTime& dt, const strv view)
+			[[deprecated]] static bool Parse(DateTime& dt, const strv view)
 			{
 				return 7 == sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
 			}
 			
-			static bool ParseNTP(DateTime& dt, const strv view)
+			static std::optional<DateTime> Parse(strv view)
 			{
-				return 7 == sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
+				DateTime dt;
+				
+				if (int n; sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					view.remove_prefix(n);
+					if (sscanf(view.data(), "%3hhd\"", &dt.zz) != 1)
+					{
+						if (view == "\""sv)
+							dt.zz = 0;
+						else
+							return std::nullopt;
+					}
+					
+					if (dt.IsSet())
+						return dt;
+				}
+				
+				return std::nullopt;
+			}
+			
+			[[deprecated]] static bool ParseNTP(DateTime& dt, const strv view)
+			{
+				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
+						dt.zz = 0;
+					
+					return dt.IsSet();
+				}
+				
+				return false;
+			}
+			
+			static std::optional<DateTime> ParseNTP(strv view)
+			{
+				DateTime dt;
+				
+				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				{
+					view.remove_prefix(n);
+					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
+					{
+						if (view.empty())
+							dt.zz = 0;
+						else
+							return std::nullopt;
+					}
+					
+					if (dt.IsSet())
+						return dt;
+				}
+				
+				return std::nullopt;
 			}
 			
 			static bool IsLeapYear(uint8_t yy)

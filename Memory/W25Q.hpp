@@ -8,9 +8,9 @@
 namespace STM32T
 {
 	/**
-	* @brief The name is very specific because there are subtle differences between the different W25Q variants. This was written for W25Q128JVSQ but should work on other variants.
+	* @note There are subtle differences between the different W25Q variants. This was written for W25Q128JVSQ but should work on other variants.
 	*/
-	class W25Q128JV
+	class W25Q
 	{
 	public:
 		using addr_t = uint32_t;
@@ -37,27 +37,15 @@ namespace STM32T
 			ERASE_CHIP = 0xC7,
 		};
 		
-		struct IOFlag
-		{
-			STM32T::IO m_io;
-			
-			IOFlag(STM32T::IO io) : m_io(io)
-			{
-				m_io.Set();
-			}
-			
-			~IOFlag()
-			{
-				m_io.Reset();
-			}
-		};
 		
-		static constexpr addr_t MAX_ADDRESS = 0x00FF'FFFF, NO_ADDRESS = 0xFFFF'FFFF;
+		
+		static constexpr addr_t NO_ADDRESS = 0xFFFF'FFFF;
 		
 		
 		
 		SPI_HandleTypeDef* const p_hspi;
 		STM32T::IO m_CS;
+		const addr_t c_MaxAddress;
 		
 		/**
 		* @brief Send a single-byte instruction with no data.
@@ -79,7 +67,7 @@ namespace STM32T
 		*/
 		bool Read(const CMD cmd, uint8_t * const buf, const uint16_t len, const strv args = strv())
 		{
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			if (HAL_SPI_Transmit(p_hspi, (uint8_t *)&cmd, 1, HAL_MAX_DELAY) != HAL_OK)
 				return false;
@@ -100,12 +88,12 @@ namespace STM32T
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 			
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			if (HAL_SPI_Transmit(p_hspi, (uint8_t *)&cmd, 1, HAL_MAX_DELAY) != HAL_OK)
 				return false;
 			
-			if (addr <= MAX_ADDRESS and HAL_SPI_Transmit(p_hspi, _addr, sizeof(_addr), HAL_MAX_DELAY) != HAL_OK)
+			if (addr <= c_MaxAddress and HAL_SPI_Transmit(p_hspi, _addr, sizeof(_addr), HAL_MAX_DELAY) != HAL_OK)
 				return false;
 			
 			if (len > 0 and HAL_SPI_Transmit(p_hspi, buf, len, HAL_MAX_DELAY) != HAL_OK)
@@ -119,7 +107,7 @@ namespace STM32T
 		*/
 		bool BusyWait(const uint32_t timeout)
 		{
-			IOFlag _cs(m_CS);
+			ScopeIO _cs(m_CS);
 			
 			const uint32_t start = HAL_GetTick();
 			
@@ -144,8 +132,9 @@ namespace STM32T
 		
 		/**
 		* @param CS - This is usually active low and must be configured as such. The class won't handle the polarity of the pin.
+		* @param size - The size of memory in Mbits.
 		*/
-		W25Q128JV(SPI_HandleTypeDef* hspi, STM32T::IO CS) : p_hspi(hspi), m_CS(CS) {}
+		W25Q(SPI_HandleTypeDef* hspi, STM32T::IO CS, uint16_t size) : p_hspi(hspi), m_CS(CS), c_MaxAddress(size * 1_Ki * 1_Ki / 8 - 1) {}
 		
 		/**
 		* @retval JEDEC ID of the device or 0 in case of failure.
@@ -174,7 +163,7 @@ namespace STM32T
 		bool ReadData(const addr_t addr, uint8_t * const data, const uint16_t len)
 		{
 			const uint8_t _addr[3] = { (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
-			return addr <= MAX_ADDRESS and Read(READ_DATA, data, len, strv((char *)_addr, sizeof(_addr)));
+			return addr <= c_MaxAddress and Read(READ_DATA, data, len, strv((char *)_addr, sizeof(_addr)));
 		}
 		
 		template <class T>
@@ -197,11 +186,44 @@ namespace STM32T
 		}
 		
 		/**
+		* @param data - Must be at least 256 bytes (W25Q page size).
+		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
+		*/
+		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = 256)
+		{
+			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len) and BusyWait(3);
+		}
+		
+		/**
 		* @param len - If zero, considered 256. Int narrowing will take care of making sure it's not more than 256 (W25Q page size).
 		*/
-		bool WriteData(const addr_t addr, const uint8_t * const data, const uint8_t len)
+		bool WriteData(const addr_t addr, const uint8_t * const data, const uint16_t len)
 		{
-			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len ? len : 256) and BusyWait(3);
+			uint16_t written = 0;
+			const addr_t offset = addr % PAGE_SIZE;
+			
+			if (offset != 0)
+			{
+				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
+				if (!WritePage(addr + written, data + written, write_size))
+					return false;
+				
+				written += write_size;
+			}
+			
+			uint16_t rem = len - written;
+			if (!rem)
+				return true;
+			
+			for (; rem > PAGE_SIZE; rem = len - written)
+			{
+				if (!WritePage(addr + written, data + written))
+					return false;
+				
+				written += PAGE_SIZE;
+			}
+			
+			return WritePage(addr + written, data + written, rem);
 		}
 		
 		template <class T>

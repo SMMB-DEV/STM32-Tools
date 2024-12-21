@@ -44,6 +44,52 @@ namespace STM32T
 		return x;
 	}
 	
+	/**
+	* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+	*/
+	inline bool is_power_2(uint32_t val)
+	{
+		return val && !(val & (val - 1));
+	}
+	
+	/**
+	* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+	*/
+	inline uint8_t bit_count(uint32_t val)
+	{
+		uint8_t c;
+		for (c = 0; val; c++)
+			val &= val - 1;		//clear the least significant bit set
+		
+		return c;
+	}
+	
+	/**
+	* @brief https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
+	* @retval True if val has odd parity.
+	*/
+	template <typename T>
+	inline bool parity(T val)
+	{
+		static_assert(std::is_integral_v<T>);
+		
+		if constexpr (sizeof(T) > sizeof(uint64_t))
+			val ^= val >> 64;
+		
+		if constexpr (sizeof(T) > sizeof(uint32_t))
+			val ^= val >> 32;
+		
+		if constexpr (sizeof(T) > sizeof(uint16_t))
+			val ^= val >> 16;
+		
+		if constexpr (sizeof(T) > sizeof(uint8_t))
+			val ^= val >> 8;
+		
+		val ^= val >> 4;
+		val &= 0x0F;
+		return (0b0110'1001'1001'0110 >> val) & 1;
+	}
+	
 	template <typename T>
 	inline constexpr T ceil(T x, T y)
 	{
@@ -63,9 +109,9 @@ namespace STM32T
 	
 	struct ScopeAction
 	{
-		const func<void ()>& m_end;
+		void (* const m_end)();
 		
-		ScopeAction(const func<void ()>& end) : m_end(end) {}
+		ScopeAction(void (* end)()) : m_end(end) {}
 		~ScopeAction() { m_end(); }
 	};
 	template<bool condition>
@@ -442,17 +488,4 @@ namespace STM32T
 		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
-	
-	/**
-	* @param TABLE - Must have 256 values.
-	* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
-	*/
-	template <const uint8_t * TABLE>
-	inline uint8_t CRC8(const uint8_t * const data, const size_t len, uint8_t crc_init = 0)
-	{
-		for (size_t i = 0; i < len; i++)
-			crc_init = TABLE[data[i] ^ crc_init];
-
-		return crc_init;
-	}
 }

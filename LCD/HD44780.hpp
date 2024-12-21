@@ -78,6 +78,7 @@ namespace STM32T
 		
 		void Init()
 		{
+			DWT_Init();
 			HAL_Delay(15);		// For VCC; probably not necessary.
 			f_write(0, 0b0011'0000);
 			DWT_Delay(4100);
@@ -118,6 +119,7 @@ namespace STM32T
 		}
 		
 		__attribute__((always_inline)) HD44780& xl(uint8_t x, uint8_t l) { Gotoxl(x, l); return *this; }
+		__attribute__((always_inline)) HD44780& clear() { ClearScreen(); return xl(0, 0); }
 		
 		void PutChar(const uint8_t ch, bool interpret_specials = true) override
 		{

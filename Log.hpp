@@ -115,6 +115,21 @@ inline void LOG(void (*f)())
 		f();
 }
 
+inline void LOGA(const uint8_t * arr, size_t len)
+{
+	if constexpr (_LOG)
+	{
+		len++;
+		while (len)
+		{
+			for (uint8_t i = 0; --len && i < 8; i++)
+				printf("%02X ", *arr++);
+			
+			printf("\n");
+		}
+	}
+}
+
 template <class... Args>
 inline void LOGF(const char *fmt, Args... args)
 {
@@ -148,7 +163,7 @@ inline void LOGSEP()
 }
 
 
-//#define LOGFI(indent, fmt, ...)		{ if constexpr (_LOG) { printf("%*s" fmt, indent * 4, "", ##__VA_ARGS__); } }
+
 #define LOGT(__msg__, __min_time__, ...) \
 { \
 	if constexpr (_LOG) \
