@@ -68,6 +68,13 @@ namespace STM32T
 		ScopeAction(const func<void ()>& end) : m_end(end) {}
 		~ScopeAction() { m_end(); }
 	};
+	template<bool condition>
+	struct warn_if {};
+
+	template<> struct __attribute__((deprecated)) warn_if<false> { constexpr warn_if() = default; };
+	
+	#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
+	//#define static_warn(x, ...) (__attribute__((deprecated)) (void))
 	
 	template<typename T, typename BUF_TYPE = char*>
 	inline T pack_be(BUF_TYPE buf)
