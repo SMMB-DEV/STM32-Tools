@@ -507,8 +507,32 @@ namespace STM32T
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
-			ErrorCode code = SingleToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, args);
-			if (code != OK)
+			bool done = false;
+			
+			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
+			{
+				if (tokens.size() < 1  || tokens.size() > 2 || tokens[0] != "OK"sv)
+					return Error(tokens);
+				
+				if (tokens.size() == 2)		// In case the response wasn't actually delayed
+				{
+					done = true;
+					
+					const auto t = tokens[1];
+					const bool ok = CompareAndRemove(tokens[1], cmd) && (CompareAndRemove(tokens[1], ": "sv) || CompareAndRemove(tokens[1], ":"sv));
+					if (!ok)
+					{
+						addURC(t);
+						return UNKNOWN;
+					}
+					
+					return op(tokens[1]);
+				}
+				
+				return OK;
+			});
+			
+			if (code != OK || done)
 				return code;
 			
 			return ResponseToken<LEN>(1, timeout, CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
