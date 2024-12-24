@@ -32,8 +32,8 @@ namespace STM32T
 			WRITE_STATUS3 = 0x11,
 			
 			ERASE_SECTOR = 0x20,
-			ERASE_BLOCK32 = 0x52,
-			ERASE_BLOCK64 = 0xD8,
+			ERASE_HALF_BLOCK = 0x52,
+			ERASE_BLOCK = 0xD8,
 			ERASE_CHIP = 0xC7,
 		};
 		
@@ -128,7 +128,7 @@ namespace STM32T
 	public:
 		static constexpr size_t BLOCK_SIZE = 64_Ki, SECTOR_SIZE = 4_Ki, PAGE_SIZE = 256;
 		
-		enum class ET : uint8_t { SECTOR = ERASE_SECTOR, BLOCK32 = ERASE_BLOCK32, BLOCK64 = ERASE_BLOCK64, CHIP = ERASE_CHIP };
+		enum class ET : uint8_t { SECTOR = ERASE_SECTOR, HALF_BLOCK = ERASE_HALF_BLOCK, BLOCK = ERASE_BLOCK, CHIP = ERASE_CHIP };
 		
 		/**
 		* @param CS - This is usually active low and must be configured as such. The class won't handle the polarity of the pin.

@@ -1,3 +1,4 @@
+#define STM32T_LOG
 #include "./Log.h"
 
 #include <stdarg.h>
@@ -5,14 +6,11 @@
 
 void LOG(void (*f)())
 {
-#ifndef STM32T_LOG
 	f();
-#endif
 }
 
 void LOGA(const uint8_t * arr, size_t len)
 {
-#ifndef STM32T_LOG
 	len++;
 	while (len)
 	{
@@ -21,29 +19,24 @@ void LOGA(const uint8_t * arr, size_t len)
 		
 		printf("\n");
 	}
-#endif
 }
 
 void LOGF(const char *fmt, ...)
 {
-#ifndef STM32T_LOG
 	va_list args;
     va_start(args, fmt);
     vprintf(fmt, args);
     va_end(args);
-#endif
 }
 
 void LOGFI(const size_t indent, const char *fmt, ...)
 {
-#ifndef STM32T_LOG
 	printf("%*s", indent * 4, "");
 	
 	va_list args;
     va_start(args, fmt);
     vprintf(fmt, args);
     va_end(args);
-#endif
 }
 
 bool LOGFC(const bool c, const char *fmt, ...)
@@ -61,7 +54,5 @@ bool LOGFC(const bool c, const char *fmt, ...)
 
 void LOGSEP()
 {
-#ifndef STM32T_LOG
 	printf("--------------------------------------------------------------------------------\n");
-#endif
 }

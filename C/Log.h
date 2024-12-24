@@ -97,17 +97,21 @@ extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
+#ifdef STM32T_LOG
 void LOG(void (*f)());
-
 void LOGA(const uint8_t * arr, size_t len);
-
 void LOGF(const char *fmt, ...);
-
 void LOGFI(const size_t indent, const char *fmt, ...);
-
 bool LOGFC(const bool c, const char *fmt, ...);
-
 void LOGSEP();
+#else
+inline void LOG(void (*f)()) {}
+inline void LOGA(const uint8_t * arr, size_t len) {}
+inline void LOGF(const char *fmt, ...) {}
+inline void LOGFI(const size_t indent, const char *fmt, ...) {}
+inline bool LOGFC(const bool c, const char *fmt, ...) { return c; }
+inline void LOGSEP() {}
+#endif
 
 
 
