@@ -640,12 +640,12 @@ namespace STM32T
 
 	void KS0108B::Test()
 	{
-		ClearScreen(true);
+		Clear(true);
 		HAL_Delay(1000);
-		ClearScreen();
+		Clear();
 		HAL_Delay(1000);
 		
-		Gotoxy(100, 4);
+		XY(100, 4);
 		WriteByte(0xFF);
 		WriteByte(0xAA);
 		WriteByte(0x55);
@@ -657,7 +657,7 @@ namespace STM32T
 		Circle(110, 30, 8);
 		FillCircle(110, 52, 10);
 		
-		Gotoxy(0, 4);
+		XY(0, 4);
 		PutStr("Normal");
 		NextLine(2);
 		PutStrBig("Big");
@@ -676,10 +676,10 @@ namespace STM32T
 		f_setCS(0xFF);
 		
 		Display(1);
-		ClearScreen();
+		Clear();
 	}
 
-	void KS0108B::ClearScreen(const bool fill)
+	KS0108B& KS0108B::Clear(const bool fill)
 	{
 		f_setCS(0xFF);
 		
@@ -700,9 +700,11 @@ namespace STM32T
 		m_row = 0;
 		
 		memset(m_screenMap, _write, MAX_LINES * m_screenLen);
+		
+		return *this;
 	}
 
-	KS0108B& KS0108B::Gotoxy(const uint8_t x, const uint8_t y)
+	KS0108B& KS0108B::XY(const uint8_t x, const uint8_t y)
 	{
 		m_row = y % PIXELS_PER_LINE;
 		Goto(x, y / PIXELS_PER_LINE);
@@ -721,11 +723,11 @@ namespace STM32T
 		if (_y < 0)
 			_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
 		
-		Gotoxy(_x, _y);
+		XY(_x, _y);
 		return *this;
 	}
 
-	KS0108B& KS0108B::Gotoxl(const uint8_t x, const uint8_t line)
+	KS0108B& KS0108B::XL(const uint8_t x, const uint8_t line)
 	{
 		m_row = 0;
 		Goto(x, line);

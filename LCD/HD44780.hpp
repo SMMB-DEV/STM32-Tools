@@ -95,13 +95,14 @@ namespace STM32T
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
 			
 			Write(0, 0b0000'1100);			// Display on, Cursor off, Blink off
-			ClearScreen();
+			Clear();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
 		}
 		
-		void ClearScreen()
+		HD44780& Clear()
 		{
 			Write(0, 0b0000'0001, 1600);	// Display clear
+			return *this;
 		}
 		
 		void NextLine()
@@ -110,16 +111,15 @@ namespace STM32T
 				SetAddress((m_addressCounter & 0x40) + 0x40);	// 0x00 or 0x40
 		}
 		
-		void Gotoxl(uint8_t x, uint8_t l)
+		HD44780& XL(uint8_t x, uint8_t l)
 		{
 			if (m_twoLines)
 				SetAddress(l * 0x40 + x % 0x40);
 			else
 				SetAddress(x);
+			
+			return *this;
 		}
-		
-		__attribute__((always_inline)) HD44780& xl(uint8_t x, uint8_t l) { Gotoxl(x, l); return *this; }
-		__attribute__((always_inline)) HD44780& clear() { ClearScreen(); return xl(0, 0); }
 		
 		void PutChar(const uint8_t ch, bool interpret_specials = true) override
 		{

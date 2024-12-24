@@ -111,13 +111,10 @@ namespace STM32T
 		/**
 		* @brief Fills or clears the Screen and goes to (0, 0)
 		*/
-		void ClearScreen(const bool fill = false);
-		KS0108B& Gotoxy(const uint8_t x, const uint8_t y);
+		KS0108B& Clear(const bool fill = false);
+		KS0108B& XY(const uint8_t x, const uint8_t y);
 		KS0108B& Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
-		KS0108B& Gotoxl(const uint8_t x, const uint8_t line);
-		
-		__attribute__((always_inline)) KS0108B& xy(const uint8_t x, const uint8_t y) { return Gotoxy(x, y); }
-		__attribute__((always_inline)) KS0108B& xl(const uint8_t x, const uint8_t line) { return Gotoxl(x, line); }
+		KS0108B& XL(const uint8_t x, const uint8_t line);
 		
 		std::pair<uint8_t, uint8_t> Getxy() { return { m_cursor + MAX_CURSOR * m_page, m_line * PIXELS_PER_LINE + m_row }; }
 		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
