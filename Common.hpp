@@ -114,6 +114,73 @@ namespace STM32T
 		ScopeAction(void (* end)()) : m_end(end) {}
 		~ScopeAction() { m_end(); }
 	};
+	/**
+	* @brief Useful for queuing work inside an ISR to be handled in the main loop.
+	*		Allocates memory on the heap.
+	*/
+	template <class T, size_t MAX_SIZE = SIZE_MAX>
+	class linked_list
+	{
+		static_assert(MAX_SIZE > 0);
+		
+		class container
+		{
+			friend class linked_list<T, MAX_SIZE>;
+			
+			container *p_next = nullptr;
+			T m_val;
+			
+			container(const T& val) : m_val(val) {}
+			container(T&& val) : m_val(val) {}
+		};
+		
+		container * volatile p_list = nullptr;
+		
+	public:
+		/**
+		* @note Must not be called on an empty linked_list.
+		*/
+		T& front() const { return (*p_list).m_val; }
+		
+		bool empty() const volatile { return p_list == nullptr; }
+		
+		/**
+		* @brief Meant to be called from the main loop.
+		*/
+		void pop_front()
+		{
+			if (!p_list)
+				return;
+			
+			container *current = p_list;
+			p_list = p_list->p_next;
+			delete current;
+		}
+		
+		/**
+		* @brief Meant to be called from an ISR.
+		*/
+		template <class... Args>
+		T& emplace_back(Args&&... args)
+		{
+			size_t size = 0;
+			container * volatile *end = &p_list;
+			
+			while (*end)
+			{
+				end = &((*end)->p_next);
+				size++;
+			}
+			
+			while (size-- >= MAX_SIZE)
+				pop_front();
+			
+			*end = new container(T{args...});
+			
+			return (**end).m_val;
+		}
+	};
+	
 	template<bool condition>
 	struct warn_if {};
 
