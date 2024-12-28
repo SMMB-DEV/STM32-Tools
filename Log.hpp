@@ -81,8 +81,8 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_USB() \
-extern USBD_HandleTypeDef hUsbDeviceFS; \
+#define STM32T_SYS_WRITE_USB(connected, init) \
+extern "C" USBD_HandleTypeDef hUsbDeviceFS; \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
@@ -91,8 +91,9 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	\
 	uint8_t res = USBD_FAIL; \
 	uint32_t start = HAL_GetTick(); \
-	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100);\
-	return -res; \
+	while (connected && init && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100);\
+	/*return -res;*/ \
+	return 0;\
 }
 
 
