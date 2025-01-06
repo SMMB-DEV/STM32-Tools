@@ -1,6 +1,9 @@
 #pragma once
 
+extern "C"
+{
 #include "main.h"
+}
 
 #include <string_view>
 #include <vector>
@@ -23,6 +26,9 @@ namespace STM32T
 	
 	template <class F>
 	using func = std::function<F>;
+	
+	template <class T>
+	constexpr bool is_int = !std::is_same_v<T, bool> && std::is_integral_v<T>;
 
 	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
@@ -93,7 +99,7 @@ namespace STM32T
 	template <typename T>
 	inline constexpr T ceil(T x, T y)
 	{
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+		static_assert(is_int<T>);
 		
 		return x / y + (x % y != 0);
 	}
@@ -101,7 +107,7 @@ namespace STM32T
 	template<class T>
 	union shared_arr
 	{
-		static_assert(!std::is_same_v<T, uint8_t>);
+		static_assert(sizeof(T) > sizeof(uint8_t));
 		
 		uint8_t arr[sizeof(T)];
 		T val;
@@ -114,6 +120,17 @@ namespace STM32T
 		ScopeAction(void (* end)()) : m_end(end) {}
 		~ScopeAction() { m_end(); }
 	};
+	
+	struct ScopeActionF
+	{
+		using funt_t = func<void()>;
+		
+		const funt_t m_end;
+		
+		ScopeActionF(funt_t &&end) : m_end(end) {}
+		~ScopeActionF() { m_end(); }
+	};
+	
 	/**
 	* @brief Useful for queuing work inside an ISR to be handled in the main loop.
 	*		Allocates memory on the heap.

@@ -1,6 +1,9 @@
 #pragma once
 
+extern "C"
+{
 #include "main.h"
+}
 
 #include <cstdio>
 

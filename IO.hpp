@@ -1,8 +1,6 @@
 #pragma once
 
-#include "main.h"
-
-#include <type_traits>
+#include "./Timing.hpp"
 
 
 
@@ -32,12 +30,6 @@ namespace STM32T
 		const bool active_low;
 		
 	public:
-		template <typename T>
-		using TickFuncPtr = T (* const)();
-		
-		template <typename T>
-		using DelayFuncPtr = void (* const)(const T);
-		
 		const uint16_t Pin;
 		
 		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)

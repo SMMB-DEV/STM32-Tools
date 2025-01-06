@@ -1,8 +1,6 @@
 #pragma once
 
-#include "main.h"
-
-#include <type_traits>
+#include "./Common.hpp"
 
 
 
@@ -30,6 +28,12 @@ void delay_us(const uint32_t delay) \
 
 namespace STM32T
 {
+	template <typename T>
+	using TickFuncPtr = T (* const)();
+	
+	template <typename T>
+	using DelayFuncPtr = void (* const)(const T);
+	
 	#ifdef DWT
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
 	inline void DWT_Init()
@@ -78,7 +82,7 @@ namespace STM32T
 	template <typename T>
 	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
 	{
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+		static_assert(is_int<T>);
 		
 		while (get_tick() - start < wait);
 	}
