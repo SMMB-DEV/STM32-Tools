@@ -76,7 +76,7 @@ namespace STM32T
 			f_write(write), f_read(read), m_twoLines(line_count != 1), m_4Bit(_4_bit) {}
 		~HD44780() {}
 		
-		void Init()
+		HD44780& Init()
 		{
 			DWT_Init();
 			HAL_Delay(15);		// For VCC; probably not necessary.
@@ -97,6 +97,8 @@ namespace STM32T
 			Write(0, 0b0000'1100);			// Display on, Cursor off, Blink off
 			Clear();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
+			
+			return *this;
 		}
 		
 		HD44780& Clear()
