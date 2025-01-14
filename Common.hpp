@@ -132,11 +132,10 @@ namespace STM32T
 	};
 	
 	/**
-	* @brief Useful for queuing work inside an ISR to be handled in the main loop.
-	*		Allocates memory on the heap.
+	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal. Allocates memory on the heap.
 	*/
 	template <class T, size_t MAX_SIZE = SIZE_MAX>
-	class linked_list
+	class [[deprecated("Insertion and removal are still not atomic and there's a possibility of memory leak!")]] linked_list
 	{
 		static_assert(MAX_SIZE > 0);
 		
@@ -144,7 +143,7 @@ namespace STM32T
 		{
 			friend class linked_list<T, MAX_SIZE>;
 			
-			container *p_next = nullptr;
+			container * volatile p_next = nullptr;
 			T m_val;
 			
 			container(const T& val) : m_val(val) {}
@@ -152,49 +151,56 @@ namespace STM32T
 		};
 		
 		container * volatile p_list = nullptr;
+		volatile size_t m_size = 0;
 		
 	public:
+		linked_list() {}
+		~linked_list()
+		{
+			while (pop_front());
+		}
+		
 		/**
 		* @note Must not be called on an empty linked_list.
 		*/
-		T& front() const { return (*p_list).m_val; }
+		T& front() const { return p_list->m_val; }
 		
-		bool empty() const volatile { return p_list == nullptr; }
+		bool empty() const { return !m_size; }
+		
+		bool full() const { return m_size >= MAX_SIZE; }
 		
 		/**
 		* @brief Meant to be called from the main loop.
 		*/
-		void pop_front()
+		bool pop_front()
 		{
-			if (!p_list)
-				return;
+			if (empty())
+				return false;
 			
 			container *current = p_list;
 			p_list = p_list->p_next;
+			m_size--;
 			delete current;
+			
+			return true;
 		}
 		
 		/**
 		* @brief Meant to be called from an ISR.
+		* @note Don't call this from multiple ISRs with different priorities.
 		*/
 		template <class... Args>
-		T& emplace_back(Args&&... args)
+		void emplace_back(Args&&... args)
 		{
-			size_t size = 0;
+			if (full())
+				return;
+			
 			container * volatile *end = &p_list;
 			
-			while (*end)
-			{
+			while (*end)	// Not relying on m_size because it might not be in sync with p_list.
 				end = &((*end)->p_next);
-				size++;
-			}
-			
-			while (size-- >= MAX_SIZE)
-				pop_front();
 			
 			*end = new container(T{args...});
-			
-			return (**end).m_val;
 		}
 	};
 	
@@ -282,16 +288,12 @@ namespace STM32T
 	{
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
 		
-		union
-		{
-			T t;
-			uint8_t _u8[sizeof(T)];
-		} _t{t};
+		shared_arr<T> _t {.val = t};
 		
 		for (uint8_t i = 0; i < sizeof(T) / 2; i++)
-			std::swap(_t._u8[i], _t._u8[sizeof(T) - 1 - i]);
+			std::swap(_t.arr[i], _t.arr[sizeof(T) - 1 - i]);
 		
-		return _t.t;
+		return _t.val;
 	}
 	
 	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
