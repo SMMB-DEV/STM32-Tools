@@ -119,6 +119,12 @@ namespace STM32T
 		
 		uint8_t arr[sizeof(T)];
 		T val;
+		
+		shared_arr<T>& operator=(const shared_arr<T>& other)
+		{
+			val = other.val;
+			return *this;
+		}
 	};
 	
 	struct ScopeAction
