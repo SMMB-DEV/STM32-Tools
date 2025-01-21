@@ -104,6 +104,14 @@ namespace STM32T
 		return x / y + (x % y != 0);
 	}
 	
+	strv trim(strv view, strv trimChars = " \r\n\t\f\v"sv)
+	{
+		view.remove_prefix(std::min(view.find_first_not_of(trimChars), view.size()));
+		view.remove_suffix(view. size() - std::min(view.find_last_not_of(trimChars) + 1, view.size()));
+		
+		return view;
+	}
+	
 	template<class T>
 	union shared_arr
 	{
@@ -350,7 +358,7 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv& sep, const func<void (strv)>& op, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, const func<void (strv)>& op, const bool ignoreSingleEnded)
 	{
 		//note: assuming view is null-terminated.
 		//todo: handle {sep} inside string literals
