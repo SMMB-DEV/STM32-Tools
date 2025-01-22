@@ -392,6 +392,38 @@ namespace STM32T
 		}
 	}
 	
+	/**
+	* @param op - Handles each token. It op() returns true, it means that no more tokens should be processed.
+	*/
+	inline void Tokenize(strv view, const strv sep, const func<bool (strv)>& op, const bool ignoreSingleEnded)
+	{
+		//note: assuming view is null-terminated.
+		//todo: handle {sep} inside string literals
+		
+		const char * const start = view.data();
+		
+		while (view.size() > 0)
+		{
+			strv::size_type end = view.find(sep);
+			if (end == strv::npos)
+			{
+				if (!ignoreSingleEnded)
+					op(view);
+			
+				return;
+			}
+			
+			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
+			{
+				((char*)view.data())[end] = '\0';	//no problems with C string functions
+				if (op(view.substr(0, end)))
+					return;
+			}
+			
+			view.remove_prefix(end + sep.size());
+		}
+	}
+	
 #ifdef HAL_RTC_MODULE_ENABLED
 	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
 	{
