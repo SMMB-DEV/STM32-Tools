@@ -30,6 +30,7 @@ namespace STM32T
 			ERR,
 			FAIL,			// To execute command (received data was OK)
 			BUF_FULL,
+			ABORT,
 			UNKNOWN
 		};
 		
@@ -103,7 +104,7 @@ namespace STM32T
 				SendUART(cmd);
 			}
 			
-			if (type == CommandType::Write || type == CommandType::Test)
+			if ((type == CommandType::Write && !args.empty()) || type == CommandType::Test)
 				SendUART("="sv);
 			
 			if (type == CommandType::Write || type == CommandType::Execute || type == CommandType::Bare)

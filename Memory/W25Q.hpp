@@ -185,8 +185,27 @@ namespace STM32T
 			return false;
 		}
 		
+		template <size_t BUF_SIZE = PAGE_SIZE>
+		bool VerifyData(addr_t addr, const uint8_t * data, uint16_t len)
+		{
+			uint8_t buf[BUF_SIZE];
+			
+			while (len)
+			{
+				const uint16_t read_size = std::min((uint16_t)sizeof(buf), len);
+				if (!ReadData(addr, buf, read_size) or !memcmp(buf, data, read_size))
+					return false;
+				
+				addr += read_size;
+				data += read_size;
+				len -= read_size;
+			}
+			
+			return true;
+		}
+		
 		/**
-		* @param data - Must be at least 256 bytes (W25Q page size).
+		* @param data - Must be at most 256 bytes (W25Q page size).
 		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
 		*/
 		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = 256)
@@ -194,9 +213,6 @@ namespace STM32T
 			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len) and BusyWait(3);
 		}
 		
-		/**
-		* @param len - If zero, considered 256. Int narrowing will take care of making sure it's not more than 256 (W25Q page size).
-		*/
 		bool WriteData(const addr_t addr, const uint8_t * const data, const uint16_t len)
 		{
 			uint16_t written = 0;
@@ -224,6 +240,35 @@ namespace STM32T
 			}
 			
 			return WritePage(addr + written, data + written, rem);
+		}
+		
+		bool WriteVerifyData(const addr_t addr, const uint8_t * const data, const uint16_t len)
+		{
+			uint16_t written = 0;
+			const addr_t offset = addr % PAGE_SIZE;
+			
+			if (offset != 0)
+			{
+				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
+				if (!WritePage(addr + written, data + written, write_size) or !VerifyData(addr + written, data + written, write_size))
+					return false;
+				
+				written += write_size;
+			}
+			
+			uint16_t rem = len - written;
+			if (!rem)
+				return true;
+			
+			for (; rem > PAGE_SIZE; rem = len - written)
+			{
+				if (!WritePage(addr + written, data + written) or !VerifyData(addr + written, data + written, PAGE_SIZE))
+					return false;
+				
+				written += PAGE_SIZE;
+			}
+			
+			return WritePage(addr + written, data + written, rem) and VerifyData(addr + written, data + written, rem);
 		}
 		
 		template <class T>
