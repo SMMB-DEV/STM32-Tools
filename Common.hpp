@@ -146,10 +146,12 @@ namespace STM32T
 	};
 	
 	/**
-	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal. Allocates memory on the heap.
+	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal.
+	*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
+	* @note In very rare cases, it might lose some data. Do not use for critical information.
 	*/
 	template <class T, size_t MAX_SIZE = SIZE_MAX>
-	class [[deprecated("Insertion and removal are still not atomic and there's a possibility of memory leak!")]] linked_list
+	class linked_list
 	{
 		static_assert(MAX_SIZE > 0);
 		
@@ -166,6 +168,7 @@ namespace STM32T
 		
 		container * volatile p_list = nullptr;
 		volatile size_t m_size = 0;
+		volatile bool popping = false;
 		
 	public:
 		linked_list() {}
@@ -192,7 +195,11 @@ namespace STM32T
 				return false;
 			
 			container *current = p_list;
+			
+			popping = true;
 			p_list = p_list->p_next;
+			popping = false;
+			
 			m_size--;
 			delete current;
 			
@@ -207,6 +214,9 @@ namespace STM32T
 		void emplace_back(Args&&... args)
 		{
 			if (full())
+				return;
+			
+			if (m_size == 1 && popping && p_list != nullptr)		// fixme
 				return;
 			
 			container * volatile *end = &p_list;
