@@ -193,7 +193,7 @@ namespace STM32T
 			while (len)
 			{
 				const uint16_t read_size = std::min((uint16_t)sizeof(buf), len);
-				if (!ReadData(addr, buf, read_size) or !memcmp(buf, data, read_size))
+				if (!ReadData(addr, buf, read_size) or memcmp(buf, data, read_size) != 0)
 					return false;
 				
 				addr += read_size;
