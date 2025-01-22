@@ -21,8 +21,14 @@ namespace STM32T
 		* @brief Constructs an invald Version.
 		*/
 		Version() : m_data{ 0 } {}
-		constexpr Version(const uint32_t val) : m_data{.val = val} {}
+		Version(const uint32_t val) : m_data{.val = val} {}
 		constexpr Version(const uint8_t major, const uint8_t minor, const uint8_t patch, const PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
+		
+		Version(const Version& other) = default;
+		Version(const Version& other, PreRelease new_pr) : m_data(other.m_data)
+		{
+			m_data.arr[0] = new_pr;
+		}
 		
 		Version& operator=(const Version& other)
 		{
@@ -30,22 +36,22 @@ namespace STM32T
 			return *this;
 		}
 		
-		constexpr operator uint32_t() const
+		explicit operator uint32_t() const
 		{
 			return m_data.val;
 		}
 		
-		constexpr uint8_t Major() const
+		uint8_t Major() const
 		{
 			return m_data.arr[3];
 		}
 		
-		constexpr uint8_t Minor() const
+		uint8_t Minor() const
 		{
 			return m_data.arr[2];
 		}
 		
-		constexpr uint8_t Patch() const
+		uint8_t Patch() const
 		{
 			return m_data.arr[1];
 		}
@@ -61,22 +67,22 @@ namespace STM32T
 			return pr == Alpha || pr == Beta || pr == RC || pr == Normal;
 		}
 		
-		bool HasPreRelease() const
+		bool Complete() const
 		{
 			return PreRelease();
 		}
 		
-		bool operator==(const Version& other)
+		bool operator==(const Version& other) const
 		{
 			constexpr uint32_t NO_PR_MASK = 0xFFFF'FF00;
 			
-			if (HasPreRelease() && other.HasPreRelease())
+			if (Complete() && other.Complete())
 				return m_data.val == other.m_data.val;
 			
 			return (m_data.val & NO_PR_MASK) == (other.m_data.val & NO_PR_MASK);
 		}
 		
-		bool operator<(const Version& other)
+		bool operator<(const Version& other) const
 		{
 			if (Major() != other.Major())
 				return Major() < other.Major();
@@ -87,13 +93,13 @@ namespace STM32T
 			if (Patch() != other.Patch())
 				return Patch() < other.Patch();
 			
-			if (HasPreRelease() && other.HasPreRelease())
+			if (Complete() && other.Complete())
 				return PreRelease() < other.PreRelease();
 			
 			return false;
 		}
 		
-		bool operator<=(const Version& other)
+		bool operator<=(const Version& other) const
 		{
 			if (Major() != other.Major())
 				return Major() < other.Major();
@@ -104,17 +110,17 @@ namespace STM32T
 			if (Patch() != other.Patch())
 				return Patch() < other.Patch();
 			
-			if (HasPreRelease() && other.HasPreRelease())
+			if (Complete() && other.Complete())
 				return PreRelease() <= other.PreRelease();
 			
 			return true;
 		}
 		
-		bool operator>(const Version& other) { return !operator<=(other); }
+		bool operator>(const Version& other) const { return !operator<=(other); }
 		
-		bool operator>=(const Version& other) { return !operator<(other); }
+		bool operator>=(const Version& other) const { return !operator<(other); }
 		
-		bool operator!=(const Version& other) { return !operator==(other); }
+		bool operator!=(const Version& other) const { return !operator==(other); }
 		
 		operator strv() const
 		{
@@ -204,6 +210,43 @@ namespace STM32T
 				return Version();
 			
 			return Version(data);
+		}
+		
+		void Next()
+		{
+			switch (PreRelease())
+			{
+				case Alpha:
+					m_data.arr[0] = Beta;
+					break;
+				
+				case Beta:
+					m_data.arr[0] = RC;
+					break;
+				
+				case RC:
+					m_data.arr[0] = Normal;
+					break;
+				
+				case Normal:
+				{
+					m_data.arr[0] = Alpha;
+					
+					for (uint8_t i = 1; i < 4; i++)
+					{
+						m_data.arr[i]++;
+						if (m_data.arr[i] != 0)
+							break;
+					}
+					
+					break;
+				}
+				
+				case Unspecified:
+				default:
+					m_data.arr[0] = Alpha;
+					break;
+			}
 		}
 	};
 }
