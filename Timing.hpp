@@ -82,7 +82,7 @@ namespace STM32T
 	template <typename T>
 	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
 	{
-		static_assert(is_int<T>);
+		static_assert(is_int_v<T>);
 		
 		while (get_tick() - start < wait);
 	}

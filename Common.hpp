@@ -28,7 +28,7 @@ namespace STM32T
 	using func = std::function<F>;
 	
 	template <class T>
-	constexpr bool is_int = !std::is_same_v<T, bool> && std::is_integral_v<T>;
+	constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
 
 	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
@@ -99,7 +99,7 @@ namespace STM32T
 	template <typename T>
 	inline constexpr T ceil(T x, T y)
 	{
-		static_assert(is_int<T>);
+		static_assert(is_int_v<T>);
 		
 		return x / y + (x % y != 0);
 	}
