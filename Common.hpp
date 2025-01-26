@@ -127,52 +127,22 @@ namespace STM32T
 		}
 	};
 	
-	template <class RET = int>
 	struct ScopeAction
 	{
-		using end_type = void (* const)();
-		using ret_type = const RET& (* const)(const RET& ret);
+		void (* const m_end)();
 		
-		end_type m_end;
-		ret_type m_ret;
-		
-		ScopeAction(end_type end) : m_end(end), m_ret(nullptr) {}
-		ScopeAction(ret_type ret) : m_end(nullptr), m_ret(ret) {}
-		
-		~ScopeAction()
-		{
-			if (m_end)
-				m_end();
-		}
-		
-		const RET& operator()(const RET& t)
-		{
-			return m_ret(t);
-		}
+		ScopeAction(void (* end)()) : m_end(end) {}
+		~ScopeAction() { m_end(); }
 	};
 	
-	template <class RET = int>
 	struct ScopeActionF
 	{
-		using end_t = func<void()>;
-		using ret_t = func<const RET&(const RET&)>;
+		using funt_t = func<void()>;
 		
-		const end_t m_end;
-		const ret_t m_ret;
+		const funt_t m_end;
 		
-		ScopeActionF(end_t &&end) : m_end(end), m_ret() {}
-		ScopeActionF(ret_t &&ret) : m_end(), m_ret(ret) {}
-		
-		~ScopeActionF()
-		{
-			if (m_end)
-				m_end();
-		}
-		
-		const RET& operator()(const RET& t)
-		{
-			return m_ret(t);
-		}
+		ScopeActionF(funt_t &&end) : m_end(end) {}
+		~ScopeActionF() { m_end(); }
 	};
 	
 	/**
