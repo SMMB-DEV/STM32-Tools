@@ -145,6 +145,74 @@ namespace STM32T
 		~ScopeActionF() { m_end(); }
 	};
 	
+	template <typename T, T MIN, T MAX>
+	class ClampedInt
+	{
+		static_assert(is_int_v<T>);
+		
+		T m_val;
+		
+	public:
+		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
+		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
+		ClampedInt(const ClampedInt& other) : m_val(other.m_val) {}
+		
+		operator T() const
+		{
+			return m_val;
+		}
+		
+		ClampedInt& operator=(const T val)
+		{
+			m_val = std::clamp(val, MIN, MAX);
+			return *this;
+		}
+		
+		ClampedInt& operator++()	// prefix
+		{
+			if (m_val >= MAX)
+				m_val = MIN;
+			else
+				m_val++;
+			
+			return *this;
+		}
+		
+		ClampedInt operator++(int)	// postfix
+		{
+			ClampedInt val = *this;
+			
+			if (m_val >= MAX)
+				m_val = MIN;
+			else
+				m_val++;
+			
+			return val;
+		}
+		
+		ClampedInt& operator--()	// prefix
+		{
+			if (m_val <= MIN)
+				m_val = MAX;
+			else
+				m_val--;
+			
+			return *this;
+		}
+		
+		ClampedInt operator--(int)	// postfix
+		{
+			ClampedInt val = *this;
+			
+			if (m_val <= MIN)
+				m_val = MAX;
+			else
+				m_val--;
+			
+			return val;
+		}
+	};
+	
 	/**
 	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal.
 	*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
