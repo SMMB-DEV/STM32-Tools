@@ -130,6 +130,8 @@ namespace STM32T
 		
 		enum class ET : uint8_t { SECTOR = ERASE_SECTOR, HALF_BLOCK = ERASE_HALF_BLOCK, BLOCK = ERASE_BLOCK, CHIP = ERASE_CHIP };
 		
+		static addr_t Sector(const uint16_t sector_num) { return sector_num * SECTOR_SIZE; }
+		
 		/**
 		* @param CS - This is usually active low and must be configured as such. The class won't handle the polarity of the pin.
 		* @param size - The size of memory in Mbits.
@@ -205,7 +207,7 @@ namespace STM32T
 		}
 		
 		/**
-		* @param data - Must be at most 256 bytes (W25Q page size).
+		* @param data - Should be at most 256 bytes (W25Q page size).
 		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
 		*/
 		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = 256)
@@ -286,7 +288,27 @@ namespace STM32T
 		bool Erase(const addr_t addr, const ET erase_type)
 		{
 			static constexpr uint32_t DELAY[16] = { 400, 0, 1600, 0, 0, 0, 0, 200'000, 2000, 0 };	// lookup table for max delay
+			
 			return SingleByte(WRITE_ENABLE) and Write((CMD)erase_type, addr, nullptr, 0) and BusyWait(DELAY[(uint8_t)erase_type & 0x0F]);
+		}
+		
+		bool ModifySector(const uint16_t sector_num, const uint16_t offset, const uint8_t * const data, const uint16_t len)
+		{
+			const addr_t addr = Sector(sector_num);
+			
+			if (offset + len > SECTOR_SIZE)
+				return false;
+			
+			if (VerifyData(addr + offset, data, len))
+				return true;
+			
+			std::unique_ptr<uint8_t[]> buf(new uint8_t[SECTOR_SIZE]);
+			if (!ReadData(addr, buf.get(), SECTOR_SIZE))
+				return false;
+			
+			memcpy(buf.get() + offset, data, len);
+			// fixme: If Erase() fails, the data is lost.
+			return Erase(addr, ET::SECTOR) and WriteData(addr, buf.get(), SECTOR_SIZE);
 		}
 	};
 }
