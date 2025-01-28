@@ -17,7 +17,7 @@ extern "C"
 
 
 using std::operator"" sv;
-using strv = std::string_view;
+using strv = std::string_view;	// todo: Make strv a subclass with a compare_remove() method
 
 namespace STM32T
 {
@@ -148,19 +148,18 @@ namespace STM32T
 	template <typename T, T MIN, T MAX>
 	class ClampedInt
 	{
-		static_assert(is_int_v<T>);
+		static_assert(is_int_v<T> && MAX > MIN);
+		
+		static constexpr bool is_unlimited = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
+		
 		
 		T m_val;
 		
 	public:
 		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
 		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
-		ClampedInt(const ClampedInt& other) : m_val(other.m_val) {}
 		
-		operator T() const
-		{
-			return m_val;
-		}
+		operator T() const volatile { return m_val; }
 		
 		ClampedInt& operator=(const T val)
 		{
@@ -168,12 +167,34 @@ namespace STM32T
 			return *this;
 		}
 		
+		bool operator==(const T val) { return m_val == val; }
+		
 		ClampedInt& operator++()	// prefix
 		{
-			if (m_val >= MAX)
-				m_val = MIN;
-			else
+			if constexpr (is_unlimited)
 				m_val++;
+			else
+			{
+				if (m_val >= MAX)
+					m_val = MIN;
+				else
+					m_val++;
+			}
+			
+			return *this;
+		}
+		
+		ClampedInt& operator--()	// prefix
+		{
+			if constexpr (is_unlimited)
+				m_val--;
+			else
+			{
+				if (m_val <= MIN)
+					m_val = MAX;
+				else
+					m_val--;
+			}
 			
 			return *this;
 		}
@@ -182,32 +203,96 @@ namespace STM32T
 		{
 			ClampedInt val = *this;
 			
-			if (m_val >= MAX)
-				m_val = MIN;
-			else
+			if constexpr (is_unlimited)
 				m_val++;
+			else
+			{
+				if (m_val >= MAX)
+					m_val = MIN;
+				else
+					m_val++;
+			}
 			
 			return val;
-		}
-		
-		ClampedInt& operator--()	// prefix
-		{
-			if (m_val <= MIN)
-				m_val = MAX;
-			else
-				m_val--;
-			
-			return *this;
 		}
 		
 		ClampedInt operator--(int)	// postfix
 		{
 			ClampedInt val = *this;
 			
-			if (m_val <= MIN)
-				m_val = MAX;
-			else
+			if constexpr (is_unlimited)
 				m_val--;
+			else
+			{
+				if (m_val <= MIN)
+					m_val = MAX;
+				else
+					m_val--;
+			}
+			
+			return val;
+		}
+		
+		volatile ClampedInt& operator++() volatile	// prefix
+		{
+			if constexpr (is_unlimited)
+				m_val++;
+			else
+			{
+				if (m_val >= MAX)
+					m_val = MIN;
+				else
+					m_val++;
+			}
+			
+			return *this;
+		}
+		
+		volatile ClampedInt& operator--() volatile	// prefix
+		{
+			if constexpr (is_unlimited)
+				m_val--;
+			else
+			{
+				if (m_val <= MIN)
+					m_val = MAX;
+				else
+					m_val--;
+			}
+			
+			return *this;
+		}
+		
+		ClampedInt operator++(int) volatile	// postfix
+		{
+			ClampedInt val = *this;
+			
+			if constexpr (is_unlimited)
+				m_val++;
+			else
+			{
+				if (m_val >= MAX)
+					m_val = MIN;
+				else
+					m_val++;
+			}
+			
+			return val;
+		}
+		
+		ClampedInt operator--(int) volatile	// postfix
+		{
+			ClampedInt val = *this;
+			
+			if constexpr (is_unlimited)
+				m_val--;
+			else
+			{
+				if (m_val <= MIN)
+					m_val = MAX;
+				else
+					m_val--;
+			}
 			
 			return val;
 		}
@@ -284,7 +369,7 @@ namespace STM32T
 			if (full())
 				return;
 			
-			if (m_size == 1 && popping && p_list != nullptr)		// fixme
+			if (m_size == 1 && popping && p_list != nullptr)	// fixme
 				return;
 			
 			container * volatile *end = &p_list;
