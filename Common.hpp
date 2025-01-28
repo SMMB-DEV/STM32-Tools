@@ -388,33 +388,6 @@ namespace STM32T
 		return _t.val;
 	}
 	
-	inline void __attribute__((deprecated)) Tokenize(vec<strv>& tokens, strv view, const strv& sep = " "sv, const bool ignoreSingleEnded = false)
-	{
-		//assuming view is null-terminated.
-		
-		const char * const start = view.data();
-		
-		while (view.size() > 0)
-		{
-			strv::size_type end = view.find(sep);
-			if (end == strv::npos)
-			{
-				if (!ignoreSingleEnded)
-					tokens.push_back(view);
-			
-				return;
-			}
-			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
-			{
-				((char*)view.data())[end] = '\0';	//no problems with C string functions
-				tokens.push_back(view.substr(0, end));
-			}
-			
-			view.remove_prefix(end + sep.size());
-		}
-	}
-	
 	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded)
 	{
 		//assuming view is null-terminated.
@@ -598,104 +571,6 @@ namespace STM32T
 		}
 		
 		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
-	}
-	
-	[[deprecated]] inline void AdjustDateAndTime_ms(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t msec)
-	{
-		// 24-Hour/Binary Format
-		
-		if (msec == 0)
-			return;
-		
-		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	//February can be 29
-		
-		//These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
-		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
-		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
-		
-		int8_t sec = (msec / 1000) % 60;
-		int16_t mins = (msec / (60 * 1000)) % 60;
-		int16_t hours = (msec / (60 * 60 * 1000)) % 24;
-		int8_t days = msec / (24 * 60 * 60 * 1000);
-		//msec %= 1000;
-		
-		if (msec > 0)
-		{
-			time.Seconds += sec;
-			if (time.Seconds >= 60)
-			{
-				time.Seconds -= 60;
-				time.Minutes++;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes >= 60)
-			{
-				time.Minutes -= 60;
-				time.Hours++;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours >= 24)
-			{
-				time.Hours -= 24;
-				days++;
-			}
-			
-			date.Date += days;
-			if (date.Date > monthDays)
-			{
-				date.Date -= monthDays;
-				date.Month++;
-				
-				if (date.Month > 12)
-				{
-					date.Month -= 12;
-					date.Year++;
-					date.Year %= 100;
-				}
-			}
-		}
-		else
-		{
-			time.Seconds += sec;
-			if (time.Seconds > 60)
-			{
-				time.Seconds += 60;
-				time.Minutes--;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes > 60)	//underflow
-			{
-				time.Minutes += 60;
-				time.Hours--;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours > 24)	//underflow
-			{
-				time.Hours += 24;
-				days--;
-			}
-			
-			const uint8_t lastMonth = date.Month == 1 ? 12 : date.Month - 1;
-			date.Date += days;
-			if (date.Date == 0 || date.Date > monthDays)	//underflow
-			{
-				date.Date = MONTH_DAYS[lastMonth - 1] + (lastMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
-				date.Month = lastMonth;
-				
-				if (lastMonth == 12)
-				{
-					date.Year--;
-					if (date.Year > 100)	//underflow
-						date.Year += 100;
-				}
-			}
-		}
-		
-		date.WeekDay = ((date.WeekDay - 1) + 7 + days % 7) % 7 + 1;
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
 }
