@@ -37,11 +37,21 @@ namespace STM32T
 		class URC : public strv
 		{
 		public:
-			const uint32_t timestamp;
+			uint32_t m_timestamp;
 			
-			URC() : strv(), timestamp(0) {}
-			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), timestamp(timestamp) {}
-			URC(const strv& other, const uint32_t timestamp) : strv(other), timestamp(timestamp) {}
+			URC() : strv(), m_timestamp(0) {}
+			URC(URC&& other) : strv(std::move((strv)other)), m_timestamp(other.m_timestamp) {}
+			
+			URC& operator=(URC&& other) &
+			{
+				(strv)*this = std::move((strv)other);
+				m_timestamp = other.m_timestamp;
+				
+				return *this;
+			}
+			
+			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), m_timestamp(timestamp) {}
+			URC(const strv& other, const uint32_t timestamp) : strv(other), m_timestamp(timestamp) {}
 			
 			bool compare_remove(const std::string_view& remove)
 			{
@@ -650,6 +660,19 @@ namespace STM32T
 							return std::nullopt;
 					}
 					
+					if (dt.IsSet())
+						return dt;
+				}
+				
+				return std::nullopt;
+			}
+			
+			static std::optional<DateTime> ParseSMS(strv view)
+			{
+				DateTime dt;
+				
+				if (7 == sscanf(view.data(), "\"20%2hhu/%2hhu/%2hhu %2hhu:%2hhu:%2hhu%3hhd\"", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz))
+				{
 					if (dt.IsSet())
 						return dt;
 				}

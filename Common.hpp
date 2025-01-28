@@ -21,6 +21,8 @@ using strv = std::string_view;	// todo: Make strv a subclass with a compare_remo
 
 namespace STM32T
 {
+	inline constexpr strv WHITESPACE = " \r\n\t\f\v"sv;
+	
 	template <class T>
 	using vec = std::vector<T>;
 	
@@ -104,7 +106,7 @@ namespace STM32T
 		return x / y + (x % y != 0);
 	}
 	
-	strv trim(strv view, strv trimChars = " \r\n\t\f\v"sv)
+	strv trim(strv view, strv trimChars = WHITESPACE)
 	{
 		view.remove_prefix(std::min(view.find_first_not_of(trimChars), view.size()));
 		view.remove_suffix(view. size() - std::min(view.find_last_not_of(trimChars) + 1, view.size()));
@@ -162,6 +164,12 @@ namespace STM32T
 		operator T() const volatile { return m_val; }
 		
 		ClampedInt& operator=(const T val)
+		{
+			m_val = std::clamp(val, MIN, MAX);
+			return *this;
+		}
+		
+		volatile ClampedInt& operator=(const T val) volatile
 		{
 			m_val = std::clamp(val, MIN, MAX);
 			return *this;
@@ -471,9 +479,7 @@ namespace STM32T
 				m_front++;
 			}
 			
-			T item = m_items[prio_index];
-			
-			return item;
+			return std::move(m_items[prio_index]);
 		}
 	};
 	
@@ -569,15 +575,15 @@ namespace STM32T
 		return _t.val;
 	}
 	
-	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
 	{
-		//assuming view is null-terminated.
+		// Assuming view is null-terminated.
 		
 		const char * const start = view.data();
 		
 		while (view.size() > 0)
 		{
-			strv::size_type end = view.find(sep);
+			size_t end = (view.*f_find)(sep, 0);
 			if (end == strv::npos)
 			{
 				if (!ignoreSingleEnded)
@@ -586,9 +592,9 @@ namespace STM32T
 				return;
 			}
 			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
+			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
 			{
-				((char*)view.data())[end] = '\0';	// no problems with C string functions. todo: use std::span
+				((char*)view.data())[end] = '\0';	// No problems with C string functions. todo: use std::span
 				tokens.push_back(view.substr(0, end));
 			}
 			
@@ -596,16 +602,15 @@ namespace STM32T
 		}
 	}
 	
-	inline void Tokenize(strv view, const strv sep, const func<void (strv)>& op, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, const func<void (strv)>& op, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
 	{
-		//note: assuming view is null-terminated.
-		//todo: handle {sep} inside string literals
+		// note: Assuming view is null-terminated.
 		
 		const char * const start = view.data();
 		
 		while (view.size() > 0)
 		{
-			strv::size_type end = view.find(sep);
+			size_t end = (view.*f_find)(sep, 0);
 			if (end == strv::npos)
 			{
 				if (!ignoreSingleEnded)
@@ -614,9 +619,9 @@ namespace STM32T
 				return;
 			}
 			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
+			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
 			{
-				((char*)view.data())[end] = '\0';	//no problems with C string functions
+				((char*)view.data())[end] = '\0';	// No problems with C string functions
 				op(view.substr(0, end));
 			}
 			
@@ -627,16 +632,16 @@ namespace STM32T
 	/**
 	* @param op - Handles each token. It op() returns true, it means that no more tokens should be processed.
 	*/
-	inline void Tokenize(strv view, const strv sep, const func<bool (strv)>& op, const bool ignoreSingleEnded)
+	inline void Tokenize(strv view, const strv sep, const func<bool (strv)>& op, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
 	{
-		//note: assuming view is null-terminated.
-		//todo: handle {sep} inside string literals
+		// note: Assuming view is null-terminated.
+		// todo: Handle {sep} inside string literals
 		
 		const char * const start = view.data();
 		
 		while (view.size() > 0)
 		{
-			strv::size_type end = view.find(sep);
+			size_t end = (view.*f_find)(sep, 0);
 			if (end == strv::npos)
 			{
 				if (!ignoreSingleEnded)
@@ -645,9 +650,9 @@ namespace STM32T
 				return;
 			}
 			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	//ensures no empty tokens
+			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
 			{
-				((char*)view.data())[end] = '\0';	//no problems with C string functions
+				((char*)view.data())[end] = '\0';	// No problems with C string functions
 				if (op(view.substr(0, end)))
 					return;
 			}
@@ -655,6 +660,8 @@ namespace STM32T
 			view.remove_prefix(end + sep.size());
 		}
 	}
+	
+	
 	
 #ifdef HAL_RTC_MODULE_ENABLED
 	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
