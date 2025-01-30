@@ -26,11 +26,14 @@ namespace STM32T
 		static constexpr uint32_t GPIO_NUMBER = 16;
 		
 		GPIO_TypeDef* const Port;
-		const bool active_low;
 		
 	public:
 		const uint16_t Pin;
 		
+	private:
+		const bool active_low;
+		
+	public:
 		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
 		{
 			assert_param(IS_GPIO_PIN(Pin));
@@ -38,17 +41,17 @@ namespace STM32T
 		
 		__attribute__((always_inline)) bool Read() const
 		{
-			return (bool)(Port->IDR & Pin) ^ active_low;
+			return (Port->IDR & Pin) ? !active_low : active_low;
 		}
 		
 		__attribute__((always_inline)) bool Check() const
 		{
-			return (bool)(Port->ODR & Pin) ^ active_low;
+			return (Port->ODR & Pin) ? !active_low : active_low;
 		}
 		
 		__attribute__((always_inline)) void Set(bool state = true)
 		{
-			Port->BSRR = Pin << ((active_low ? state : !state) * GPIO_NUMBER);
+			Port->BSRR = Pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
 		}
 		
 		__attribute__((always_inline)) void Reset()
@@ -128,7 +131,59 @@ namespace STM32T
 		}
 	};
 	
-	
+	template <size_t COUNT>
+	class IOs
+	{
+		static_assert(COUNT > 1 && COUNT <= 32);
+		
+		std::array<IO, COUNT> m_pins;
+		
+	public:
+		IOs(std::array<IO, COUNT>&& pins) : m_pins(pins) {}
+		
+		STM32T::IO& operator[](size_t index) { return m_pins[index]; }
+		
+		uint32_t Read() const
+		{
+			uint32_t bits = 0;
+			for (size_t i = 0; i < COUNT; i++)
+				bits |= m_pins[i].Read() << i;
+			
+			return bits;
+		}
+		
+		uint32_t Check() const
+		{
+			uint32_t bits = 0;
+			for (size_t i = 0; i < COUNT; i++)
+				bits |= m_pins[i].Check() << i;
+			
+			return bits;
+		}
+		
+		void Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF)
+		{
+			for (uint32_t i = 0; i < COUNT; i++)
+			{
+				if (mask & (1 << i))
+					m_pins[i].Set((vals >> i) & 1);
+			}
+		}
+		
+		void Reset(const uint32_t mask = 0xFFFF'FFFF)
+		{
+			Set(0x0000'0000, mask);
+		}
+		
+		void Toggle(const uint32_t mask = 0xFFFF'FFFF)
+		{
+			for (uint32_t i = 0; i < COUNT; i++)
+			{
+				if (mask & (1 << i))
+					m_pins[i].Toggle();
+			}
+		}
+	};
 	
 	struct ScopeIO
 	{

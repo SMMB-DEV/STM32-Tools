@@ -5,8 +5,6 @@ extern "C"
 	#include "main.h"
 }
 
-#include "./strv.hpp"
-
 #include <vector>
 #include <functional>
 #include <type_traits>
