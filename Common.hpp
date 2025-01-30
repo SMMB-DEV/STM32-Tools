@@ -2,10 +2,11 @@
 
 extern "C"
 {
-#include "main.h"
+	#include "main.h"
 }
 
-#include <string_view>
+#include "./strv.hpp"
+
 #include <vector>
 #include <functional>
 #include <type_traits>
@@ -16,13 +17,8 @@ extern "C"
 
 
 
-using std::operator"" sv;
-using strv = std::string_view;	// todo: Make strv a subclass with a compare_remove() method
-
 namespace STM32T
 {
-	inline constexpr strv WHITESPACE = " \r\n\t\f\v"sv;
-	
 	template <class T>
 	using vec = std::vector<T>;
 	
@@ -104,14 +100,6 @@ namespace STM32T
 		static_assert(is_int_v<T>);
 		
 		return x / y + (x % y != 0);
-	}
-	
-	strv trim(strv view, strv trimChars = WHITESPACE)
-	{
-		view.remove_prefix(std::min(view.find_first_not_of(trimChars), view.size()));
-		view.remove_suffix(view. size() - std::min(view.find_last_not_of(trimChars) + 1, view.size()));
-		
-		return view;
 	}
 	
 	template<class T>
@@ -574,94 +562,6 @@ namespace STM32T
 		
 		return _t.val;
 	}
-	
-	inline void Tokenize(strv view, const strv sep, vec<strv>& tokens, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
-	{
-		// Assuming view is null-terminated.
-		
-		const char * const start = view.data();
-		
-		while (view.size() > 0)
-		{
-			size_t end = (view.*f_find)(sep, 0);
-			if (end == strv::npos)
-			{
-				if (!ignoreSingleEnded)
-					tokens.push_back(view);		// This is why the view must be null-terminated.
-			
-				return;
-			}
-			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-			{
-				((char*)view.data())[end] = '\0';	// No problems with C string functions. todo: use std::span
-				tokens.push_back(view.substr(0, end));
-			}
-			
-			view.remove_prefix(end + sep.size());
-		}
-	}
-	
-	inline void Tokenize(strv view, const strv sep, const func<void (strv)>& op, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
-	{
-		// note: Assuming view is null-terminated.
-		
-		const char * const start = view.data();
-		
-		while (view.size() > 0)
-		{
-			size_t end = (view.*f_find)(sep, 0);
-			if (end == strv::npos)
-			{
-				if (!ignoreSingleEnded)
-					op(view);
-			
-				return;
-			}
-			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-			{
-				((char*)view.data())[end] = '\0';	// No problems with C string functions
-				op(view.substr(0, end));
-			}
-			
-			view.remove_prefix(end + sep.size());
-		}
-	}
-	
-	/**
-	* @param op - Handles each token. It op() returns true, it means that no more tokens should be processed.
-	*/
-	inline void Tokenize(strv view, const strv sep, const func<bool (strv)>& op, const bool ignoreSingleEnded, size_t (strv::*f_find)(strv, size_t) const = &strv::find)
-	{
-		// note: Assuming view is null-terminated.
-		// todo: Handle {sep} inside string literals
-		
-		const char * const start = view.data();
-		
-		while (view.size() > 0)
-		{
-			size_t end = (view.*f_find)(sep, 0);
-			if (end == strv::npos)
-			{
-				if (!ignoreSingleEnded)
-					op(view);
-			
-				return;
-			}
-			
-			if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-			{
-				((char*)view.data())[end] = '\0';	// No problems with C string functions
-				if (op(view.substr(0, end)))
-					return;
-			}
-			
-			view.remove_prefix(end + sep.size());
-		}
-	}
-	
-	
 	
 #ifdef HAL_RTC_MODULE_ENABLED
 	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)

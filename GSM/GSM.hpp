@@ -52,17 +52,6 @@ namespace STM32T
 			
 			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), m_timestamp(timestamp) {}
 			URC(const strv& other, const uint32_t timestamp) : strv(other), m_timestamp(timestamp) {}
-			
-			bool compare_remove(const std::string_view& remove)
-			{
-				if (compare(0, remove.size(), remove) == 0)
-				{
-					remove_prefix(remove.size());
-					return true;
-				}
-
-				return false;
-			}
 		};
 		
 	protected:
@@ -83,7 +72,7 @@ namespace STM32T
 		void addURCFromBuf(const strv buf)
 		{
 			vec<strv> tokens;
-			Tokenize(buf, "\r\n"sv, tokens, true);
+			buf.tokenize("\r\n"sv, tokens, true);
 			addURCs(tokens);
 		}
 		
@@ -162,7 +151,7 @@ namespace STM32T
 			
 			buffer[len] = 0;	// make it safe for C str functions
 			
-			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			return OK;
 		}
@@ -263,7 +252,7 @@ namespace STM32T
 				return code;
 			
 			vec<strv> tokens;
-			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			// fixme: Standard() might not return the correct code.
 			return op ? op(tokens) : Standard(tokens);
@@ -283,7 +272,7 @@ namespace STM32T
 				return code;
 			
 			vec<strv> tokens;
-			Tokenize(strv(buffer, len), "\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			return op(tokens);
 		}
