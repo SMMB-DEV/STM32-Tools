@@ -310,5 +310,11 @@ namespace STM32T
 			// fixme: If Erase() fails, the data is lost.
 			return Erase(addr, ET::SECTOR) and WriteData(addr, buf.get(), SECTOR_SIZE);
 		}
+		
+		template <class T>
+		bool ModifySector(const uint16_t sector_num, const uint16_t offset, const T& t)
+		{
+			return ModifySector(sector_num, offset, (uint8_t *)&t, sizeof(t));
+		}
 	};
 }
