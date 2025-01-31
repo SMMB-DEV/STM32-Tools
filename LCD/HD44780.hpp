@@ -12,7 +12,8 @@ namespace STM32T
 		void (* const f_write)(bool rs, uint8_t data);
 		uint8_t (* const f_read)(bool rs);
 		uint8_t m_addressCounter = 0;
-		bool m_twoLines, m_4Bit;
+		const uint8_t m_colCount;
+		bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
 		
 		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = 50)
 		{
@@ -47,10 +48,10 @@ namespace STM32T
 		
 		bool BusyWait(uint16_t timeout_us)
 		{
-			const uint32_t start = DWT_GetTick();
+			auto time = DWT_Timeout(timeout_us);
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
-				if (DWT_GetTick() - start >= timeout_us)
+				if (time.Expired())
 					return false;
 			}
 			
@@ -72,8 +73,9 @@ namespace STM32T
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
 		*/
-		HD44780(void (* const write)(bool rs, uint8_t data), uint8_t (* const read)(bool rs), uint8_t line_count = 2, bool _4_bit = true) :
-			f_write(write), f_read(read), m_twoLines(line_count != 1), m_4Bit(_4_bit) {}
+		HD44780(const uint8_t line_count, const uint8_t col_count, void (* const write)(bool rs, uint8_t data), uint8_t (* const read)(bool rs), bool _4_bit = true) :
+			f_write(write), f_read(read), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
+		
 		~HD44780() {}
 		
 		HD44780& Init()
@@ -94,7 +96,7 @@ namespace STM32T
 			if (m_4Bit)
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
 			
-			Write(0, 0b0000'1100);			// Display on, Cursor off, Blink off
+			Display(true, false, false);
 			Clear();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
 			
@@ -105,6 +107,11 @@ namespace STM32T
 		{
 			Write(0, 0b0000'0001, 1600);	// Display clear
 			return *this;
+		}
+		
+		void Display(const bool on, const bool cursor = false, const bool blink = false)
+		{
+			Write(0, 0b0000'1000 | (on << 2) | (cursor << 1) | blink);
 		}
 		
 		void NextLine()
@@ -123,7 +130,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		void PutChar(const uint8_t ch, bool interpret_specials = true) override
+		void PutChar(const uint8_t ch, bool interpret_specials = true, bool auto_next_line = true) override
 		{
 			if (interpret_specials)
 			{
@@ -166,6 +173,9 @@ namespace STM32T
 					}*/
 				}
 			}
+			
+			if (auto_next_line && m_twoLines && (m_addressCounter & 0x3F) >= m_colCount - 1)
+				NextLine();
 			
 			Write(1, ch);
 		}

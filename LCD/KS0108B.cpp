@@ -822,7 +822,7 @@ namespace STM32T
 		Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 	}
 
-	void KS0108B::PutChar(const uint8_t ch, bool interpret_specials)
+	void KS0108B::PutChar(const uint8_t ch, bool interpret_specials, bool auto_next_line)
 	{
 		//todo: space between characters
 		

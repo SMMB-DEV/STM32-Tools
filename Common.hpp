@@ -46,6 +46,15 @@ namespace STM32T
 		return x;
 	}
 	
+	inline constexpr uint32_t pow10(uint8_t pow)
+	{
+		uint32_t val = 1;
+		for (uint8_t i = 0; i < pow; i++)
+			val *= 10;
+		
+		return val;
+	}
+	
 	/**
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
 	*/

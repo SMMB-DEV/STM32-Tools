@@ -67,9 +67,17 @@ namespace STM32T
 	/**
 	* @note Doesn't overflow at UINT32_MAX. Be careful when using this function for time difference measurement.
 	*/
+	[[deprecated("Use DWT_GetCycle() and DWT_Elapsed() instead.")]]
 	inline uint32_t DWT_GetTick()
 	{
 		return DWT->CYCCNT / (DWT_DELAY_CLK / 1'000'000);
+	}
+	
+	inline uint32_t DWT_GetCycle() { return DWT->CYCCNT; }
+	
+	inline bool DWT_Elapsed(const uint32_t startCycle, const uint16_t time_us)
+	{
+		return DWT->CYCCNT - startCycle >= time_us * (DWT_DELAY_CLK / 1'000'000);
 	}
 	
 	inline void DWT_Delay_ns(uint16_t ns)
@@ -86,4 +94,15 @@ namespace STM32T
 		
 		while (get_tick() - start < wait);
 	}
+	
+	class DWT_Timeout
+	{
+		const uint32_t m_start, m_timeout;
+	public:
+		static uint32_t ToCycles(const uint16_t timeout_us) { return timeout_us * (DWT_DELAY_CLK / 1'000'000); }
+		
+		DWT_Timeout(const uint16_t timeout_us) : m_start(DWT_GetCycle()), m_timeout(ToCycles(timeout_us)) {}
+		
+		bool Expired() const { return DWT_GetCycle() - m_start >= m_timeout; }
+	};
 }

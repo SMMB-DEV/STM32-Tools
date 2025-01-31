@@ -3,6 +3,7 @@
 //#define GSM_URC_SUPPORT
 
 #include "../Common.hpp"
+#include "../strv.hpp"
 
 #include <memory>	// unique_ptr
 #include <optional>
