@@ -51,7 +51,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_UART(PHUART) \
+#define STM32T_SYS_WRITE_ITM() \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
@@ -72,7 +72,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_ITM() \
+#define STM32T_SYS_WRITE_UART(PHUART) \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
