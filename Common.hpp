@@ -486,75 +486,69 @@ namespace STM32T
 	#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
 	//#define static_warn(x, ...) (__attribute__((deprecated)) (void))
 	
-	template<typename T, typename BUF_TYPE = char*>
-	inline T pack_be(BUF_TYPE buf)
+	template<typename T>
+	inline T pack_be(const void *buf)
 	{
-		{
-			using namespace std;
-			
-			static_assert(is_same_v<make_unsigned_t<remove_const_t<remove_pointer_t<BUF_TYPE>>>, unsigned char>);
-			static_assert(!is_same_v<T, bool> && is_integral_v<T>);
-		}
+		static_assert(is_int_v<T>);
+		
+		const uint8_t *buf2 = reinterpret_cast<const uint8_t *>(buf);
 		
 		T val = 0;
 		for (size_t i = 0; i < sizeof(T); i++)
 		{
 			val <<= 8;
-			val |= *buf++;
+			val |= *buf2++;
 		}
 		
 		return val;
 	}
 	
-	template<typename T, typename BUF_TYPE = char*>
-	inline T pack_le(BUF_TYPE buf)
+	template<typename T>
+	inline T pack_le(const void *buf)
 	{
-		{
-			using namespace std;
-			
-			static_assert(is_same_v<BUF_TYPE, char*> || is_same_v<BUF_TYPE, uint8_t*>);
-			static_assert(!is_same_v<T, bool> && is_integral_v<T>, "");
-		}
+		static_assert(is_int_v<T>);
 		
 		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
 		{
+			const uint8_t *buf2 = reinterpret_cast<const uint8_t *>(buf);
+			
 			T val = 0;
-			buf += sizeof(T);
+			buf2 += sizeof(T);
 			for (size_t i = 0; i < sizeof(T); i++)
 			{
 				val <<= 8;
-				val |= *--buf;
+				val |= *--buf2;
 			}
 			
 			return val;
 		}
 		else
-			return *(T*)buf;
+			return *reinterpret_cast<const T*>(buf);
 	}
 	
-	template<typename T, typename BUF_TYPE = char*>
-	inline void unpack_be(BUF_TYPE buf, T val)
+	template<typename T>
+	inline void unpack_be(void *buf, T val)
 	{
-		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		static_assert(is_int_v<T>);
 		
+		uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
 		for (int i = sizeof(T) - 1; i >= 0; i--)
-			*buf++ = val >> (i * 8);
+			*buf2++ = val >> (i * 8);
 	}
 	
-	template<typename T, typename BUF_TYPE = char*>
-	inline void unpack_le(BUF_TYPE buf, T val)
+	template<typename T>
+	inline void unpack_le(void *buf, T val)
 	{
-		static_assert(std::is_same_v<BUF_TYPE, char*> || std::is_same_v<BUF_TYPE, uint8_t*>);
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>, "");
+		static_assert(is_int_v<T>);
 		
 		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
 		{
+			uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
 			for (size_t i = 0; i < sizeof(T); i++)
-				*buf++ = val >> (i * 8);
+				*buf2++ = val >> (i * 8);
 		}
 		else
-			*(T*)buf = val;
+			*reinterpret_cast<T*>(buf) = val;
 	}
 	
 	template<typename T>
