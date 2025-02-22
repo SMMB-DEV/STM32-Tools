@@ -145,22 +145,29 @@ namespace STM32T
 	template <typename T, T MIN, T MAX>
 	class ClampedInt
 	{
+		T m_val;
+		
+	public:
+		static constexpr T val_min = MIN, val_max = MAX;
 		static_assert(is_int_v<T> && MAX > MIN);
 		
 		static constexpr bool is_unlimited = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
 		
 		
-		T m_val;
-		
-	public:
 		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
 		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
 		
 		operator T() const volatile { return m_val; }
 		
+		T val() { return m_val; }
+		
 		ClampedInt& operator=(const T val)
 		{
-			m_val = std::clamp(val, MIN, MAX);
+			if constexpr (is_unlimited)
+				m_val = val;
+			else
+				m_val = std::clamp(val, MIN, MAX);
+			
 			return *this;
 		}
 		
