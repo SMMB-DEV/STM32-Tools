@@ -29,10 +29,10 @@ void delay_us(const uint32_t delay) \
 namespace STM32T
 {
 	template <typename T>
-	using TickFuncPtr = T (* const)();
+	using TickFuncPtr = T (*)();
 	
 	template <typename T>
-	using DelayFuncPtr = void (* const)(const T);
+	using DelayFuncPtr = void (*)(T);
 	
 	#ifdef DWT
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839

@@ -401,7 +401,6 @@ namespace STM32T
 		uint8_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
 		
 		// m_front always modified in pop_front() and m_back always modified in push_back().
-		//volatile index_t m_front = 0, m_back = 0;
 		volatile ClampedInt<index_t, 0, MAX_SIZE - 1> m_front = 0, m_back = 0;
 		
 	public:

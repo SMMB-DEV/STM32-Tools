@@ -30,7 +30,7 @@ namespace STM32T
 	public:
 		const uint16_t Pin;
 		
-	private:
+	protected:
 		const bool active_low;
 		
 	public:
@@ -113,7 +113,7 @@ namespace STM32T
 		template <typename T>
 		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+			static_assert(is_int_v<T>);
 			
 			T elapsed = 0;
 			const T startTime = get_tick();
