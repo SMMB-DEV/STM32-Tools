@@ -58,9 +58,14 @@ namespace STM32T
 	#define DWT_DELAY_CLK	(SystemCoreClock)
 	#endif
 	
+	inline uint32_t ToDWTCycles(const uint16_t time_us)
+	{
+		return time_us * (DWT_DELAY_CLK / 1'000'000);
+	}
+	
 	inline void DWT_Delay(uint16_t us)
 	{
-		const uint32_t start = DWT->CYCCNT, delay = us * (DWT_DELAY_CLK / 1'000'000);
+		const uint32_t start = DWT->CYCCNT, delay = ToDWTCycles(us);
 		while (DWT->CYCCNT - start < delay);	// < because delay is usually accurate (when DWT_DELAY_CLK is divisible by 1'000'000).
 	}
 	
@@ -85,15 +90,6 @@ namespace STM32T
 		const uint32_t start = DWT->CYCCNT, delay = ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
 		while (DWT->CYCCNT - start <= delay);	// <= because delay isn't always accurate.
 	}
-	#endif	// DWT
-	
-	template <typename T>
-	inline void WaitAfter(const T start, const T wait, T(* const get_tick)() = HAL_GetTick)
-	{
-		static_assert(is_int_v<T>);
-		
-		while (get_tick() - start < wait);
-	}
 	
 	class DWT_Timeout
 	{
@@ -105,4 +101,13 @@ namespace STM32T
 		
 		bool Expired() const { return DWT_GetCycle() - m_start >= m_timeout; }
 	};
+	#endif	// DWT
+	
+	template <typename T>
+	inline void WaitAfter(const T start, const T wait, TickFuncPtr<T> get_tick = HAL_GetTick)
+	{
+		static_assert(is_int_v<T>);
+		
+		while (get_tick() - start < wait);
+	}
 }
