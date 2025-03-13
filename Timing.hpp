@@ -26,7 +26,7 @@ void delay_us(const uint32_t delay) \
 
 
 
-namespace STM32T
+namespace STM32T::Time
 {
 	template <typename T>
 	using TickFuncPtr = T (*)();
@@ -58,15 +58,24 @@ namespace STM32T
 	#define DWT_DELAY_CLK	(SystemCoreClock)
 	#endif
 	
-	inline uint32_t ToDWTCycles(const uint16_t time_us)
+	inline uint32_t usToCycles(const uint16_t time_us)
 	{
 		return time_us * (DWT_DELAY_CLK / 1'000'000);
 	}
 	
-	inline void DWT_Delay(uint16_t us)
+	inline uint32_t nsToCycles(const uint16_t time_ns)
 	{
-		const uint32_t start = DWT->CYCCNT, delay = ToDWTCycles(us);
-		while (DWT->CYCCNT - start < delay);	// < because delay is usually accurate (when DWT_DELAY_CLK is divisible by 1'000'000).
+		return time_ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
+	}
+	
+	inline uint32_t CyclesTo_us(uint32_t cyc)
+	{
+		return cyc / (DWT_DELAY_CLK / 1'000'000);
+	}
+	
+	inline uint32_t CyclesTo_ns(uint32_t cyc)
+	{
+		return cyc * 1000 / (DWT_DELAY_CLK / 1'000'000);
 	}
 	
 	/**
@@ -78,29 +87,31 @@ namespace STM32T
 		return DWT->CYCCNT / (DWT_DELAY_CLK / 1'000'000);
 	}
 	
-	inline uint32_t DWT_GetCycle() { return DWT->CYCCNT; }
+	inline uint32_t GetCycle() { return DWT->CYCCNT; }
 	
-	inline bool DWT_Elapsed(const uint32_t startCycle, const uint16_t time_us)
+	inline void Delay_us(uint16_t us)
 	{
-		return DWT->CYCCNT - startCycle >= time_us * (DWT_DELAY_CLK / 1'000'000);
+		const uint32_t start = DWT->CYCCNT, delay = usToCycles(us);
+		while (DWT->CYCCNT - start < delay);	// < because delay is usually accurate (when DWT_DELAY_CLK is divisible by 1'000'000).
 	}
 	
-	inline void DWT_Delay_ns(uint16_t ns)
+	inline void Delay_ns(uint16_t ns)
 	{
-		const uint32_t start = DWT->CYCCNT, delay = ns * (DWT_DELAY_CLK / 1'000'000) / 1000;
+		const uint32_t start = DWT->CYCCNT, delay = nsToCycles(ns);
 		while (DWT->CYCCNT - start <= delay);	// <= because delay isn't always accurate.
 	}
 	
-	class DWT_Timeout
+	inline bool Elapsed_us(const uint32_t startCycle, const uint16_t time_us)
 	{
-		const uint32_t m_start, m_timeout;
-	public:
-		static uint32_t ToCycles(const uint16_t timeout_us) { return timeout_us * (DWT_DELAY_CLK / 1'000'000); }
-		
-		DWT_Timeout(const uint16_t timeout_us) : m_start(DWT_GetCycle()), m_timeout(ToCycles(timeout_us)) {}
-		
-		bool Expired() const { return DWT_GetCycle() - m_start >= m_timeout; }
-	};
+		const uint32_t delay = usToCycles(time_us);
+		return DWT->CYCCNT - startCycle >= delay;
+	}
+	
+	inline bool Elapsed_ns(const uint32_t startCycle, const uint16_t time_ns)
+	{
+		const uint32_t delay = nsToCycles(time_ns);
+		return DWT->CYCCNT - startCycle > delay;
+	}
 	#endif	// DWT
 	
 	template <typename T>

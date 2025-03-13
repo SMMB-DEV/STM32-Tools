@@ -66,7 +66,7 @@ namespace STM32T
 		}
 		
 		template<typename T = uint32_t>
-		void Timed(const T time, DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
+		void Timed(const T time, Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
 			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 			
@@ -96,7 +96,7 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		bool Wait(const bool desired_state, const T timeout, TickFuncPtr<T> get_tick = HAL_GetTick) const
+		bool Wait(const bool desired_state, const T timeout, Time::TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
 			static_assert(is_int_v<T>);
 			
@@ -111,7 +111,7 @@ namespace STM32T
 		}
 		
 		template <typename T>
-		T CheckPulse(const bool desired_state, const T max, const T min = 0, TickFuncPtr<T> get_tick = HAL_GetTick) const
+		T CheckPulse(const bool desired_state, const T max, const T min = 0, Time::TickFuncPtr<T> get_tick = HAL_GetTick) const
 		{
 			static_assert(is_int_v<T>);
 			
