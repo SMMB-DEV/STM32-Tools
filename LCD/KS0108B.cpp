@@ -1,6 +1,7 @@
 // *** TODO: ADD LICENSE ***
 
 #include "./KS0108B.hpp"
+#include "../Timing.hpp"
 
 #include <algorithm>
 
@@ -10,7 +11,7 @@ namespace STM32T
 {
 	static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
 	
-	static constexpr uint8_t MAX_CHARS = 130, FONT_WIDTH = 5;
+	static constexpr uint8_t MAX_CHARS = 128, FONT_WIDTH = 5;
 
 	static constexpr uint8_t Font[MAX_CHARS][FONT_WIDTH] =
 	{
@@ -143,8 +144,8 @@ namespace STM32T
 		0x00, 0x41, 0x36, 0x08, 0x00,	/*}*/
 		0, 0, 0, 0, 0,					/*~*/
 		0, 0, 0, 0, 0,					/*DEL*/
-		0x04, 0x02, 0x7F, 0x02, 0x04,	/*up*/
-		0x10, 0x20, 0x7F, 0x20, 0x10	/*down*/
+		//0x04, 0x02, 0x7F, 0x02, 0x04,	/*up*/
+		//0x10, 0x20, 0x7F, 0x20, 0x10	/*down*/
 	};
 
 
@@ -272,6 +273,34 @@ namespace STM32T
 
 
 
+	bool KS0108B::BusyWait(const uint16_t timeout_ns) const
+	{
+		using namespace STM32T::Time;
+		
+		const uint32_t start = GetCycle();
+		while (f_rw(1, 0, 0) & 0b1000'0000)		// Busy Flag
+		{
+			if (Elapsed_ns(start, timeout_ns))
+				return false;
+		}
+		
+		//Delay_us(5);
+		
+		return true;
+	}
+	
+	bool KS0108B::Instruction(const uint8_t ins) const
+	{
+		f_rw(0, 0, ins);
+		return BusyWait();
+	}
+	
+	bool KS0108B::DataWrite(const uint8_t data) const
+	{
+		f_rw(0, 1, data);
+		return BusyWait();
+	}
+	
 	bool KS0108B::SetPage(const uint8_t page, const bool force)
 	{
 		if (!force && m_page == page % m_pageCount)
@@ -290,7 +319,7 @@ namespace STM32T
 			return;
 		
 		m_line = line % MAX_LINES;
-		f_command(m_line | 0b1011'1000, 0, 0);
+		Instruction(m_line | 0b1011'1000);
 	}
 
 	void KS0108B::SetCursor(const uint8_t cursor, const bool force)
@@ -299,12 +328,12 @@ namespace STM32T
 			return;
 		
 		m_cursor = cursor % MAX_CURSOR;
-		f_command(m_cursor | 0b0100'0000, 0, 0);
+		Instruction(m_cursor | 0b0100'0000);
 	}
 
 	void KS0108B::Display(const bool display) const
 	{
-		f_command(0b0011'1110 | display, 0, 0);
+		Instruction(0b0011'1110 | display);
 	}
 
 	void KS0108B::Goto(const uint8_t cursor, const uint8_t line, const bool force)
@@ -334,7 +363,7 @@ namespace STM32T
 	void KS0108B::Write(const uint8_t byte, const bool check, const uint8_t lines)
 	{
 		m_screenMap[MapIndex()] = byte;
-		f_command(byte, 0, 1);
+		DataWrite(byte);
 		
 		if (check)
 			CheckCursor(lines);
@@ -344,7 +373,7 @@ namespace STM32T
 	{
 		const uint16_t index = MapIndex();
 		m_screenMap[index] = (m_screenMap[index] & (0xFF >> (8 - shift))) | (byte << shift);
-		f_command(m_screenMap[index], 0, 1);
+		DataWrite(m_screenMap[index]);
 		
 		if (check)
 			CheckCursor(lines);
@@ -354,7 +383,7 @@ namespace STM32T
 	{
 		const uint16_t index = MapIndex();
 		m_screenMap[index] = (m_screenMap[index] & (0xFF << shift)) | (byte >> (8 - shift));
-		f_command(m_screenMap[index], 0, 1);
+		DataWrite(m_screenMap[index]);
 		
 		if (check)
 			CheckCursor(lines);
@@ -424,8 +453,8 @@ namespace STM32T
 
 
 
-	KS0108B::KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count) :
-			f_command(command), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
+	KS0108B::KS0108B(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), void (*set_cs)(uint8_t), const uint8_t page_count) :
+			f_rw(rw), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
 			m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
 	
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
@@ -671,7 +700,7 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
-		//DWT_Init();
+		STM32T::Time::DWT_Init();
 		
 		f_setCS(0xFF);
 		
@@ -691,7 +720,7 @@ namespace STM32T
 			SetLine(i);
 			
 			for (uint8_t j = 0; j < MAX_CURSOR; j++)
-				f_command(_write, 0, 1);
+				DataWrite(_write);
 		}
 		
 		SetPage(0, true);	//ensure page change
@@ -822,7 +851,7 @@ namespace STM32T
 		Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 	}
 
-	void KS0108B::PutChar(const uint8_t ch, bool interpret_specials, bool auto_next_line)
+	void KS0108B::PutChar(const char ch, bool interpret_specials, bool auto_next_line)
 	{
 		//todo: space between characters
 		

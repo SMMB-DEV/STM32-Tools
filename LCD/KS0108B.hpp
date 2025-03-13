@@ -63,6 +63,9 @@ namespace STM32T
 		
 		bool faset = false, Fa = false;
 		
+		bool BusyWait(const uint16_t timeout_ns = 60'000) const;
+		bool Instruction(const uint8_t ins) const;
+		bool DataWrite(const uint8_t data) const;
 		bool SetPage(const uint8_t page, const bool force = false);
 		void SetLine(const uint8_t line, const bool force = true);		//Lines:0-7
 		void SetCursor(const uint8_t cursor, const bool force = true);	//0-63
@@ -79,7 +82,7 @@ namespace STM32T
 		
 		
 		
-		void (* const f_command)(uint8_t data, bool rw, bool rs);
+		uint8_t (* const f_rw)(bool rw, bool rs, uint8_t data);
 		void (* const f_setCS)(uint8_t);
 		
 		const uint8_t m_pageCount;
@@ -99,7 +102,7 @@ namespace STM32T
 		* @param set_cs - Function to enable/disable LCD pages (controls CSx pins).
 		* @param page_count - Max. 8 pages.
 		*/
-		KS0108B(void (*command)(uint8_t data, bool rw, bool rs), void (*set_cs)(uint8_t), const uint8_t page_count = 2);
+		KS0108B(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), void (*set_cs)(uint8_t), const uint8_t page_count = 2);
 		~KS0108B();
 		
 		//void SetFa();
@@ -125,7 +128,7 @@ namespace STM32T
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		
-		void PutChar(const uint8_t ch, bool interpret_specials = true, bool auto_next_line = true) override;
+		void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override;
 		
 		void PutCharBig(const uint8_t ch, bool interpret_specials = true);
 		void PutStrBig(const char* str);

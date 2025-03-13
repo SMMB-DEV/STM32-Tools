@@ -14,7 +14,7 @@ namespace STM32T
 	class ILCD
 	{
 	public:
-		virtual void PutChar(const uint8_t ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
+		virtual void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
 		
 		void PutStr(const char* str)
 		{
