@@ -139,6 +139,8 @@ namespace STM32T
 		std::array<IO, COUNT> m_pins;
 		
 	public:
+		static constexpr size_t PinCount() { return COUNT; }
+		
 		IOs(std::array<IO, COUNT>&& pins) : m_pins(pins) {}
 		
 		STM32T::IO& operator[](size_t index) { return m_pins[index]; }

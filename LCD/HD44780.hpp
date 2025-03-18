@@ -9,18 +9,17 @@ namespace STM32T
 {
 	class HD44780 : public ILCD
 	{
-		void (* const f_write)(bool rs, uint8_t data);
-		uint8_t (* const f_read)(bool rs);
+		uint8_t (* const f_rw)(bool rw, bool rs, uint8_t data);
 		uint8_t m_addressCounter = 0;
 		const uint8_t m_colCount;
 		bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
 		
 		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = 50)
 		{
-			f_write(rs, data);
+			f_rw(0, rs, data);
 			
 			if (m_4Bit)
-				f_write(rs, data << 4);
+				f_rw(0, rs, data << 4);
 			
 			BusyWait(timeout_us);
 			
@@ -30,10 +29,10 @@ namespace STM32T
 		
 		uint8_t Read(const bool rs)
 		{
-			uint8_t data = f_read(rs);
+			uint8_t data = f_rw(1, rs, 0);
 			
 			if (m_4Bit)
-				data |= (f_read(rs) >> 4);
+				data |= (f_rw(1, rs, 0) >> 4);
 			
 			if (rs)
 			{
@@ -65,16 +64,13 @@ namespace STM32T
 		
 	public:
 		/**
-		* @param write - Function to set DB7:0 (or DB7:4) and RS pins according to input arguments.
-		*				It must always set RW pin to 0 and the data pins must be configurd as output. The E pin must also be cycled according to the datasheet.
-		* @param read - Function to read DB7:0 (or DB7:4) and set RS pin according to input argument.
-		*				It must always set RW pin to 1 and the data pins must be configurd as input. The E pin must also be cycled according to the datasheet.
-		*				If the LCD is configured in 4-bit mode, DB3:0 must be returned as 0.
+	* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
+		*				The E pin must also be cycled according to the datasheet.
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
 		*/
-		HD44780(const uint8_t line_count, const uint8_t col_count, void (* const write)(bool rs, uint8_t data), uint8_t (* const read)(bool rs), bool _4_bit = true)
-			: f_write(write), f_read(read), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
+		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const uint8_t line_count, const uint8_t col_count, bool _4_bit = true)
+			: f_rw(rw), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
 		
 		~HD44780() {}
 		
@@ -82,23 +78,24 @@ namespace STM32T
 		{
 			Time::DWT_Init();
 			HAL_Delay(15);		// For VCC; probably not necessary.
-			f_write(0, 0b0011'0000);
+			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(4100);
-			f_write(0, 0b0011'0000);
+			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(100);
-			f_write(0, 0b0011'0000);
+			f_rw(0, 0, 0b0011'0000);
 			
 			Time::Delay_us(100);		// Instead of BusyWait() because interface is stil in 8-bit mode.
 			
-			f_write(0, 0b0010'0000 | (!m_4Bit << 4) | (m_twoLines << 3));	// 5x8 font by default
+			f_rw(0, 0, 0b0010'0000 | (!m_4Bit << 4) | (m_twoLines << 3));	// 5x8 font by default
 			Time::Delay_us(100);
 			
 			if (m_4Bit)
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
 			
-			Display(true, false, false);
+			Display(false, false, false);
 			Clear();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
+			Display(true, false, false);
 			
 			return *this;
 		}

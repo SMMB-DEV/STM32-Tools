@@ -282,8 +282,6 @@ namespace STM32T
 				return false;
 		}
 		
-		//Delay_us(5);
-		
 		return true;
 	}
 	
