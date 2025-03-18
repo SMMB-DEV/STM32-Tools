@@ -275,12 +275,10 @@ namespace STM32T
 
 	bool KS0108B::BusyWait(const uint16_t timeout_ns) const
 	{
-		using namespace STM32T::Time;
-		
-		const uint32_t start = GetCycle();
+		const uint32_t start = Time::GetCycle();
 		while (f_rw(1, 0, 0) & 0b1000'0000)		// Busy Flag
 		{
-			if (Elapsed_ns(start, timeout_ns))
+			if (Time::Elapsed_ns(start, timeout_ns))
 				return false;
 		}
 		
@@ -700,7 +698,7 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
-		STM32T::Time::DWT_Init();
+		Time::DWT_Init();
 		
 		f_setCS(0xFF);
 		

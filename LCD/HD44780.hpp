@@ -25,7 +25,7 @@ namespace STM32T
 			BusyWait(timeout_us);
 			
 			if (rs)
-				DWT_Delay(4);	// tADD
+				Time::Delay_us(4);	// tADD
 		}
 		
 		uint8_t Read(const bool rs)
@@ -38,7 +38,7 @@ namespace STM32T
 			if (rs)
 			{
 				BusyWait(50);
-				DWT_Delay(4);	// tADD
+				Time::Delay_us(4);	// tADD
 			}
 			else
 				m_addressCounter = data & 0b0111'1111;
@@ -48,10 +48,10 @@ namespace STM32T
 		
 		bool BusyWait(uint16_t timeout_us)
 		{
-			auto time = DWT_Timeout(timeout_us);
+			const uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
-				if (time.Expired())
+				if (Time::Elapsed_us(start, timeout_us))
 					return false;
 			}
 			
@@ -73,25 +73,25 @@ namespace STM32T
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
 		*/
-		HD44780(const uint8_t line_count, const uint8_t col_count, void (* const write)(bool rs, uint8_t data), uint8_t (* const read)(bool rs), bool _4_bit = true) :
-			f_write(write), f_read(read), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
+		HD44780(const uint8_t line_count, const uint8_t col_count, void (* const write)(bool rs, uint8_t data), uint8_t (* const read)(bool rs), bool _4_bit = true)
+			: f_write(write), f_read(read), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
 		
 		~HD44780() {}
 		
 		HD44780& Init()
 		{
-			DWT_Init();
+			Time::DWT_Init();
 			HAL_Delay(15);		// For VCC; probably not necessary.
 			f_write(0, 0b0011'0000);
-			DWT_Delay(4100);
+			Time::Delay_us(4100);
 			f_write(0, 0b0011'0000);
-			DWT_Delay(100);
+			Time::Delay_us(100);
 			f_write(0, 0b0011'0000);
 			
-			DWT_Delay(100);		// Instead of BusyWait() because interface is stil in 8-bit mode.
+			Time::Delay_us(100);		// Instead of BusyWait() because interface is stil in 8-bit mode.
 			
 			f_write(0, 0b0010'0000 | (!m_4Bit << 4) | (m_twoLines << 3));	// 5x8 font by default
-			DWT_Delay(100);
+			Time::Delay_us(100);
 			
 			if (m_4Bit)
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
@@ -130,7 +130,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		void PutChar(const uint8_t ch, bool interpret_specials = true, bool auto_next_line = true) override
+		void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override
 		{
 			if (interpret_specials)
 			{
