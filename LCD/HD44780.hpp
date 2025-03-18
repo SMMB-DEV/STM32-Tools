@@ -92,10 +92,9 @@ namespace STM32T
 			if (m_4Bit)
 				Write(0, 0b0010'0000 | (m_twoLines << 3));
 			
-			Display(false, false, false);
+			Display(true, false, false);
 			Clear();
 			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
-			Display(true, false, false);
 			
 			return *this;
 		}
