@@ -187,9 +187,9 @@ namespace STM32T
 				}
 				
 				uint8_t val;
-				auto [_, ec] = std::from_chars(ver.data(), ver.data() + sep_idx, val, 10);
+				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + sep_idx, val, 10);
 				
-				if (ec == std::errc::invalid_argument || ec == std::errc::result_out_of_range)
+				if (result.ec != std::errc())
 					return Version();
 				
 				data.arr[sizeof(data) - 1 - i] = val;

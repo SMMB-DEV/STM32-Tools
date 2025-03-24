@@ -76,7 +76,7 @@ namespace STM32T
 		
 		HD44780& Init()
 		{
-			Time::DWT_Init();
+			Time::Init();
 			HAL_Delay(15);		// For VCC; probably not necessary.
 			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(4100);

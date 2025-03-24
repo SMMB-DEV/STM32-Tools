@@ -22,10 +22,10 @@ namespace STM32T
 				PutChar(*str++);
 		}
 		
-		void PutStrn(const char* str, uint16_t n)
+		void PutStrn(const char* str, size_t n)
 		{
-			for (uint16_t i = 0; i < n; i++)
-				PutChar(str[i]);
+			while (n--)
+				PutChar(*str++);
 		}
 		
 		[[deprecated("Use PutStr() instead.")]]
@@ -39,16 +39,17 @@ namespace STM32T
 			PutStrn(view.data(), view.length());
 		}
 		
+		template <size_t BUF_SIZE = 32>
 		void PutStrf(const char* fmt, ...)
 		{
-			char buf[64];
+			char buf[BUF_SIZE];
 			
 			va_list args;
 			va_start(args, fmt);
-			vsnprintf(buf, sizeof(buf), fmt, args);
+			const int len = vsnprintf(buf, sizeof(buf), fmt, args);
 			va_end(args);
 			
-			PutStr(buf);
+			PutStrn(buf, std::min((size_t)len, BUF_SIZE - 1));
 		}
 		
 		template <typename T>

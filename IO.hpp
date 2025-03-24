@@ -61,14 +61,13 @@ namespace STM32T
 		
 		__attribute__((always_inline)) void Toggle()
 		{
-			const uint32_t odr = Port->ODR;
-			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);
+			Port->ODR ^= Pin;
 		}
 		
 		template<typename T = uint32_t>
 		void Timed(const T time, Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
-			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
+			static_assert(is_int_v<T>);
 			
 			Set(state);
 			delay(time);

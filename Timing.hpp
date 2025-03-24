@@ -19,7 +19,7 @@ namespace STM32T::Time
 	
 	#ifdef DWT
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
-	inline void DWT_Init()
+	inline void Init()
 	{
 		if (!READ_BIT(CoreDebug->DEMCR, CoreDebug_DEMCR_TRCENA_Msk))
 		{
@@ -37,7 +37,7 @@ namespace STM32T::Time
 	
 	[[gnu::always_inline]] inline uint32_t GetCycle() { return DWT->CYCCNT; }
 	#else
-	inline void DWT_Init() {}
+	inline void Init() {}
 	
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic error "-Wundefined-inline"
