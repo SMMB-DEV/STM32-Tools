@@ -21,10 +21,7 @@ namespace STM32T
 			if (m_4Bit)
 				f_rw(0, rs, data << 4);
 			
-			BusyWait(timeout_us);
-			
-			if (rs)
-				Time::Delay_us(4);	// tADD
+			BusyWait(timeout_us, rs);
 		}
 		
 		uint8_t Read(const bool rs)
@@ -35,23 +32,26 @@ namespace STM32T
 				data |= (f_rw(1, rs, 0) >> 4);
 			
 			if (rs)
-			{
-				BusyWait(50);
-				Time::Delay_us(4);	// tADD
-			}
+				BusyWait(50, true);
 			else
 				m_addressCounter = data & 0b0111'1111;
 			
 			return data;
 		}
 		
-		bool BusyWait(uint16_t timeout_us)
+		bool BusyWait(uint16_t timeout_us, const bool tADD)
 		{
 			const uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
 				if (Time::Elapsed_us(start, timeout_us))
 					return false;
+			}
+			
+			if (tADD)
+			{
+				Time::Delay_us(5);
+				Read(0);		// Update m_addressCounter
 			}
 			
 			return true;
@@ -170,7 +170,7 @@ namespace STM32T
 				}
 			}
 			
-			if (auto_next_line && m_twoLines && (m_addressCounter & 0x3F) >= m_colCount - 1)
+			if (auto_next_line && m_twoLines && (m_addressCounter & 0x3F) >= m_colCount)
 				NextLine();
 			
 			Write(1, ch);
