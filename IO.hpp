@@ -39,6 +39,12 @@ namespace STM32T
 			assert_param(IS_GPIO_PIN(Pin));
 		}
 		
+		static IO None()
+		{
+			static GPIO_TypeDef DUMMY_GPIO = {0};
+			return IO(&DUMMY_GPIO, GPIO_PIN_0);
+		}
+		
 		__attribute__((always_inline)) bool Read() const
 		{
 			return (Port->IDR & Pin) ? !active_low : active_low;
