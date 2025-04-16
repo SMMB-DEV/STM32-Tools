@@ -100,32 +100,39 @@ namespace STM32T
 			HAL_GPIO_Init(Port, &init);
 		}
 		
-		template <typename T>
-		bool Wait(const bool desired_state, const T timeout, Time::TickFuncPtr<T> get_tick = HAL_GetTick) const
+		bool Wait(const bool desired_state, const uint32_t timeout) const
 		{
-			static_assert(is_int_v<T>);
-			
-			const T start = get_tick();
+			const uint32_t start = HAL_GetTick();
 			while (Read() != desired_state)
 			{
-				if (get_tick() - start > timeout)
+				if (HAL_GetTick() - start > timeout)
 					return false;
 			}
 			
 			return true;
 		}
 		
-		template <typename T>
-		T CheckPulse(const bool desired_state, const T max, const T min = 0, Time::TickFuncPtr<T> get_tick = HAL_GetTick) const
+		bool Wait_us(const bool desired_state, const uint16_t timeout) const
 		{
-			static_assert(is_int_v<T>);
+			const uint32_t start = Time::GetCycle(), timeoutCycles = Time::usToCycles(timeout);
 			
-			T elapsed = 0;
-			const T startTime = get_tick();
+			while (Read() != desired_state)
+			{
+				if (Time::GetCycle() - start > timeoutCycles)
+					return false;
+			}
+			
+			return true;
+		}
+		
+		uint32_t CheckPulse(const bool desired_state, const uint32_t max, const uint32_t min = 0) const
+		{
+			uint32_t elapsed = 0;
+			const uint32_t startTime = HAL_GetTick();
 			
 			while (Read() == desired_state)
 			{
-				if ((elapsed = get_tick() - startTime) > max)
+				if ((elapsed = HAL_GetTick() - startTime) > max)
 					return 0;
 			}
 			
@@ -133,6 +140,23 @@ namespace STM32T
 				return 0;
 			
 			return elapsed;
+		}
+		
+		uint16_t CheckPulse_us(const bool desired_state, const uint16_t max, const uint16_t min = 0) const
+		{
+			uint32_t elapsed = 0;
+			const uint32_t startCycle = Time::GetCycle(), minCycles = Time::usToCycles(min), maxCycles = Time::usToCycles(max);
+			
+			while (Read() == desired_state)
+			{
+				if ((elapsed = Time::GetCycle() - startCycle) >= maxCycles)
+					return 0;
+			}
+			
+			if (elapsed < minCycles)
+				return 0;
+			
+			return Time::CyclesTo_us(elapsed);
 		}
 	};
 	
@@ -146,7 +170,7 @@ namespace STM32T
 	public:
 		static constexpr size_t PinCount() { return COUNT; }
 		
-		IOs(std::array<IO, COUNT>&& pins) : m_pins(pins) {}
+		IOs(std::array<IO, COUNT>&& pins) : m_pins(std::move(pins)) {}
 		
 		STM32T::IO& operator[](size_t index) { return m_pins[index]; }
 		

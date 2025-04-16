@@ -29,10 +29,10 @@ namespace STM32T
 			
 			for (uint8_t mask = 0b1000'0000; mask; mask >>= 1)
 			{
-				if (!m_sda.CheckPulse(false, BIT_LOW_MAX, BIT_LOW_MIN, DWT_GetTick))
+				if (!m_sda.CheckPulse_us(false, BIT_LOW_MAX, BIT_LOW_MIN))
 					return false;
 				
-				uint32_t highTime = m_sda.CheckPulse(true, std::max(BIT_0_HIGH_MAX, BIT_1_HIGH_MAX), std::min(BIT_0_HIGH_MIN, BIT_1_HIGH_MIN), DWT_GetTick);
+				uint32_t highTime = m_sda.CheckPulse_us(true, std::max(BIT_0_HIGH_MAX, BIT_1_HIGH_MAX), std::min(BIT_0_HIGH_MIN, BIT_1_HIGH_MIN));
 				
 				if (highTime <= BIT_0_HIGH_MAX)					// 0 signal
 					;
@@ -62,9 +62,9 @@ namespace STM32T
 			m_sda.Set();
 			
 			// Response signal
-			if (!m_sda.Wait(false, RESP_DELAY_MAX, DWT_GetTick) ||
-				!m_sda.CheckPulse(false, RESP_LOW_MAX, RESP_LOW_MIN, DWT_GetTick) ||
-				!m_sda.CheckPulse(true, RESP_HIGH_MAX, RESP_HIGH_MIN, DWT_GetTick))
+			if (!m_sda.Wait_us(false, RESP_DELAY_MAX) ||
+				!m_sda.CheckPulse_us(false, RESP_LOW_MAX, RESP_LOW_MIN) ||
+				!m_sda.CheckPulse_us(true, RESP_HIGH_MAX, RESP_HIGH_MIN))
 				return std::nullopt;
 			
 			// Data: 16 bits humidity + 16 bits temperature + 8 bits parity
@@ -75,7 +75,7 @@ namespace STM32T
 				return std::nullopt;
 			
 			// Final low pulse
-			if (!m_sda.CheckPulse(false, END_MAX, END_MIN, DWT_GetTick))
+			if (!m_sda.CheckPulse_us(false, END_MAX, END_MIN))
 				return std::nullopt;
 			
 			if (((humidity.arr[0] + humidity.arr[1] + temperature.arr[0] + temperature.arr[1]) & 0xFF) != parity)

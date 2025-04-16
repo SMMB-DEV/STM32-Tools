@@ -696,7 +696,7 @@ namespace STM32T
 
 	void KS0108B::Init()
 	{
-		Time::DWT_Init();
+		Time::Init();
 		
 		f_setCS(0xFF);
 		
