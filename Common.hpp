@@ -308,6 +308,134 @@ namespace STM32T
 		}
 	};
 	
+	template <typename T>
+	class DynClampedInt
+	{
+		static_assert(is_int_v<T>);
+		
+	public:
+		const T min, max;
+		
+	private:
+		T m_val;
+		
+	public:
+		bool IsUnlimited()
+		{
+			return min == std::numeric_limits<T>::min() && max == std::numeric_limits<T>::max();
+		}
+		
+		
+		DynClampedInt(const T min, const T max) : min(min), max(max), m_val(std::clamp(T(0), min, max)) {}
+		DynClampedInt(const T val, const T min, const T max) : min(min), max(max), m_val(std::clamp(val, min, max)) {}
+		
+		operator T() const volatile { return m_val; }
+		
+		T val() { return m_val; }
+		
+		DynClampedInt& operator=(const T val)
+		{
+			m_val = std::clamp(val, min, max);
+			return *this;
+		}
+		
+		volatile DynClampedInt& operator=(const T val) volatile
+		{
+			m_val = std::clamp(val, min, max);
+			return *this;
+		}
+		
+		bool operator==(const T val) { return m_val == val; }
+		
+		DynClampedInt& operator++()	// prefix
+		{
+			if (m_val >= max)
+				m_val = min;
+			else
+				m_val++;
+			
+			return *this;
+		}
+		
+		DynClampedInt& operator--()	// prefix
+		{
+			if (m_val <= min)
+				m_val = max;
+			else
+				m_val--;
+			
+			return *this;
+		}
+		
+		DynClampedInt operator++(int)	// postfix
+		{
+			DynClampedInt val = *this;
+			
+			if (m_val >= max)
+				m_val = min;
+			else
+				m_val++;
+			
+			return val;
+		}
+		
+		DynClampedInt operator--(int)	// postfix
+		{
+			DynClampedInt val = *this;
+			
+			if (m_val <= min)
+				m_val = max;
+			else
+				m_val--;
+			
+			return val;
+		}
+		
+		volatile DynClampedInt& operator++() volatile	// prefix
+		{
+			if (m_val >= max)
+				m_val = min;
+			else
+				m_val++;
+			
+			return *this;
+		}
+		
+		volatile DynClampedInt& operator--() volatile	// prefix
+		{
+			if (m_val <= min)
+				m_val = max;
+			else
+				m_val--;
+			
+			return *this;
+		}
+		
+		DynClampedInt operator++(int) volatile	// postfix
+		{
+			DynClampedInt val = *this;
+			
+			if (m_val >= max)
+				m_val = min;
+			else
+				m_val++;
+			
+			return val;
+		}
+		
+		DynClampedInt operator--(int) volatile	// postfix
+		{
+			DynClampedInt val = *this;
+			
+			if (m_val <= min)
+				m_val = max;
+			else
+				m_val--;
+			
+			return val;
+		}
+	};
+	
 	/**
 	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal.
 	*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
