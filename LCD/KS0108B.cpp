@@ -354,8 +354,11 @@ namespace STM32T
 	}
 
 	// todo: Add WriteArr().
-	void KS0108B::Write(const uint8_t byte, const bool check, const uint8_t lines)
+	void KS0108B::Write(uint8_t byte, const bool check, const uint8_t lines)
 	{
+		if (negate)
+			byte = ~byte;
+		
 		m_screenMap[MapIndex()] = byte;
 		DataWrite(byte);
 		
@@ -363,8 +366,11 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::Write_H(const uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::Write_H(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
 	{
+		if (negate)
+			byte = ~byte;
+		
 		const uint16_t index = MapIndex();
 		m_screenMap[index] = (m_screenMap[index] & (0xFF >> (8 - shift))) | (byte << shift);
 		DataWrite(m_screenMap[index]);
@@ -373,8 +379,11 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::Write_L(const uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::Write_L(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
 	{
+		if (negate)
+			byte = ~byte;
+		
 		const uint16_t index = MapIndex();
 		m_screenMap[index] = (m_screenMap[index] & (0xFF << shift)) | (byte >> (8 - shift));
 		DataWrite(m_screenMap[index]);

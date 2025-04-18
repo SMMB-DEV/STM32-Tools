@@ -73,9 +73,9 @@ namespace STM32T
 		void Display(const bool display) const;							//0:OFF   1:ON
 		void Goto(const uint8_t cursor, const uint8_t line, const bool force = false);			//x:0-191   y:0-7
 		void CheckCursor(const uint8_t lines = 1);
-		void Write(const uint8_t byte, const bool check = true, const uint8_t lines = 1);
-		void Write_H(const uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
-		void Write_L(const uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
+		void Write(uint8_t byte, const bool check = true, const uint8_t lines = 1);
+		void Write_H(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
+		void Write_L(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
 		
 		void Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
 		void Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
@@ -90,6 +90,7 @@ namespace STM32T
 		
 	public:
 		const uint16_t screenLen;
+		bool negate = false;
 		
 	private:
 		uint8_t * const m_screenMap;
