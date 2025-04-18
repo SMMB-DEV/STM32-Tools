@@ -10,10 +10,8 @@
 namespace STM32T
 {
 	static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
-	
-	static constexpr uint8_t MAX_CHARS = 128, FONT_WIDTH = 5;
 
-	static constexpr uint8_t Font[MAX_CHARS][FONT_WIDTH] =
+	static constexpr uint8_t Font[KS0108B::MAX_CHARS][KS0108B::FONT_LENGTH] =
 	{
 		0, 0, 0, 0, 0,					/*0*/
 		0, 0, 0, 0, 0,					/*1*/
@@ -450,8 +448,8 @@ namespace STM32T
 
 
 	KS0108B::KS0108B(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), void (*set_cs)(uint8_t), const uint8_t page_count) :
-			f_rw(rw), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), m_screenLen(m_pageCount * MAX_CURSOR),
-			m_screenMap(new uint8_t[MAX_LINES * m_screenLen]) {}
+			f_rw(rw), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), screenLen(m_pageCount * MAX_CURSOR),
+			m_screenMap(new uint8_t[MAX_LINES * screenLen]) {}
 	
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
 
@@ -724,7 +722,7 @@ namespace STM32T
 		SetLine(0);
 		m_row = 0;
 		
-		memset(m_screenMap, _write, MAX_LINES * m_screenLen);
+		memset(m_screenMap, _write, MAX_LINES * screenLen);
 		
 		return *this;
 	}
@@ -740,10 +738,10 @@ namespace STM32T
 	{
 		static constexpr uint8_t MAX_PIXELS = PIXELS_PER_LINE * MAX_LINES;
 		
-		int32_t _x = (m_page * MAX_CURSOR + m_cursor + x) % m_screenLen, _y = (m_line * PIXELS_PER_LINE + m_row + y) % MAX_PIXELS;
+		int32_t _x = (m_page * MAX_CURSOR + m_cursor + x) % screenLen, _y = (m_line * PIXELS_PER_LINE + m_row + y) % MAX_PIXELS;
 		
 		if (_x < 0)
-			_x += (-_x / m_screenLen + 1) * m_screenLen;
+			_x += (-_x / screenLen + 1) * screenLen;
 		
 		if (_y < 0)
 			_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
@@ -836,7 +834,7 @@ namespace STM32T
 
 	void KS0108B::Pixel(uint8_t x, uint8_t y, bool fill)
 	{
-		if (x >= m_screenLen || y >= SCREEN_WIDTH)
+		if (x >= screenLen || y >= SCREEN_WIDTH)
 			return;
 		
 		uint8_t row = y % PIXELS_PER_LINE;
@@ -868,8 +866,8 @@ namespace STM32T
 				
 				case '\b':
 				{
-					const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1);
-					const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
+					const uint16_t s = Fa ? m_line * screenLen + m_cursor + 6 : m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_LENGTH + 1);
+					const uint8_t cursor = s % screenLen, line = s / screenLen;
 					
 					Goto(cursor, line);
 					PutChar(' ');
@@ -901,7 +899,7 @@ namespace STM32T
 		
 		if (m_page == m_pageCount - 1)
 		{
-			uint8_t maxCursor = MAX_CURSOR - FONT_WIDTH;
+			uint8_t maxCursor = MAX_CURSOR - FONT_LENGTH;
 			if (m_cursor > maxCursor)
 				NextLine();
 			else
@@ -912,7 +910,7 @@ namespace STM32T
 		
 		if (m_row == 0)
 		{
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 				Write(Font[ch][i]);
 			
 			if (writeSpace)
@@ -922,14 +920,14 @@ namespace STM32T
 		{
 			SetLine(line + 1);
 			
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 				Write_L(Font[ch][i], m_row);
 			
 			if (writeSpace)
 				Write_L(0, m_row, false);
 			
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 				Write_H(Font[ch][i], m_row);
 			
 			if (writeSpace)
@@ -958,8 +956,8 @@ namespace STM32T
 				
 				case '\b':
 				{
-					const uint16_t s = Fa ? m_line * m_screenLen + m_cursor + 6 : m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * 2;
-					const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
+					const uint16_t s = Fa ? m_line * screenLen + m_cursor + 6 : m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_LENGTH + 1) * 2;
+					const uint8_t cursor = s % screenLen, line = s / screenLen;
 					
 					Goto(cursor, line);
 					PutCharBig(' ');
@@ -991,7 +989,7 @@ namespace STM32T
 		
 		if (m_page == m_pageCount - 1)
 		{
-			uint8_t maxCursor = MAX_CURSOR - (FONT_WIDTH) * 2;
+			uint8_t maxCursor = MAX_CURSOR - (FONT_LENGTH) * 2;
 			if (m_cursor > maxCursor)
 				NextLine(2);
 			else
@@ -1000,8 +998,8 @@ namespace STM32T
 		
 		const uint8_t line = m_line, cursor = m_page * MAX_CURSOR + m_cursor;
 		
-		uint16_t bigCh[FONT_WIDTH] = { 0 };
-		for (uint8_t i = 0; i < FONT_WIDTH; i++)
+		uint16_t bigCh[FONT_LENGTH] = { 0 };
+		for (uint8_t i = 0; i < FONT_LENGTH; i++)
 		{
 			for (uint8_t j = 0; j < 8; j++)
 				bigCh[i] |= (Font[ch][i] & (1 << j)) << j;
@@ -1014,7 +1012,7 @@ namespace STM32T
 		{
 			//Low
 			SetLine(line + 1);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
 				Write(bigCh[i] >> PIXELS_PER_LINE);
 				Write(bigCh[i] >> PIXELS_PER_LINE);
@@ -1028,7 +1026,7 @@ namespace STM32T
 			
 			//High
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
 				Write(bigCh[i]);
 				Write(bigCh[i], true, 2);
@@ -1041,7 +1039,7 @@ namespace STM32T
 		{
 			//Low
 			SetLine(line + 2);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
 				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
 				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
@@ -1055,7 +1053,7 @@ namespace STM32T
 			
 			//Mid
 			Goto(cursor, line + 1, true);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
 				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
 				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
@@ -1069,7 +1067,7 @@ namespace STM32T
 			
 			//High
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_WIDTH; i++)
+			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
 				Write_H(bigCh[i], m_row);
 				Write_H(bigCh[i], m_row, true, 2);
@@ -1098,7 +1096,7 @@ namespace STM32T
 		
 		uint16_t bmp_x = *(uint16_t*)bmp, bmp_y = *((uint16_t*)(bmp) + 1);
 		
-		if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE)	// || x + bmp_x > m_screenLen || x >= m_screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
+		if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE)	// || x + bmp_x > screenLen || x >= screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
 			return;
 		
 		bmp += 4;
@@ -1155,7 +1153,7 @@ namespace STM32T
 			const uint8_t *dh=FontFa[ch].getdh(s), *dl=FontFa[ch].getdl(s);
 			if (m_page==0 && m_cursor+1<w)
 			{
-				Goto(m_screenLen-1,m_line+2);
+				Goto(screenLen-1,m_line+2);
 			}
 			uint8_t l=m_line, c=64*m_page+m_cursor+1-w;
 			if (m_row==0)
@@ -1194,7 +1192,7 @@ namespace STM32T
 			}
 			if (c==0)
 			{
-				Goto(m_screenLen-1,l+2);
+				Goto(screenLen-1,l+2);
 			}
 			else
 			{
@@ -1231,7 +1229,7 @@ namespace STM32T
 					cp=40;
 					if (m_cursor+m_page*64+1<6)
 					{
-						Goto(m_screenLen-1,m_line+2);
+						Goto(screenLen-1,m_line+2);
 					}
 					Movexy(-6,5);
 					PutChar(str[i]);
@@ -1326,7 +1324,7 @@ namespace STM32T
 
 	void KS0108B::Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 	{
-		if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+		if (x1 >= screenLen || x2 >= screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 			return;
 		
 		int16_t dy = y2 - y1, dx = x2 - x1;
@@ -1448,7 +1446,7 @@ namespace STM32T
 
 	void KS0108B::Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 	{
-		if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+		if (x1 >= screenLen || x2 >= screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 			return;
 		
 		sort(x1, x2);
@@ -1529,7 +1527,7 @@ namespace STM32T
 
 	void KS0108B::FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool fill)
 	{
-		if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+		if (x1 >= screenLen || x2 >= screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 			return;
 		
 		sort(x1, x2);
@@ -1569,7 +1567,7 @@ namespace STM32T
 
 	void KS0108B::NegateRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 	{
-		if (x1 >= m_screenLen || x2 >= m_screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
+		if (x1 >= screenLen || x2 >= screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
 			return;
 		
 		sort(x1, x2);
@@ -1657,7 +1655,7 @@ namespace STM32T
 
 	void KS0108B::Circle(uint8_t x, uint8_t y, uint8_t r, bool draw)
 	{
-		if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
+		if (x >= screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= screenLen - x || r >= SCREEN_WIDTH - y)
 			return;
 		
 		if (r == 0)
@@ -1695,7 +1693,7 @@ namespace STM32T
 
 	void KS0108B::FillCircle(uint8_t x, uint8_t y, uint8_t r, bool fill)
 	{
-		if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
+		if (x >= screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= screenLen - x || r >= SCREEN_WIDTH - y)
 			return;
 		
 		if (r == 0)
@@ -1730,7 +1728,7 @@ namespace STM32T
 
 	void KS0108B::FillCircleNew(uint8_t x, uint8_t y, uint8_t r, bool fill)
 	{
-		if (x >= m_screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= m_screenLen - x || r >= SCREEN_WIDTH - y)
+		if (x >= screenLen || y >= SCREEN_WIDTH || r > x || r > y || r >= screenLen - x || r >= SCREEN_WIDTH - y)
 			return;
 		
 		if (r == 0)

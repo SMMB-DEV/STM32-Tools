@@ -37,23 +37,24 @@ namespace STM32T
 		
 	public:
 		static constexpr uint8_t MAX_LINES = 8, MAX_CURSOR = 64, PIXELS_PER_LINE = 8, SCREEN_WIDTH = MAX_LINES * PIXELS_PER_LINE;
+		static constexpr uint8_t MAX_CHARS = 128, FONT_LENGTH = 5, FONT_WIDTH = PIXELS_PER_LINE;
 		
 	private:
 		//Char *FontFa = nullptr;          //[36];
 		
 		inline uint16_t MapIndex() const
 		{
-			return m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor;
+			return m_line * screenLen + m_page * MAX_CURSOR + m_cursor;
 		}
 		
 		__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t cursor) const
 		{
-			return m_line * m_screenLen + cursor;
+			return m_line * screenLen + cursor;
 		}
 		
 		__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t line, uint8_t cursor) const
 		{
-			return line * m_screenLen + cursor;
+			return line * screenLen + cursor;
 		}
 		
 		__attribute__((always_inline)) inline uint8_t LongCursor() const
@@ -86,8 +87,11 @@ namespace STM32T
 		void (* const f_setCS)(uint8_t);
 		
 		const uint8_t m_pageCount;
-		const uint16_t m_screenLen;
 		
+	public:
+		const uint16_t screenLen;
+		
+	private:
 		uint8_t * const m_screenMap;
 		
 		uint8_t m_cursor = 0, m_row = 0, m_line = 0, m_page = 0;
