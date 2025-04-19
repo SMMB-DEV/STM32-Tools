@@ -149,6 +149,7 @@ namespace STM32T
 		
 	public:
 		static constexpr T val_min = MIN, val_max = MAX;
+		static constexpr uintmax_t RANGE = MAX - MIN;
 		static_assert(is_int_v<T> && MAX > MIN);
 		
 		static constexpr bool is_unlimited = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
@@ -177,7 +178,13 @@ namespace STM32T
 			return *this;
 		}
 		
-		bool operator==(const T val) { return m_val == val; }
+		template <typename E>
+		bool operator==(const E val)
+		{
+			static_assert(is_int_v<E>);
+			
+			return m_val == val;
+		}
 		
 		ClampedInt& operator++()	// prefix
 		{
@@ -306,6 +313,47 @@ namespace STM32T
 			
 			return val;
 		}
+		
+		template <typename A>
+		ClampedInt& operator+=(A add)
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (is_unlimited)
+				m_val += add;
+			else
+			{
+				if (add >= 0)
+				{
+					add %= RANGE + 1;
+					
+					const uintmax_t rem = MAX - m_val;	// always <= RANGE
+					if (add > rem)
+					{
+						add -= rem + 1;
+						m_val = MIN;
+					}
+					
+					m_val += add;
+				}
+				else
+				{
+					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+					add_pos %= RANGE + 1;
+					
+					const uintmax_t rem = m_val - MIN;
+					if (add_pos > rem)
+					{
+						add_pos -= rem + 1;
+						m_val = MAX;
+					}
+					
+					m_val -= add_pos;
+				}
+			}
+			
+			return *this;
+		}
 	};
 	
 	template <typename T>
@@ -315,6 +363,7 @@ namespace STM32T
 		
 	public:
 		const T min, max;
+		const uintmax_t range;
 		
 	private:
 		T m_val;
@@ -326,8 +375,8 @@ namespace STM32T
 		}
 		
 		
-		DynClampedInt(const T min, const T max) : min(min), max(max), m_val(std::clamp(T(0), min, max)) {}
-		DynClampedInt(const T val, const T min, const T max) : min(min), max(max), m_val(std::clamp(val, min, max)) {}
+		DynClampedInt(const T min, const T max) : min(min), max(max), range(max - min), m_val(std::clamp(T(0), min, max)) {}
+		DynClampedInt(const T val, const T min, const T max) : min(min), max(max), range(max - min), m_val(std::clamp(val, min, max)) {}
 		
 		operator T() const volatile { return m_val; }
 		
@@ -345,7 +394,13 @@ namespace STM32T
 			return *this;
 		}
 		
-		bool operator==(const T val) { return m_val == val; }
+		template <typename E>
+		bool operator==(const E val)
+		{
+			static_assert(is_int_v<E>);
+			
+			return m_val == val;
+		}
 		
 		DynClampedInt& operator++()	// prefix
 		{
@@ -433,6 +488,47 @@ namespace STM32T
 				m_val--;
 			
 			return val;
+		}
+		
+		template <typename A>
+		DynClampedInt& operator+=(A add)
+		{
+			static_assert(is_int_v<A>);
+			
+			if (IsUnlimited())
+				m_val += add;
+			else
+			{
+				if (add >= 0)
+				{
+					add %= range + 1;
+					
+					const uintmax_t rem = max - m_val;	// always <= RANGE
+					if (add > rem)
+					{
+						add -= rem + 1;
+						m_val = min;
+					}
+					
+					m_val += add;
+				}
+				else
+				{
+					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+					add_pos %= range + 1;
+					
+					const uintmax_t rem = m_val - min;
+					if (add_pos > rem)
+					{
+						add_pos -= rem + 1;
+						m_val = max;
+					}
+					
+					m_val -= add_pos;
+				}
+			}
+			
+			return *this;
 		}
 	};
 	
