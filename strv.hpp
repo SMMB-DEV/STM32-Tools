@@ -64,15 +64,11 @@ namespace STM32T
 		using base::remove_suffix;
 		using base::find_first_not_of;
 		using base::find_last_not_of;
+		using base::substr;
 		
 		using base::base;
 		
 		constexpr bstrv(base&& other) : base(std::move(other)) {}
-		
-		constexpr bstrv substr(size_type pos, size_type count = npos) const
-		{
-			return base::substr(pos, count);
-		}
 		
 		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
@@ -177,7 +173,7 @@ namespace STM32T
 			return ltrim(trimChars).rtrim(trimChars);
 		}
 		
-		bool compare_remove(base remove)
+		bool compare_remove_prefix(base remove)
 		{
 			if (base::compare(0, remove.size(), remove) == 0)
 			{
@@ -186,6 +182,23 @@ namespace STM32T
 			}
 
 			return false;
+		}
+		
+		bool compare_remove_suffix(base remove)
+		{
+			if (size() >= remove.size() && base::compare(size() - remove.size(), remove.size(), remove) == 0)
+			{
+				remove_suffix(remove.size());
+				return true;
+			}
+
+			return false;
+		}
+		
+		[[deprecated("Use compare_remove_prefix() instead.")]]
+		bool compare_remove(base remove)
+		{
+			return compare_remove_prefix(remove);
 		}
 	};
 	

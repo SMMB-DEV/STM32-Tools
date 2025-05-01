@@ -6,6 +6,10 @@
 #include <charconv>
 
 
+#ifdef MAX
+#undef MAX
+#endif
+
 
 namespace STM32T
 {
@@ -18,14 +22,19 @@ namespace STM32T
 	public:
 		enum PreRelease : uint8_t { Unspecified = 0, Alpha = 16, Beta = 64, RC = 128, Normal = 255 };
 		
+		static constexpr Version MAX()
+		{
+			return Version(UINT32_MAX);
+		}
+		
 		/**
 		* @brief Constructs an invald Version.
 		*/
 		Version() : m_data{ 0 } {}
-		Version(const uint32_t val) : m_data{.val = val} {}
+		constexpr Version(const uint32_t val) : m_data{.val = val} {}
 		constexpr Version(const uint8_t major, const uint8_t minor, const uint8_t patch, const PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
 		
-		Version(const Version& other) = default;
+		constexpr Version(const Version& other) = default;
 		Version(const Version& other, PreRelease new_pr) : m_data(other.m_data)
 		{
 			m_data.arr[0] = new_pr;
