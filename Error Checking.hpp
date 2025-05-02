@@ -1,22 +1,32 @@
 #pragma once
 
 #include "./Common.hpp"
-//#include "./Log.hpp"
+#include "./strv.hpp"
 
 
 
-namespace STM32T::CRCx
+namespace STM32T
 {
 	/**
-	* @param TABLE - Must have 256 values.
+	* @param TYPE - The integer type used for calculating CRC. Determines the size of the CRC.
+	* @param table - Must have 256 values.
 	* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
 	*/
-	template <const uint8_t * TABLE>
-	inline uint8_t CRC8(const uint8_t * const data, const size_t len, uint8_t crc_init = 0)
+	template <typename TYPE>
+	inline TYPE CRCx(const uint8_t * const data, const size_t len, const TYPE *table, TYPE crc_init = 0)
 	{
-		for (size_t i = 0; i < len; i++)
-			crc_init = TABLE[data[i] ^ crc_init];
+		static_assert(is_int_v<TYPE>);
 		
+		for (size_t i = 0; i < len; i++)
+		{
+			const uint8_t pos = (crc_init >> (sizeof(TYPE) - 1) * 8) ^ data[i];
+			
+			if constexpr (sizeof(TYPE) > 8)
+				crc_init = (crc_init << 8) ^ table[pos];
+			else
+				crc_init = table[pos];
+		}
+
 		return crc_init;
 	}
 }
