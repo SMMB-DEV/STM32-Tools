@@ -124,22 +124,49 @@ namespace STM32T
 		}
 	};
 	
-	struct ScopeAction
+	class ScopeAction
 	{
-		void (* const m_end)();
+		void (*m_end)();
 		
+	public:
 		ScopeAction(void (* end)()) : m_end(end) {}
-		~ScopeAction() { m_end(); }
+		~ScopeAction()
+		{
+			if (m_end)
+				m_end();
+		}
+		
+		void EarlyExit()
+		{
+			if (m_end)
+				m_end();
+			
+			m_end = nullptr;
+		}
 	};
 	
-	struct ScopeActionF
+	class ScopeActionF
 	{
+	public:
 		using funt_t = func<void()>;
 		
-		const funt_t m_end;
+		ScopeActionF(funt_t &&end) : m_end(std::move(end)) {}
+		~ScopeActionF()
+		{
+			if (m_end)
+				m_end();
+		}
 		
-		ScopeActionF(funt_t &&end) : m_end(end) {}
-		~ScopeActionF() { m_end(); }
+		void EarlyExit()
+		{
+			if (m_end)
+				m_end();
+			
+			m_end = nullptr;
+		}
+		
+	private:
+		funt_t m_end;
 	};
 	
 	template <typename T, T MIN, T MAX>
