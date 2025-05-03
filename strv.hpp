@@ -64,11 +64,15 @@ namespace STM32T
 		using base::remove_suffix;
 		using base::find_first_not_of;
 		using base::find_last_not_of;
-		using base::substr;
 		
 		using base::base;
 		
 		constexpr bstrv(base&& other) : base(std::move(other)) {}
+			
+		constexpr bstrv substr(size_type pos, size_type count = npos) const
+		{
+			return base::substr(pos, count);
+		}
 		
 		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
@@ -77,7 +81,7 @@ namespace STM32T
 			bstrv view = *this;
 			const const_pointer start = view.data();
 			
-			while (view.size() > 0)
+			while (!view.empty())
 			{
 				size_t end = (view.*f_find)(sep, 0);
 				if (end == npos)
@@ -126,15 +130,17 @@ namespace STM32T
 			}
 		}
 		
+		/**
+		* @note If op returns true, this function returns.
+		*/
 		void tokenize(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// note: Assuming view is null-terminated.
-			// todo: Handle {sep} inside string literals
 			
 			bstrv view = *this;
 			const const_pointer start = view.data();
 			
-			while (view.size() > 0)
+			while (!view.empty())
 			{
 				size_t end = (view.*f_find)(sep, 0);
 				if (end == npos)

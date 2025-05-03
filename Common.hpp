@@ -1,9 +1,6 @@
 #pragma once
 
-extern "C"
-{
-	#include "main.h"
-}
+#include "main.h"
 
 #include <vector>
 #include <functional>

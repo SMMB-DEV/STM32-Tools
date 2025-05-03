@@ -21,7 +21,7 @@ namespace STM32T
 		{
 			const uint8_t pos = (crc_init >> (sizeof(TYPE) - 1) * 8) ^ data[i];
 			
-			if constexpr (sizeof(TYPE) > 8)
+			if constexpr (sizeof(TYPE) > 1)
 				crc_init = (crc_init << 8) ^ table[pos];
 			else
 				crc_init = table[pos];

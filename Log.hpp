@@ -124,14 +124,14 @@ inline void LOG(void (*f)())
 		f();
 }
 
-inline void LOGA(const uint8_t * arr, size_t len)
+inline void LOGA(const uint8_t * arr, size_t len, const size_t line_count = 16)
 {
 	if constexpr (_LOG)
 	{
 		len++;
 		while (len)
 		{
-			for (uint8_t i = 0; --len && i < 8; i++)
+			for (uint8_t i = 0; --len && i < line_count; i++)
 				printf("%02X ", *arr++);
 			
 			printf("\n");
