@@ -15,6 +15,8 @@ namespace STM32T
 {
 	class Version
 	{
+		static inline char s_buf_strv[20];
+		
 		shared_arr<uint32_t> m_data;
 		
 		Version(shared_arr<uint32_t> data) : m_data(data) {}
@@ -156,28 +158,33 @@ namespace STM32T
 		
 		operator strv() const
 		{
-			static char buf[20];
-			
-			int len = sprintf(buf, "%hhu.%hhu.%hhu", m_data.arr[3], m_data.arr[2], m_data.arr[1]), len2;
+			int len = sprintf(s_buf_strv, "%hhu.%hhu.%hhu", Major(), Minor(), Patch()), len2;
 			
 			const uint8_t pr = PreRelease();
 			
 			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
-				len2 = sprintf(buf + len, "-inv");
+				len2 = sprintf(s_buf_strv + len, "-inv");
 			else if (pr == Normal)
 				len2 = 0;
 			else if (pr >= RC0)
-				len2 = sprintf(buf + len, "-rc%hhu", pr - RC0);
+				len2 = sprintf(s_buf_strv + len, "-rc%hhu", pr - RC0);
 			else if (pr >= Beta0)
-				len2 = sprintf(buf + len, "-beta%hhu", pr - Beta0);
+				len2 = sprintf(s_buf_strv + len, "-beta%hhu", pr - Beta0);
 			else if (pr >= Alpha0)
-				len2 = sprintf(buf + len, "-alpha%hhu", pr - Alpha0);
+				len2 = sprintf(s_buf_strv + len, "-alpha%hhu", pr - Alpha0);
 			else
-				len2 = sprintf(buf + len, "-x");
+				len2 = sprintf(s_buf_strv + len, "-x");
 			
 			len += len2;
 			
-			return strv(buf, len);
+			return strv(s_buf_strv, len);
+		}
+		
+		strv NormalName() const
+		{
+			const int len = sprintf(s_buf_strv, "%hhu.%hhu.%hhu", Major(), Minor(), Patch());
+			
+			return strv(s_buf_strv, len);
 		}
 		
 		static Version from_strv(strv ver)

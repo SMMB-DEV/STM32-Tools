@@ -42,6 +42,11 @@ namespace STM32T
 	{
 		return x;
 	}
+
+	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept
+	{
+		return x;
+	}
 	
 	inline constexpr uint32_t pow10(uint8_t pow)
 	{
