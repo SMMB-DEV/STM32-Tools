@@ -179,29 +179,41 @@ namespace STM32T
 			return ltrim(trimChars).rtrim(trimChars);
 		}
 		
+		bool remove_prefix(base prefix)
+		{
+			if (base::compare(0, prefix.size(), prefix) == 0)
+			{
+				remove_prefix(prefix.size());
+				return true;
+			}
+
+			return false;
+		}
+		
+		bool remove_suffix(base suffix)
+		{
+			if (size() >= suffix.size() && base::compare(size() - suffix.size(), suffix.size(), remove) == 0)
+			{
+				remove_suffix(suffix.size());
+				return true;
+			}
+
+			return false;
+		}
+		
+		[[deprecated("Use remove_prefix(strv) instead.")]]
 		bool compare_remove_prefix(base remove)
 		{
-			if (base::compare(0, remove.size(), remove) == 0)
-			{
-				remove_prefix(remove.size());
-				return true;
-			}
-
-			return false;
+			return remove_prefix(remove);
 		}
 		
+		[[deprecated("Use remove_suffix(strv) instead.")]]
 		bool compare_remove_suffix(base remove)
 		{
-			if (size() >= remove.size() && base::compare(size() - remove.size(), remove.size(), remove) == 0)
-			{
-				remove_suffix(remove.size());
-				return true;
-			}
-
-			return false;
+			return remove_suffix(remove);
 		}
 		
-		[[deprecated("Use compare_remove_prefix() instead.")]]
+		[[deprecated("Use remove_prefix(strv) instead.")]]
 		bool compare_remove(base remove)
 		{
 			return compare_remove_prefix(remove);

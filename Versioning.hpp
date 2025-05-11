@@ -20,7 +20,29 @@ namespace STM32T
 		Version(shared_arr<uint32_t> data) : m_data(data) {}
 		
 	public:
-		enum PreRelease : uint8_t { Unspecified = 0, Alpha = 16, Beta = 64, RC = 128, Normal = 255 };
+		enum PreRelease : uint8_t
+		{
+			Unspecified = 0,
+			
+			Alpha = 32,
+			Alpha0 = Alpha, Alpha1, Alpha2, Alpha3, Alpha4, Alpha5, Alpha6, Alpha7,
+			Alpha8, Alpha9, Alpha10, Alpha11, Alpha12, Alpha13, Alpha14, Alpha15,
+			Alpha16, Alpha17, Alpha18, Alpha19, Alpha20, Alpha21, Alpha22, Alpha23,
+			Alpha24, Alpha25, Alpha26, Alpha27, Alpha28, Alpha29, Alpha30, Alpha31,
+			
+			Beta = 64,
+			Beta0 = Beta, Beta1, Beta2, Beta3, Beta4, Beta5, Beta6, Beta7,
+			Beta8, Beta9, Beta10, Beta11, Beta12, Beta13, Beta14, Beta15,
+			Beta16, Beta17, Beta18, Beta19, Beta20, Beta21, Beta22, Beta23,
+			Beta24, Beta25, Beta26, Beta27, Beta28, Beta29, Beta30, Beta31,
+			
+			RC = 96,
+			RC0 = RC, RC1, RC2, RC3, RC4, RC5, RC6, RC7,
+			RC8, RC9, RC10, RC11, RC12, RC13, RC14, RC15,
+			RC16, RC17, RC18, RC19, RC20, RC21, RC22, RC23,
+			RC24, RC25, RC26, RC27, RC28, RC29, RC30, RC31,
+			
+			Normal = 255 };
 		
 		static constexpr Version MAX()
 		{
@@ -74,7 +96,7 @@ namespace STM32T
 		constexpr bool Valid() const
 		{
 			const auto pr = PreRelease();
-			return pr == Alpha || pr == Beta || pr == RC || pr == Normal;
+			return (pr >= Alpha0 && pr <= RC31) || pr == Normal;
 		}
 		
 		bool Complete() const
@@ -136,44 +158,24 @@ namespace STM32T
 		{
 			static char buf[20];
 			
-			int len = sprintf(buf, "%hhu.%hhu.%hhu", m_data.arr[3], m_data.arr[2], m_data.arr[1]);
-			switch (PreRelease())
-			{
-				case Unspecified:
-				{
-					strcpy(buf + len, "-x");
-					len += 2;
-					break;
-				}
-				
-				case Alpha:
-				{
-					strcpy(buf + len, "-alpha");
-					len += 6;
-					break;
-				}
-				
-				case Beta:
-				{
-					strcpy(buf + len, "-beta");
-					len += 5;
-					break;
-				}
-				
-				case RC:
-				{
-					strcpy(buf + len, "-rc");
-					len += 3;
-					break;
-				}
-				
-				case Normal:
-					break;
-				
-				default:
-					strcpy(buf + len, "-inv");
-					len += 4;
-			}
+			int len = sprintf(buf, "%hhu.%hhu.%hhu", m_data.arr[3], m_data.arr[2], m_data.arr[1]), len2;
+			
+			const uint8_t pr = PreRelease();
+			
+			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
+				len2 = sprintf(buf + len, "-inv");
+			else if (pr == Normal)
+				len2 = 0;
+			else if (pr >= RC0)
+				len2 = sprintf(buf + len, "-rc%hhu", pr - RC0);
+			else if (pr >= Beta0)
+				len2 = sprintf(buf + len, "-beta%hhu", pr - Beta0);
+			else if (pr >= Alpha0)
+				len2 = sprintf(buf + len, "-alpha%hhu", pr - Alpha0);
+			else
+				len2 = sprintf(buf + len, "-x");
+			
+			len += len2;
 			
 			return strv(buf, len);
 		}
@@ -197,7 +199,7 @@ namespace STM32T
 				}
 				
 				uint8_t val;
-				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + sep_idx, val, 10);
+				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + sep_idx, val);
 				
 				if (result.ec != std::errc())
 					return Version();
@@ -206,12 +208,12 @@ namespace STM32T
 				ver.remove_prefix(std::min(sep_idx + 1, ver.size()));
 			}
 			
-			if (ver == "alpha"sv)
-				data.arr[0] = Alpha;
-			else if (ver == "beta"sv)
-				data.arr[0] = Beta;
-			else if (ver == "rc"sv)
-				data.arr[0] = RC;
+			if (ver.remove_prefix("alpha"sv))
+				data.arr[0] = Alpha0;
+			else if (ver.remove_prefix("beta"sv))
+				data.arr[0] = Beta0;
+			else if (ver.remove_prefix("rc"sv))
+				data.arr[0] = RC0;
 			else if (ver == "x"sv)
 				data.arr[0] = Unspecified;
 			else if (ver.empty())
@@ -219,42 +221,51 @@ namespace STM32T
 			else
 				return Version();
 			
+			if (data.arr[0] != Unspecified && data.arr[0] != Normal && !ver.empty())
+			{
+				uint8_t val;
+				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + ver.size(), val);
+				
+				if (result.ec != std::errc() || val > 31)
+					return Version();
+				
+				data.arr[0] += val;
+			}
+			
 			return Version(data);
 		}
 		
 		void Next()
 		{
-			switch (PreRelease())
+			const uint8_t pr = PreRelease();
+			
+			if (pr == Normal)
 			{
-				case Alpha:
-					m_data.arr[0] = Beta;
-					break;
+				m_data.arr[0] = Alpha0;
 				
-				case Beta:
-					m_data.arr[0] = RC;
-					break;
-				
-				case RC:
-					m_data.arr[0] = Normal;
-					break;
-				
-				case Normal:
+				for (uint8_t i = 1; i < 4; i++)
 				{
-					m_data.arr[0] = Alpha;
-					
-					for (uint8_t i = 1; i < 4; i++)
-					{
-						m_data.arr[i]++;
-						if (m_data.arr[i] != 0)
-							break;
-					}
-					
-					break;
+					m_data.arr[i]++;
+					if (m_data.arr[i] != 0)
+						break;
 				}
-				
-				case Unspecified:
-				default:
-					m_data.arr[0] = Alpha;
+			}
+			else if (pr >= Alpha0 && pr < RC31)
+				m_data.arr[0]++;
+			else if (pr == RC31)
+				m_data.arr[0] = Normal;
+			else
+				m_data.arr[0] = Alpha;
+		}
+		
+		void NextNormal()
+		{
+			m_data.arr[0] = Normal;
+			
+			for (uint8_t i = 1; i < 4; i++)
+			{
+				m_data.arr[i]++;
+				if (m_data.arr[i] != 0)
 					break;
 			}
 		}
