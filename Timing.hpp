@@ -96,4 +96,10 @@ namespace STM32T::Time
 		
 		while (get_tick() - start < wait);
 	}
+	
+	inline void WaitAfter_us(const uint32_t startCycle, const uint16_t wait_us)
+	{
+		const uint32_t wait = usToCycles(wait_us);
+		while (GetCycle() - startCycle < wait);
+	}
 }

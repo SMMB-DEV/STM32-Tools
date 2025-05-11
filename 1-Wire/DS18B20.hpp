@@ -79,13 +79,13 @@ namespace STM32T
 		
 		bool Init()
 		{
-			m_dq.Timed((uint16_t)RESET_LOW, DWT_Delay, false);
-			const uint32_t start = DWT_GetTick();
+			m_dq.Timed((uint16_t)RESET_LOW, Time::Delay_us, false);
+			const uint32_t start = Time::GetCycle();
 			
-			if (!m_dq.Wait(false, PRESENCE_MAX_DELAY, DWT_GetTick) || !m_dq.CheckPulse(false, PRESENCE_MAX, PRESENCE_MIN, DWT_GetTick))
+			if (!m_dq.Wait_us(false, PRESENCE_MAX_DELAY) || !m_dq.CheckPulse_us(false, PRESENCE_MAX, PRESENCE_MIN))
 				return false;
 			
-			while (DWT_GetTick() - start < RESET_HIGH);
+			Time::WaitAfter_us(start, RESET_HIGH);
 			
 			return true;
 		}
@@ -93,21 +93,21 @@ namespace STM32T
 		void SendBit(bool bit)
 		{
 			m_dq.Reset();
-			DWT_Delay(WRITE_1_LOW);
+			Time::Delay_us(WRITE_1_LOW);
 			m_dq.Set(bit);
-			DWT_Delay(TIME_SLOT - WRITE_1_LOW);
+			Time::Delay_us(TIME_SLOT - WRITE_1_LOW);
 			m_dq.Set();
-			DWT_Delay(RECOVERY);
+			Time::Delay_us(RECOVERY);
 		}
 		
 		bool ReadBit()
 		{
 			m_dq.Reset();
-			DWT_Delay(READ_LOW);
+			Time::Delay_us(READ_LOW);
 			m_dq.Set();
-			DWT_Delay(READ_DELAY);
+			Time::Delay_us(READ_DELAY);
 			const bool bit = m_dq.Read();
-			DWT_Delay(TIME_SLOT - READ_DELAY - READ_LOW + RECOVERY);
+			Time::Delay_us(TIME_SLOT - READ_DELAY - READ_LOW + RECOVERY);
 			
 			return bit;
 		}
@@ -167,7 +167,7 @@ namespace STM32T
 			SendCmd(CMD::READ_SCRATCHPAD);
 			ReadBytes(buf, 9);
 			
-			return CRCx::CRC8<TABLE>(buf, 9) == 0;
+			return CRCx(buf, 9, TABLE) == 0;
 		}
 		
 	public:
@@ -186,7 +186,7 @@ namespace STM32T
 			shared_arr<uint64_t> id;
 			ReadBytes(id.arr, sizeof(id));
 			
-			if (CRCx::CRC8<TABLE>(id.arr, sizeof(id)) != 0)
+			if (CRCx(id.arr, sizeof(id), TABLE) != 0)
 				return std::nullopt;
 			
 			return id.val;
