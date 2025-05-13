@@ -60,6 +60,7 @@ namespace STM32T
 			m_sda.Reset();
 			HAL_Delay(BEGIN_MS);
 			m_sda.Set();
+			m_sda.Wait_us(true, 1);	// Wait for line to go high
 			
 			// Response signal
 			if (!m_sda.Wait_us(false, RESP_DELAY_MAX) ||

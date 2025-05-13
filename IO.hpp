@@ -112,9 +112,9 @@ namespace STM32T
 			return true;
 		}
 		
-		bool Wait_us(const bool desired_state, const uint16_t timeout) const
+		bool Wait_us(const bool desired_state, const uint16_t timeout_us) const
 		{
-			const uint32_t start = Time::GetCycle(), timeoutCycles = Time::usToCycles(timeout);
+			const uint32_t start = Time::GetCycle(), timeoutCycles = Time::usToCycles(timeout_us);
 			
 			while (Read() != desired_state)
 			{

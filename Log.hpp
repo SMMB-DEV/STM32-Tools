@@ -95,7 +95,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	uint8_t res = USBD_OK; \
 	uint32_t start = HAL_GetTick(); \
 	while ((connected) && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
-	return -res; \
+	return 0;	/* If non-zero is returned once, it stops working. */ \
 }
 
 

@@ -192,7 +192,7 @@ namespace STM32T
 		
 		bool remove_suffix(base suffix)
 		{
-			if (size() >= suffix.size() && base::compare(size() - suffix.size(), suffix.size(), remove) == 0)
+			if (size() >= suffix.size() && base::compare(size() - suffix.size(), suffix.size(), suffix) == 0)
 			{
 				remove_suffix(suffix.size());
 				return true;
