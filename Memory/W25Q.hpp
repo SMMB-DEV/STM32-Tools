@@ -142,21 +142,21 @@ namespace STM32T
 		/**
 		* @retval JEDEC ID of the device or 0 in case of failure.
 		*/
-		uint32_t ReadJEDECID()
+		shared_arr<uint32_t> ReadJEDECID()
 		{
-			uint8_t buf[3] = {0};
-			Read(READ_JEDEC_ID, buf, 3);
-			return (buf[0] << 16) | (buf[1] << 8) | buf[2];
+			shared_arr<uint32_t> buf;
+			Read(READ_JEDEC_ID, buf.arr, 3);
+			return buf;
 		}
 		
 		/**
 		* @retval Unique ID of the device or 0 in case of failure.
 		*/
-		uint64_t ReadUID()
+		shared_arr<uint64_t> ReadUID()
 		{
-			uint64_t id = 0;
-			Read(READ_UID, (uint8_t *)&id, sizeof(id), "\0\0\0\0"sv);
-			return STM32T::le2be(id);
+			shared_arr<uint64_t>id;
+			Read(READ_UID, id.arr, sizeof(id), "\0\0\0\0"sv);
+			return id;
 		}
 		
 		/**
@@ -211,67 +211,41 @@ namespace STM32T
 		* @param data - Should be at most 256 bytes (W25Q page size).
 		* @note If addr is not aligned to PAGE_SIZE, it will wrap around to the start of the page.
 		*/
-		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = 256)
+		bool WritePage(const addr_t addr, const uint8_t * const data, const uint16_t len = PAGE_SIZE)
 		{
 			return SingleByte(WRITE_ENABLE) and Write(PAGE_PROGRAM, addr, data, len) and BusyWait(3);
 		}
 		
-		bool WriteData(const addr_t addr, const uint8_t * const data, const uint16_t len)
+		bool WriteData(addr_t addr, const uint8_t *data, uint16_t len)
 		{
-			uint16_t written = 0;
-			const addr_t offset = addr % PAGE_SIZE;
-			
-			if (offset != 0)
+			while (len)
 			{
-				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
-				if (!WritePage(addr + written, data + written, write_size))
+				const uint16_t write_size = std::min(PAGE_SIZE - addr % PAGE_SIZE, (size_t)len);
+				if (!WritePage(addr, data, write_size))
 					return false;
 				
-				written += write_size;
+				addr += write_size;
+				data += write_size;
+				len -= write_size;
 			}
 			
-			uint16_t rem = len - written;
-			if (!rem)
-				return true;
-			
-			for (; rem > PAGE_SIZE; rem = len - written)
-			{
-				if (!WritePage(addr + written, data + written))
-					return false;
-				
-				written += PAGE_SIZE;
-			}
-			
-			return WritePage(addr + written, data + written, rem);
+			return true;
 		}
 		
-		bool WriteVerifyData(const addr_t addr, const uint8_t * const data, const uint16_t len)
+		bool WriteVerifyData(addr_t addr, const uint8_t *data, uint16_t len)
 		{
-			uint16_t written = 0;
-			const addr_t offset = addr % PAGE_SIZE;
-			
-			if (offset != 0)
+			while (len)
 			{
-				const uint16_t write_size = std::min((uint16_t)(PAGE_SIZE - offset), len);
-				if (!WritePage(addr + written, data + written, write_size) or !VerifyData(addr + written, data + written, write_size))
+				const uint16_t write_size = std::min(PAGE_SIZE - addr % PAGE_SIZE, (size_t)len);
+				if (!WritePage(addr, data, write_size) or !VerifyData(addr, data, write_size))
 					return false;
 				
-				written += write_size;
+				addr += write_size;
+				data += write_size;
+				len -= write_size;
 			}
 			
-			uint16_t rem = len - written;
-			if (!rem)
-				return true;
-			
-			for (; rem > PAGE_SIZE; rem = len - written)
-			{
-				if (!WritePage(addr + written, data + written) or !VerifyData(addr + written, data + written, PAGE_SIZE))
-					return false;
-				
-				written += PAGE_SIZE;
-			}
-			
-			return WritePage(addr + written, data + written, rem) and VerifyData(addr + written, data + written, rem);
+			return true;
 		}
 		
 		template <class T>

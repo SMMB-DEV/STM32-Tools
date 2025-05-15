@@ -570,14 +570,13 @@ namespace STM32T
 		{
 			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
 			{
-				if (str.length() <= 10 || str.compare(str.length() - 8, strv::npos, "\r\n\r\nOK\r\n"sv) != 0 || str.compare(0, 2, "\r\n"sv) != 0)
+				const strv orig = str;
+				
+				if (!str.remove_suffix("\r\n\r\nOK\r\n"sv) || !str.remove_prefix("\r\n"sv))
 				{
-					addURCFromBuf(str);
+					addURCFromBuf(orig);
 					return UNKNOWN;
 				}
-				
-				str.remove_suffix(8);
-				str.remove_prefix(2);
 				
 				const size_t len = std::min(str.length(), max_len - 1);
 				memcpy(buf, str.data(), len);
