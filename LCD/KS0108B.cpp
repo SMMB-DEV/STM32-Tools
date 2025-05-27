@@ -372,7 +372,7 @@ namespace STM32T
 			byte = ~byte;
 		
 		const uint16_t index = MapIndex();
-		m_screenMap[index] = (m_screenMap[index] & (0xFF >> (8 - shift))) | (byte << shift);
+		m_screenMap[index] = (m_screenMap[index] & (0xFF >> (PIXELS_PER_LINE - shift))) | (byte << shift);
 		DataWrite(m_screenMap[index]);
 		
 		if (check)
@@ -385,7 +385,7 @@ namespace STM32T
 			byte = ~byte;
 		
 		const uint16_t index = MapIndex();
-		m_screenMap[index] = (m_screenMap[index] & (0xFF << shift)) | (byte >> (8 - shift));
+		m_screenMap[index] = (m_screenMap[index] & (0xFF << shift)) | (byte >> (PIXELS_PER_LINE - shift));
 		DataWrite(m_screenMap[index]);
 		
 		if (check)
@@ -726,13 +726,19 @@ namespace STM32T
 				DataWrite(_write);
 		}
 		
-		SetPage(0, true);	//ensure page change
+		SetPage(0, true);
 		SetCursor(0);
 		SetLine(0);
 		m_row = 0;
 		
 		memset(m_screenMap, _write, MAX_LINES * screenLen);
 		
+		return *this;
+	}
+	
+	KS0108B& KS0108B::Clear(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, const bool fill)
+	{
+		FillRectangle(x1, y1, x2, y2, fill);	// todo: optimize
 		return *this;
 	}
 
@@ -742,8 +748,15 @@ namespace STM32T
 		Goto(x, y / PIXELS_PER_LINE);
 		return *this;
 	}
-
-	KS0108B& KS0108B::Movexy(const int16_t x, const int8_t y)
+	
+	KS0108B& KS0108B::XL(const uint8_t x, const uint8_t line)
+	{
+		m_row = 0;
+		Goto(x, line);
+		return *this;
+	}
+	
+	KS0108B& KS0108B::Move(const int16_t x, const int8_t y)
 	{
 		static constexpr uint8_t MAX_PIXELS = PIXELS_PER_LINE * MAX_LINES;
 		
@@ -756,13 +769,6 @@ namespace STM32T
 			_y = (-_y / MAX_PIXELS + 1) * MAX_PIXELS;
 		
 		XY(_x, _y);
-		return *this;
-	}
-
-	KS0108B& KS0108B::XL(const uint8_t x, const uint8_t line)
-	{
-		m_row = 0;
-		Goto(x, line);
 		return *this;
 	}
 
@@ -1099,44 +1105,63 @@ namespace STM32T
 			PutCharBig(str[i]);
 	}
 	
-	void KS0108B::Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y)
+	void KS0108B::Bitmap(const uint8_t *bmp, uint16_t x, uint8_t y)
 	{
-		// todo: Specify a format for bmp and handle y % PIXELS_PER_LINE != 0.
+		uint16_t bmp_x = *reinterpret_cast<const uint16_t *>(bmp), bmp_y = *reinterpret_cast<const uint16_t *>(bmp + 2);
 		
-		uint16_t bmp_x = *(uint16_t*)bmp, bmp_y = *((uint16_t*)(bmp) + 1);
-		
-		if (!bmp_x || !bmp_y || bmp_y % PIXELS_PER_LINE)	// || x + bmp_x > screenLen || x >= screenLen || y + bmp_y > SCREEN_WIDTH || y >= SCREEN_WIDTH)
+		if (!bmp_x || !bmp_y)
 			return;
 		
-		bmp += 4;
+		bmp += sizeof(bmp_x) + sizeof(bmp_y);
 		
-		m_row = y % PIXELS_PER_LINE;
-		const uint8_t line1 = y / PIXELS_PER_LINE, line2 = (y + bmp_y) / PIXELS_PER_LINE;
+		m_row = Row(y);
+		const uint8_t new_row = Row(y + bmp_y), line1 = Line(y), line2 = Line(y + bmp_y);
 		
 		Goto(x, line1);
-		uint16_t index = MapIndex(line1, x);
 		
-		for (uint8_t i = 0; i < bmp_x; i++, index++)
-			Write((bmp[i] << m_row) | ((0xFF >> (PIXELS_PER_LINE - m_row)) & m_screenMap[index]));
-		
-		for (uint8_t line = line1 + 1; line < line2; line++)
+		if (line1 == line2)
 		{
-			Goto(x, line);
-			
-			for (uint8_t i = 0; i < bmp_x; i++)
-				Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row));
-			
-			bmp += bmp_x;
-		}
-		
-		if (m_row)
-		{
-			Goto(x, line2);
-			index = MapIndex(line2, x);
-			
+			uint16_t index = MapIndex();
 			for (uint8_t i = 0; i < bmp_x; i++, index++)
-				Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | ((0xFF << m_row) & m_screenMap[index]));
+				Write((bmp[i] << m_row) | (((0xFF << new_row) | (0xFF >> (PIXELS_PER_LINE - m_row))) & m_screenMap[index]));
 		}
+		else
+		{
+			for (uint8_t i = 0; i < bmp_x; i++)
+				Write_H(bmp[i], m_row);
+			
+			for (uint8_t line = line1 + 1; line < line2; line++)
+			{
+				Goto(x, line);
+				
+				for (uint8_t i = 0; i < bmp_x; i++)
+					Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row));
+				
+				bmp += bmp_x;
+			}
+			
+			if (new_row)
+			{
+				Goto(x, line2);
+				uint16_t index = MapIndex();
+				
+				if (line2 - line1 < 2)
+					bmp += bmp_x;
+				
+				if (new_row <= bmp_y % PIXELS_PER_LINE)
+				{
+					for (uint8_t i = 0; i < bmp_x; i++, index++)
+						Write((bmp[i] >> (m_row ? PIXELS_PER_LINE - m_row : 0)) | ((0xFF << new_row) & m_screenMap[index]));
+				}
+				else
+				{
+					for (uint8_t i = 0; i < bmp_x; i++, index++)
+						Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row) | ((0xFF << new_row) & m_screenMap[index]));
+				}
+			}
+		}
+		
+		m_row = new_row;
 	}
 
 	/*void KS0108B::PutNum(int32_t num)

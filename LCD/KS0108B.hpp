@@ -42,24 +42,34 @@ namespace STM32T
 	private:
 		//Char *FontFa = nullptr;          //[36];
 		
-		inline uint16_t MapIndex() const
+		[[gnu::always_inline]] uint16_t MapIndex() const
 		{
 			return m_line * screenLen + m_page * MAX_CURSOR + m_cursor;
 		}
 		
-		__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t cursor) const
+		[[gnu::always_inline]] uint16_t MapIndex(uint8_t cursor) const
 		{
 			return m_line * screenLen + cursor;
 		}
 		
-		__attribute__((always_inline)) inline uint16_t MapIndex(uint8_t line, uint8_t cursor) const
+		[[gnu::always_inline]] uint16_t MapIndex(uint8_t line, uint8_t cursor) const
 		{
 			return line * screenLen + cursor;
 		}
 		
-		__attribute__((always_inline)) inline uint8_t LongCursor() const
+		[[gnu::always_inline]] uint8_t LongCursor() const
 		{
 			return m_cursor + MAX_CURSOR * m_page;
+		}
+		
+		[[gnu::always_inline]] static constexpr uint8_t Line(uint8_t y)
+		{
+			return y / PIXELS_PER_LINE;
+		}
+		
+		[[gnu::always_inline]] static constexpr uint8_t Row(uint8_t y)
+		{
+			return y % PIXELS_PER_LINE;
 		}
 		
 		bool faset = false, Fa = false;
@@ -120,9 +130,10 @@ namespace STM32T
 		* @brief Fills or clears the Screen and goes to (0, 0)
 		*/
 		KS0108B& Clear(const bool fill = false);
+		KS0108B& Clear(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, const bool fill = false);
 		KS0108B& XY(const uint8_t x, const uint8_t y);
-		KS0108B& Movexy(const int16_t x, const int8_t y);						//Moves cursor x pixels horizontally and y pixels vertically. (can be negative or positive)
 		KS0108B& XL(const uint8_t x, const uint8_t line);
+		KS0108B& Move(const int16_t x, const int8_t y);
 		
 		std::pair<uint8_t, uint8_t> Getxy() { return { m_cursor + MAX_CURSOR * m_page, m_line * PIXELS_PER_LINE + m_row }; }
 		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
@@ -149,7 +160,7 @@ namespace STM32T
 		/**
 		* @param bmp - The first four bytes contain two little endian shorts (length and width).
 		*/
-		void Bitmap(const uint8_t * bmp, uint16_t x, uint8_t y);
+		void Bitmap(const uint8_t *bmp, uint16_t x, uint8_t y);
 		
 		void Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw = true);
 		
