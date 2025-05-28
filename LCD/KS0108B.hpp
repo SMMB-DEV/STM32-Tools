@@ -74,18 +74,18 @@ namespace STM32T
 		
 		bool faset = false, Fa = false;
 		
-		bool BusyWait(const uint16_t timeout_ns = 60'000) const;
+		bool BusyWait(const uint16_t timeout_us = 60) const;
 		bool Instruction(const uint8_t ins) const;
 		bool DataWrite(const uint8_t data) const;
-		bool SetPage(const uint8_t page, const bool force = false);
-		void SetLine(const uint8_t line, const bool force = true);		//Lines:0-7
-		void SetCursor(const uint8_t cursor, const bool force = true);	//0-63
+		bool SetPage(uint8_t page, const bool force = false);
+		bool SetLine(uint8_t line, const bool force = true);		//Lines:0-7
+		bool SetCursor(uint8_t cursor, const bool force = true);	//0-63
 		void Display(const bool display) const;							//0:OFF   1:ON
 		void Goto(const uint8_t cursor, const uint8_t line, const bool force = false);			//x:0-191   y:0-7
 		void CheckCursor(const uint8_t lines = 1);
 		void Write(uint8_t byte, const bool check = true, const uint8_t lines = 1);
-		void Write_H(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
-		void Write_L(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
+		void WriteTop(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
+		void WriteBottom(uint8_t byte, const uint8_t shift, const bool check = true, const uint8_t lines = 1);
 		
 		void Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
 		void Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw);
@@ -139,6 +139,14 @@ namespace STM32T
 		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
 		
 		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
+		void WriteByteArr(const uint8_t *bytes, size_t count);
+		
+		template <size_t N>
+		void WriteByteArr(const uint8_t (&bytes)[N])
+		{
+			WriteByteArr(bytes, N);
+		}
+		
 		//uint8_t Read(void);
 		void NextLine(const uint8_t lines = 1);								// Goes to the next line and sets the cursor to 0.
 		

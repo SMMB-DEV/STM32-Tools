@@ -271,12 +271,12 @@ namespace STM32T
 
 
 
-	bool KS0108B::BusyWait(const uint16_t timeout_ns) const
+	bool KS0108B::BusyWait(const uint16_t timeout_us) const
 	{
 		const uint32_t start = Time::GetCycle();
 		while (f_rw(1, 0, 0) & 0b1000'0000)		// Busy Flag
 		{
-			if (Time::Elapsed_ns(start, timeout_ns))
+			if (Time::Elapsed_us(start, timeout_us))
 				return false;
 		}
 		
@@ -295,34 +295,40 @@ namespace STM32T
 		return BusyWait();
 	}
 	
-	bool KS0108B::SetPage(const uint8_t page, const bool force)
+	bool KS0108B::SetPage(uint8_t page, const bool force)
 	{
-		if (!force && m_page == page % m_pageCount)
+		page %= m_pageCount;
+		if (!force && m_page == page)
 			return false;
 		
-		m_page = page % m_pageCount;
-		
+		m_page = page;
 		f_setCS(1 << m_page);
 		
 		return true;
 	}
 
-	void KS0108B::SetLine(const uint8_t line, const bool force)
+	bool KS0108B::SetLine(uint8_t line, const bool force)
 	{
-		if (!force && m_line == line % MAX_LINES)
-			return;
+		line %= MAX_LINES;
+		if (!force && m_line == line)
+			return false;
 		
-		m_line = line % MAX_LINES;
+		m_line = line;
 		Instruction(m_line | 0b1011'1000);
+		
+		return true;
 	}
 
-	void KS0108B::SetCursor(const uint8_t cursor, const bool force)
+	bool KS0108B::SetCursor(uint8_t cursor, const bool force)
 	{
-		if (!force && m_cursor == cursor % MAX_CURSOR)
-			return;
+		cursor %= MAX_CURSOR;
+		if (!force && m_cursor == cursor)
+			return false;
 		
-		m_cursor = cursor % MAX_CURSOR;
+		m_cursor = cursor;
 		Instruction(m_cursor | 0b0100'0000);
+		
+		return true;
 	}
 
 	void KS0108B::Display(const bool display) const
@@ -332,10 +338,10 @@ namespace STM32T
 
 	void KS0108B::Goto(const uint8_t cursor, const uint8_t line, const bool force)
 	{
-		if (SetPage(cursor / MAX_CURSOR))
+		if (SetPage(cursor / MAX_CURSOR, force))
 		{
-			SetCursor(cursor);
-			SetLine(line);
+			SetCursor(cursor, true);
+			SetLine(line, true);
 			return;
 		}
 		
@@ -347,13 +353,12 @@ namespace STM32T
 	{
 		if (++m_cursor >= MAX_CURSOR)
 		{
-			SetPage(m_page + 1);
-			SetCursor(m_cursor);
-			SetLine(m_line + (m_page == 0) * lines);
+			SetPage(m_page + 1, true);
+			SetCursor(m_cursor, true);
+			SetLine(m_line + (m_page == 0) * lines, true);
 		}
 	}
-
-	// todo: Add WriteArr().
+	
 	void KS0108B::Write(uint8_t byte, const bool check, const uint8_t lines)
 	{
 		if (negate)
@@ -366,7 +371,7 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::Write_H(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::WriteTop(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
 	{
 		if (negate)
 			byte = ~byte;
@@ -379,7 +384,7 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::Write_L(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::WriteBottom(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
 	{
 		if (negate)
 			byte = ~byte;
@@ -726,12 +731,12 @@ namespace STM32T
 				DataWrite(_write);
 		}
 		
+		memset(m_screenMap, _write, MAX_LINES * screenLen);
+		
 		SetPage(0, true);
 		SetCursor(0);
 		SetLine(0);
 		m_row = 0;
-		
-		memset(m_screenMap, _write, MAX_LINES * screenLen);
 		
 		return *this;
 	}
@@ -781,19 +786,40 @@ namespace STM32T
 		{
 			const uint8_t line = m_line, cursor = LongCursor();
 			
-			// todo: Do all the L & H writes in one page, then move to the next page.
+			// todo: Do all the T & B writes in one page, then move to the next page.
 			
 			//Bottom part
 			SetLine(line + 1);
 			for (uint8_t i = 0; i < repeat; i++)
-				Write_L(byte, m_row, i < repeat - 1);	// Don't check for the last byte
+				WriteBottom(byte, m_row, i < repeat - 1);	// Don't check for the last byte
 			
 			//Top part
-			//SetLine(line);
-			//SetCursor(m_cursor, true);
 			Goto(cursor, line, true);
 			for (uint8_t i = 0; i < repeat; i++)
-				Write_H(byte, m_row);
+				WriteTop(byte, m_row);
+		}
+	}
+	
+	void KS0108B::WriteByteArr(const uint8_t *bytes, size_t count)
+	{
+		if (m_row == 0)
+			for (size_t i = 0; i < count; i++)
+				Write(bytes[i]);
+		else
+		{
+			const uint8_t line = m_line, cursor = LongCursor();
+			
+			// todo: Do all the T & B writes in one page, then move to the next page.
+			
+			//Bottom part
+			SetLine(line + 1);
+			for (size_t i = 0; i < count; i++)
+				WriteBottom(bytes[i], m_row, i < count - 1);	// Don't check for the last byte
+			
+			//Top part
+			Goto(cursor, line, true);
+			for (size_t i = 0; i < count; i++)
+				WriteTop(bytes[i], m_row);
 		}
 	}
 
@@ -840,8 +866,8 @@ namespace STM32T
 
 	void KS0108B::NextLine(const uint8_t lines)
 	{
-		SetPage(0);
-		SetCursor(0);
+		bool force = SetPage(0);
+		SetCursor(0, force);
 		SetLine(m_line + lines);
 		
 		//SetLine(m_line+1+Fa);
@@ -936,17 +962,17 @@ namespace STM32T
 			SetLine(line + 1);
 			
 			for (uint8_t i = 0; i < FONT_LENGTH; i++)
-				Write_L(Font[ch][i], m_row);
+				WriteBottom(Font[ch][i], m_row);
 			
 			if (writeSpace)
-				Write_L(0, m_row, false);
+				WriteBottom(0, m_row, false);
 			
 			Goto(cursor, line, true);
 			for (uint8_t i = 0; i < FONT_LENGTH; i++)
-				Write_H(Font[ch][i], m_row);
+				WriteTop(Font[ch][i], m_row);
 			
 			if (writeSpace)
-				Write_H(0, m_row);
+				WriteTop(0, m_row);
 		}
 	}
 	
@@ -1056,15 +1082,15 @@ namespace STM32T
 			SetLine(line + 2);
 			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
-				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
-				Write_L(bigCh[i] >> PIXELS_PER_LINE, m_row);
+				WriteBottom(bigCh[i] >> PIXELS_PER_LINE, m_row);
+				WriteBottom(bigCh[i] >> PIXELS_PER_LINE, m_row);
 			}
 			
 			if (writeSpace >= 1)
-				Write_L(0, m_row);
+				WriteBottom(0, m_row);
 			
 			if (writeSpace == 2)
-				Write_L(0, m_row, false);
+				WriteBottom(0, m_row, false);
 			
 			//Mid
 			Goto(cursor, line + 1, true);
@@ -1084,12 +1110,12 @@ namespace STM32T
 			Goto(cursor, line, true);
 			for (uint8_t i = 0; i < FONT_LENGTH; i++)
 			{
-				Write_H(bigCh[i], m_row);
-				Write_H(bigCh[i], m_row, true, 2);
+				WriteTop(bigCh[i], m_row);
+				WriteTop(bigCh[i], m_row, true, 2);
 			}
 			
 			for (uint8_t i = 0; i < writeSpace; i++)
-				Write_H(0, m_row, true, 2);
+				WriteTop(0, m_row, true, 2);
 		}
 	}
 
@@ -1128,7 +1154,7 @@ namespace STM32T
 		else
 		{
 			for (uint8_t i = 0; i < bmp_x; i++)
-				Write_H(bmp[i], m_row);
+				WriteTop(bmp[i], m_row);
 			
 			for (uint8_t line = line1 + 1; line < line2; line++)
 			{
@@ -1810,7 +1836,7 @@ namespace STM32T
 		{
 			//for (uint8_t i = 0; i < len[y - _y] - len[y - (_y - 1)]; ++i, ++index)
 			//{
-			//	Write_H(0xFF * fill, _y % 8);
+			//	WriteTop(0xFF * fill, _y % 8);
 			//}
 			
 			--_y;
