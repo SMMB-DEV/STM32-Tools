@@ -75,17 +75,17 @@ namespace STM32T
 			return m_data.val;
 		}
 		
-		uint8_t Major() const
+		constexpr uint8_t Major() const
 		{
 			return m_data.arr[3];
 		}
 		
-		uint8_t Minor() const
+		constexpr uint8_t Minor() const
 		{
 			return m_data.arr[2];
 		}
 		
-		uint8_t Patch() const
+		constexpr uint8_t Patch() const
 		{
 			return m_data.arr[1];
 		}
@@ -101,12 +101,12 @@ namespace STM32T
 			return (pr >= Alpha0 && pr <= RC31) || pr == Normal;
 		}
 		
-		bool Complete() const
+		constexpr bool Complete() const
 		{
 			return PreRelease();
 		}
 		
-		bool operator==(const Version& other) const
+		constexpr bool operator==(const Version& other) const
 		{
 			constexpr uint32_t NO_PR_MASK = 0xFFFF'FF00;
 			
@@ -116,7 +116,7 @@ namespace STM32T
 			return (m_data.val & NO_PR_MASK) == (other.m_data.val & NO_PR_MASK);
 		}
 		
-		bool operator<(const Version& other) const
+		constexpr bool operator<(const Version& other) const
 		{
 			if (Major() != other.Major())
 				return Major() < other.Major();
@@ -133,7 +133,7 @@ namespace STM32T
 			return false;
 		}
 		
-		bool operator<=(const Version& other) const
+		constexpr bool operator<=(const Version& other) const
 		{
 			if (Major() != other.Major())
 				return Major() < other.Major();
@@ -150,11 +150,11 @@ namespace STM32T
 			return true;
 		}
 		
-		bool operator>(const Version& other) const { return !operator<=(other); }
+		constexpr bool operator>(const Version& other) const { return !operator<=(other); }
 		
-		bool operator>=(const Version& other) const { return !operator<(other); }
+		constexpr bool operator>=(const Version& other) const { return !operator<(other); }
 		
-		bool operator!=(const Version& other) const { return !operator==(other); }
+		constexpr bool operator!=(const Version& other) const { return !operator==(other); }
 		
 		operator strv() const
 		{
