@@ -1148,8 +1148,10 @@ namespace STM32T
 		if (line1 == line2)
 		{
 			uint16_t index = MapIndex();
+			const uint8_t background_mask = (0xFF << new_row) | (0xFF >> (PIXELS_PER_LINE - m_row));
+			
 			for (uint8_t i = 0; i < bmp_x; i++, index++)
-				Write((bmp[i] << m_row) | (((0xFF << new_row) | (0xFF >> (PIXELS_PER_LINE - m_row))) & m_screenMap[index]));
+				Write(((bmp[i] << m_row) & ~background_mask) | (background_mask & m_screenMap[index]));
 		}
 		else
 		{
@@ -1171,18 +1173,20 @@ namespace STM32T
 				Goto(x, line2);
 				uint16_t index = MapIndex();
 				
-				if (line2 - line1 < 2)
-					bmp += bmp_x;
+				const uint8_t background_mask = 0xFF << new_row;
 				
 				if (new_row <= bmp_y % PIXELS_PER_LINE)
 				{
+					if (line2 - line1 < 2)
+						bmp += bmp_x;
+					
 					for (uint8_t i = 0; i < bmp_x; i++, index++)
-						Write((bmp[i] >> (m_row ? PIXELS_PER_LINE - m_row : 0)) | ((0xFF << new_row) & m_screenMap[index]));
+						Write(((bmp[i] >> (m_row ? PIXELS_PER_LINE - m_row : 0)) & ~background_mask) | (background_mask & m_screenMap[index]));
 				}
 				else
 				{
 					for (uint8_t i = 0; i < bmp_x; i++, index++)
-						Write((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row) | ((0xFF << new_row) & m_screenMap[index]));
+						Write((((bmp[i] >> (PIXELS_PER_LINE - m_row)) | (bmp[i + bmp_x] << m_row)) & ~background_mask) | (background_mask & m_screenMap[index]));
 				}
 			}
 		}
@@ -1880,4 +1884,3 @@ namespace STM32T
 		}
 	}
 }
-
