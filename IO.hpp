@@ -33,6 +33,8 @@ namespace STM32T
 	protected:
 		const bool active_low;
 		
+		static inline GPIO_TypeDef S_DUMMY_GPIO = {0};
+		
 	public:
 		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
 		{
@@ -41,8 +43,13 @@ namespace STM32T
 		
 		static IO None()
 		{
-			static GPIO_TypeDef DUMMY_GPIO = {0};
-			return IO(&DUMMY_GPIO, GPIO_PIN_0);
+			return IO(&S_DUMMY_GPIO, GPIO_PIN_0);
+		}
+		
+		static IO* NonePtr()
+		{
+			static IO S_IO{&S_DUMMY_GPIO, GPIO_PIN_0};
+			return &S_IO;
 		}
 		
 		__attribute__((always_inline)) bool Read() const

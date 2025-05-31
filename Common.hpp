@@ -383,6 +383,47 @@ namespace STM32T
 			
 			return *this;
 		}
+		
+		template <typename A>
+		ClampedInt& operator-=(A sub)
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (is_unlimited)
+				m_val -= sub;
+			else
+			{
+				if (sub >= 0)
+				{
+					sub %= RANGE + 1;
+					
+					const uintmax_t rem = m_val - MIN;	// always <= RANGE
+					if (sub > rem)
+					{
+						sub -= rem + 1;
+						m_val = MAX;
+					}
+					
+					m_val -= sub;
+				}
+				else
+				{
+					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+					sub_pos %= RANGE + 1;
+					
+					const uintmax_t rem = MAX - m_val;
+					if (sub_pos > rem)
+					{
+						sub_pos -= rem + 1;
+						m_val = MIN;
+					}
+					
+					m_val += sub_pos;
+				}
+			}
+			
+			return *this;
+		}
 	};
 	
 	template <typename T>
@@ -554,6 +595,47 @@ namespace STM32T
 					}
 					
 					m_val -= add_pos;
+				}
+			}
+			
+			return *this;
+		}
+		
+		template <typename A>
+		DynClampedInt& operator-=(A sub)
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (IsUnlimited())
+				m_val -= sub;
+			else
+			{
+				if (sub >= 0)
+				{
+					sub %= range + 1;
+					
+					const uintmax_t rem = m_val - min;	// always <= RANGE
+					if (sub > rem)
+					{
+						sub -= rem + 1;
+						m_val = max;
+					}
+					
+					m_val -= sub;
+				}
+				else
+				{
+					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+					sub_pos %= range + 1;
+					
+					const uintmax_t rem = max - m_val;
+					if (sub_pos > rem)
+					{
+						sub_pos -= rem + 1;
+						m_val = min;
+					}
+					
+					m_val += sub_pos;
 				}
 			}
 			
