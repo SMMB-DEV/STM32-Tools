@@ -104,11 +104,11 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr T ceil(T x, T y)
+	inline constexpr T ceil(T p, T q)
 	{
 		static_assert(is_int_v<T>);
 		
-		return x / y + (x % y != 0);
+		return p / q + (p % q != 0);
 	}
 	
 	template<class T>

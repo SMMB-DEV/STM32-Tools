@@ -1133,7 +1133,7 @@ namespace STM32T
 	
 	void KS0108B::Bitmap(const uint8_t *bmp, uint16_t x, uint8_t y)
 	{
-		uint16_t bmp_x = *reinterpret_cast<const uint16_t *>(bmp), bmp_y = *reinterpret_cast<const uint16_t *>(bmp + 2);
+		const uint16_t bmp_x = pack_le<uint16_t>(bmp), bmp_y = pack_le<uint16_t>(bmp + 2);
 		
 		if (!bmp_x || !bmp_y)
 			return;
@@ -1192,6 +1192,15 @@ namespace STM32T
 		}
 		
 		m_row = new_row;
+	}
+	
+	void KS0108B::ClearBitmap(const uint8_t *bmp, uint16_t x, uint8_t y, bool fill)
+	{
+		const uint16_t bmp_x = pack_le<uint16_t>(bmp), bmp_y = pack_le<uint16_t>(bmp + 2);
+		if (!bmp_x || !bmp_y)
+			return;
+		
+		FillRectangle(x, y, x + bmp_x - 1, y + bmp_y - 1, fill);
 	}
 
 	/*void KS0108B::PutNum(int32_t num)

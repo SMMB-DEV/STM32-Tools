@@ -169,6 +169,7 @@ namespace STM32T
 		* @param bmp - The first four bytes contain two little endian shorts (length and width).
 		*/
 		void Bitmap(const uint8_t *bmp, uint16_t x, uint8_t y);
+		void ClearBitmap(const uint8_t *bmp, uint16_t x, uint8_t y, bool fill = false);
 		
 		void Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw = true);
 		
