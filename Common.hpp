@@ -786,17 +786,19 @@ namespace STM32T
 	}
 	
 	template<typename T>
-	inline void unpack_be(void *buf, T val)
+	inline size_t unpack_be(void *buf, T val)
 	{
 		static_assert(is_int_v<T>);
 		
 		uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
 		for (int i = sizeof(T) - 1; i >= 0; i--)
 			*buf2++ = val >> (i * 8);
+		
+		return sizeof(T);
 	}
 	
 	template<typename T>
-	inline void unpack_le(void *buf, T val)
+	inline size_t unpack_le(void *buf, T val)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -808,6 +810,8 @@ namespace STM32T
 		}
 		else
 			*reinterpret_cast<T*>(buf) = val;
+		
+		return sizeof(T);
 	}
 	
 	template<typename T>
