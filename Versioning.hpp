@@ -106,6 +106,11 @@ namespace STM32T
 			return PreRelease();
 		}
 		
+		constexpr bool IsNormal() const
+		{
+			return PreRelease() == Normal;
+		}
+		
 		constexpr bool operator==(const Version& other) const
 		{
 			constexpr uint32_t NO_PR_MASK = 0xFFFF'FF00;
