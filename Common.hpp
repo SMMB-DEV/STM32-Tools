@@ -729,33 +729,39 @@ namespace STM32T
 	template <class T, size_t MAX_SIZE = 256>
 	class PriorityQueue
 	{
-		using index_t = uint8_t;
-		static_assert(MAX_SIZE <= (1 << (sizeof(index_t) * 8)) && MAX_SIZE > 0);
+	public:
+		using prio_t = uint8_t;
+		
+	private:
+		using index_t = volatile ClampedInt<uint8_t, 0, MAX_SIZE - 1>;
+		static_assert(MAX_SIZE <= (1 << (sizeof(uint8_t) * 8)) && MAX_SIZE > 0);
 		
 		T m_items[MAX_SIZE];
-		uint8_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
+		prio_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
 		
 		// m_front always modified in pop_front() and m_back always modified in push_back().
-		volatile ClampedInt<index_t, 0, MAX_SIZE - 1> m_front = 0, m_back = 0;
+		index_t m_front = 0, m_back = 0;
 		
 	public:
 		PriorityQueue() {}
 		~PriorityQueue() {}
 		
-		bool empty() const volatile
+		bool empty() const
 		{
 			return m_front == m_back;
 		}
 		
-		bool full() const volatile
+		bool full() const
 		{
-			return m_front - 1 == m_back;
+			index_t front = m_front;
+			--front;
+			return front == m_back;
 		}
 		
 		/**
 		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 		*/
-		void emplace_back(T&& t, const uint8_t prio = 1)
+		void push_back(T&& t, const prio_t prio = 1)
 		{
 			if (full() || !prio)
 				return;
@@ -768,7 +774,7 @@ namespace STM32T
 		/**
 		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 		*/
-		void push_back(const T& t, const uint8_t prio)
+		void push_back(const T& t, const prio_t prio)
 		{
 			if (full() || !prio)
 				return;
@@ -784,16 +790,13 @@ namespace STM32T
 			
 			// Find the first index of the highest priority
 			index_t prio_index;
-			uint8_t max_prio = 0;
-			for (index_t i = front; i != back; i++)
+			prio_t max_prio = 0;
+			for (index_t i = front; i != back; ++i)
 			{
-				if (m_prio[i])	// Ignore previously handled items
+				if (m_prio[i] && m_prio[i] > max_prio)	// Ignore previously handled items
 				{
-					if (m_prio[i] > max_prio)
-					{
-						max_prio = m_prio[i];
-						prio_index = i;
-					}
+					max_prio = m_prio[i];
+					prio_index = i;
 				}
 			}
 			
@@ -805,6 +808,7 @@ namespace STM32T
 			
 			
 			m_prio[prio_index] = 0;
+			T ret = std::move(m_items[prio_index]);
 			
 			// Remove handled items at the beginning of the list
 			for (index_t i = front; i != back; i++)
@@ -815,7 +819,7 @@ namespace STM32T
 				m_front++;
 			}
 			
-			return std::move(m_items[prio_index]);
+			return ret;
 		}
 	};
 	

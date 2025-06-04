@@ -60,7 +60,7 @@ for input, output in files.items():
 	file_name = os.path.splitext(os.path.split(output)[1])[0]
 	
 	with open(output, 'w') as output_file:
-		output_file.write(f"inline constexpr uint8_t BMP_{file_name.replace(' ', '_').upper()}[] =\n{{")
+		output_file.write(f"inline constexpr const uint8_t BMP_{file_name.replace(' ', '_').upper()}[] =\n{{")
 		size = struct.pack("<HH", x, y)
 		
 		output_file.write("\n\t")
