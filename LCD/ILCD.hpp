@@ -14,6 +14,13 @@ namespace STM32T
 	class ILCD
 	{
 	public:
+		using coord_t = uint16_t;
+		using coordx_t = coord_t;
+		using coordy_t = coord_t;
+		using line_t = uint16_t;
+		
+		virtual ILCD& NextLine(const line_t lines = 1) = 0;
+		
 		virtual void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
 		
 		void PutCharn(const char ch, size_t n, bool interpret_specials = true, bool auto_next_line = true)

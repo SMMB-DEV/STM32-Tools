@@ -148,7 +148,7 @@ namespace STM32T
 		}
 		
 		//uint8_t Read(void);
-		void NextLine(const uint8_t lines = 1);								// Goes to the next line and sets the cursor to 0.
+		KS0108B& NextLine(const line_t lines = 1) override;								// Goes to the next line and sets the cursor to 0.
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		

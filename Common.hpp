@@ -111,6 +111,14 @@ namespace STM32T
 		return p / q + (p % q != 0);
 	}
 	
+	template <typename T>
+	inline constexpr T round(T n, T multiple)
+	{
+		static_assert(is_int_v<T>);
+		
+		return ceil(n, multiple) * multiple;
+	}
+	
 	template<class T>
 	union shared_arr
 	{

@@ -864,13 +864,15 @@ namespace STM32T
 		return 0;
 	}*/
 
-	void KS0108B::NextLine(const uint8_t lines)
+	KS0108B& KS0108B::NextLine(const line_t lines)
 	{
 		bool force = SetPage(0);
 		SetCursor(0, force);
 		SetLine(m_line + lines);
 		
 		//SetLine(m_line+1+Fa);
+		
+		return *this;
 	}
 
 	void KS0108B::Pixel(uint8_t x, uint8_t y, bool fill)
