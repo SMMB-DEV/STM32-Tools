@@ -44,7 +44,8 @@ namespace STM32T
 			RC16, RC17, RC18, RC19, RC20, RC21, RC22, RC23,
 			RC24, RC25, RC26, RC27, RC28, RC29, RC30, RC31,
 			
-			Normal = 255 };
+			Normal = 255
+		};
 		
 		static constexpr Version MAX()
 		{
@@ -104,6 +105,21 @@ namespace STM32T
 		constexpr bool Complete() const
 		{
 			return PreRelease();
+		}
+		
+		constexpr bool IsAlpha() const
+		{
+			return PreRelease() >= Alpha0 && PreRelease() <= Alpha31;
+		}
+		
+		constexpr bool IsBeta() const
+		{
+			return PreRelease() >= Beta0 && PreRelease() <= Beta31;
+		}
+		
+		constexpr bool IsRC() const
+		{
+			return PreRelease() >= RC0 && PreRelease() <= RC31;
 		}
 		
 		constexpr bool IsNormal() const
