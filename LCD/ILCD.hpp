@@ -52,7 +52,7 @@ namespace STM32T
 			PutStrn(view.data(), view.length());
 		}
 		
-		template <size_t BUF_SIZE = 32>
+		template <size_t BUF_SIZE = 64>
 		void PutStrf(const char* fmt, ...)
 		{
 			char buf[BUF_SIZE];

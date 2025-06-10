@@ -153,6 +153,11 @@ namespace STM32T
 			
 			m_end = nullptr;
 		}
+		
+		void Cancel()
+		{
+			m_end = nullptr;
+		}
 	};
 	
 	class ScopeActionF
@@ -172,6 +177,11 @@ namespace STM32T
 			if (m_end)
 				m_end();
 			
+			m_end = nullptr;
+		}
+		
+		void Cancel()
+		{
 			m_end = nullptr;
 		}
 		
