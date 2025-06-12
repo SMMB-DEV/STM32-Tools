@@ -112,7 +112,7 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr T round(T n, T multiple)
+	inline constexpr T round_up(T n, T multiple)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -463,7 +463,7 @@ namespace STM32T
 		}
 		
 		
-		DynClampedInt(const T min, const T max) : min(min), max(max), range(max - min), m_val(std::clamp(T(0), min, max)) {}
+		DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
 		DynClampedInt(const T val, const T min, const T max) : min(min), max(max), range(max - min), m_val(std::clamp(val, min, max)) {}
 		
 		operator T() const volatile { return m_val; }
