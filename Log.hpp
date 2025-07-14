@@ -1,10 +1,8 @@
 #pragma once
 
-extern "C"
-{
-#include "main.h"
-}
+#include "./Timing.hpp"
 
+#include "main.h"
 #include <cstdio>
 
 
@@ -15,35 +13,44 @@ extern "C"
 
 
 
-#define STM32T_SYS_WRITE_GPIO(PORT, PIN, TIM, BAUD) \
+#define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
 extern "C" int stdout_putchar(int ch) { return ch; } \
-__attribute__((always_inline)) static void _delay_putchar(const uint32_t delay) { (TIM)->CNT = 0;	while ((TIM)->CNT < delay); } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
-	static constexpr uint16_t BIT_TIME = 48'000'000 / (BAUD) - 21; \
+	static constexpr uint32_t BIT_TIME = STM32T_DELAY_CLK / (BAUD); \
 	\
 	\
+	using namespace STM32T::Time; \
 	if (fh != FH_STDOUT) \
 		return fh == FH_STDERR ? 0 : -1; \
 	\
+	volatile uint32_t start = GetCycle(); \
 	for (; len; len--) \
 	{ \
-		const uint8_t& ch = *buf++; \
+		const uint8_t ch = *buf++; \
 		\
 		/* Start bit */ \
 		(PORT)->BRR = (PIN); \
-		_delay_putchar(BIT_TIME); \
+		WaitAfter(start, BIT_TIME, GetCycle); \
+		start += BIT_TIME; \
 		\
 		/* Data */ \
 		for (uint8_t i = 1; i; i <<= 1) \
 		{ \
 			(PORT)->BSRR = (PIN) << (16 * ((ch & i) == 0)); \
-			_delay_putchar(BIT_TIME); \
+			WaitAfter(start, BIT_TIME, GetCycle); \
+			start += BIT_TIME; \
 		} \
+		\
+		/*Odd parity*/ \
+		(PORT)->BSRR = (PIN) << (16 * (STM32T::bit_count(ch) % 2)); \
+		WaitAfter(start, BIT_TIME, GetCycle); \
+		start += BIT_TIME; \
 		\
 		/* Stop bit */ \
 		(PORT)->BSRR = (PIN); \
-		_delay_putchar(BIT_TIME); \
+		WaitAfter(start, BIT_TIME, GetCycle); \
+		start += BIT_TIME; \
 	} \
 	\
 	return 0; \
@@ -111,27 +118,26 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 #endif
 
 #ifndef STM32T_LOG
-constexpr bool _LOG = false;
+constexpr bool _STM32T_LOG = false;
 #else
-constexpr bool _LOG = true;
+constexpr bool _STM32T_LOG = true;
 #endif
 
 
 
 inline void LOG(void (*f)())
 {
-	if constexpr (_LOG)
+	if constexpr (_STM32T_LOG)
 		f();
 }
 
 inline void LOGA(const uint8_t * arr, size_t len, const size_t line_count = 16)
 {
-	if constexpr (_LOG)
+	if constexpr (_STM32T_LOG)
 	{
-		len++;
 		while (len)
 		{
-			for (uint8_t i = 0; --len && i < line_count; i++)
+			for (size_t i = 0; len && i < line_count; i++, len--)
 				printf("%02X ", *arr++);
 			
 			printf("\n");
@@ -142,14 +148,14 @@ inline void LOGA(const uint8_t * arr, size_t len, const size_t line_count = 16)
 template <class... Args>
 inline void LOGF(const char *fmt, Args... args)
 {
-	if constexpr (_LOG)
+	if constexpr (_STM32T_LOG)
 		printf(fmt, args...);
 }
 
 template <class... Args>
 inline void LOGFI(const size_t indent, const char *fmt, Args... args)
 {
-	if constexpr (_LOG)
+	if constexpr (_STM32T_LOG)
 	{
 		printf("%*s", indent * 4, "");
 		printf(fmt, args...);
@@ -167,7 +173,7 @@ inline bool LOGFC(const bool c, const char *fmt, Args... args)
 
 inline void LOGSEP()
 {
-	if constexpr (_LOG)
+	if constexpr (_STM32T_LOG)
 		printf("--------------------------------------------------------------------------------\n");
 }
 
@@ -175,7 +181,7 @@ inline void LOGSEP()
 
 #define LOGT(__msg__, __min_time__, ...) \
 { \
-	if constexpr (_LOG) \
+	if constexpr (_STM32T_LOG) \
 	{ \
 		volatile uint32_t __start__ = HAL_GetTick(); \
 		__VA_ARGS__ \

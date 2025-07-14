@@ -12,9 +12,8 @@
 
 
 
-#define STM32T_SYS_WRITE_GPIO(PORT, PIN, TIM, BAUD) \
+#define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
 extern int stdout_putchar(int ch) { return ch; } \
-__attribute__((always_inline)) static void _delay_putchar(const uint32_t delay) { (TIM)->CNT = 0;	while ((TIM)->CNT < delay); } \
 extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
 	static const uint16_t BIT_TIME = 48'000'000 / (BAUD) - 21; \
@@ -48,7 +47,7 @@ extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_UART(PHUART) \
+#define STM32T_SYS_WRITE_ITM() \
 extern int stdout_putchar(int ch) { return ch; } \
 extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
@@ -69,7 +68,7 @@ extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_ITM() \
+#define STM32T_SYS_WRITE_UART(PHUART) \
 extern int stdout_putchar(int ch) { return ch; } \
 extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
@@ -81,7 +80,7 @@ extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 
-#define STM32T_SYS_WRITE_USB() \
+#define STM32T_SYS_WRITE_USB(connected) \
 extern USBD_HandleTypeDef hUsbDeviceFS; \
 extern int stdout_putchar(int ch) { return ch; } \
 extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
@@ -89,10 +88,10 @@ extern int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	if (fh != FH_STDOUT) \
 		return fh == FH_STDERR ? 0 : -1; \
 	\
-	uint8_t res = USBD_FAIL; \
+	uint8_t res = USBD_OK; \
 	uint32_t start = HAL_GetTick(); \
-	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100);\
-	return -res; \
+	while ((connected) && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
+	return 0;	/* If non-zero is returned once, it stops working. */ \
 }
 
 
