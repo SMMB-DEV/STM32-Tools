@@ -10,7 +10,7 @@
 
 namespace STM32T
 {
-	class AM2301
+	class AM230x
 	{
 		// All times are in microseconds unless specified.
 		static constexpr uint32_t
@@ -49,7 +49,7 @@ namespace STM32T
 		/**
 		* @param sda - Must be open-drain and pulled up.
 		*/
-		AM2301(IO sda) : m_sda(sda) {}
+		AM230x(IO sda) : m_sda(sda) {}
 		
 		/**
 		* @retval A pair of 16-bit signed { temperature, humidity } multiplied by 10.
@@ -60,10 +60,10 @@ namespace STM32T
 			m_sda.Reset();
 			HAL_Delay(BEGIN_MS);
 			m_sda.Set();
-			m_sda.Wait_us(true, 1);	// Wait for line to go high
+			m_sda.Wait_us(true, RESP_DELAY_MAX);	// Wait for line to go high
 			
 			// Response signal
-			if (!m_sda.Wait_us(false, RESP_DELAY_MAX) ||
+			if (!m_sda.CheckPulse_us(true, RESP_DELAY_MAX) ||
 				!m_sda.CheckPulse_us(false, RESP_LOW_MAX, RESP_LOW_MIN) ||
 				!m_sda.CheckPulse_us(true, RESP_HIGH_MAX, RESP_HIGH_MIN))
 				return std::nullopt;
