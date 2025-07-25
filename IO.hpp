@@ -21,6 +21,18 @@ namespace STM32T
 		return true;
 	}
 	
+	inline bool WaitOnPin_us(GPIO_TypeDef* const port, const uint16_t pin, const bool desired_state, const uint16_t timeout)
+	{
+		const uint32_t start = Time::GetCycle();
+		while (HAL_GPIO_ReadPin(port, pin) != desired_state)
+		{
+			if (Time::Elapsed_us(start, timeout))
+				return false;
+		}
+		
+		return true;
+	}
+	
 	class IO
 	{
 		static constexpr uint32_t GPIO_NUMBER = 16;
