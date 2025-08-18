@@ -45,6 +45,11 @@ namespace STM32T::Time
 	#pragma GCC diagnostic pop
 	#endif	// DWT
 	
+	inline uint32_t msToCycles(const uint8_t time_ms)
+	{
+		return time_ms * (STM32T_DELAY_CLK / 1'000);
+	}
+	
 	inline uint32_t usToCycles(const uint16_t time_us)
 	{
 		return time_us * (STM32T_DELAY_CLK / 1'000'000);
@@ -53,6 +58,11 @@ namespace STM32T::Time
 	inline uint32_t nsToCycles(const uint16_t time_ns)
 	{
 		return time_ns * (STM32T_DELAY_CLK / 1'000'000) / 1000;
+	}
+	
+	inline uint32_t CyclesTo_ms(uint32_t cyc)
+	{
+		return cyc / (STM32T_DELAY_CLK / 1'000);
 	}
 	
 	inline uint32_t CyclesTo_us(uint32_t cyc)
@@ -65,6 +75,12 @@ namespace STM32T::Time
 		return cyc * 1000 / (STM32T_DELAY_CLK / 1'000'000);
 	}
 	
+	inline void Delay_ms(uint8_t ms)
+	{
+		const uint32_t start = GetCycle(), delay = msToCycles(ms);
+		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_DELAY_CLK is divisible by 1'000'000).
+	}
+	
 	inline void Delay_us(uint16_t us)
 	{
 		const uint32_t start = GetCycle(), delay = usToCycles(us);
@@ -75,6 +91,12 @@ namespace STM32T::Time
 	{
 		const uint32_t start = GetCycle(), delay = nsToCycles(ns);
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
+	}
+	
+	inline bool Elapsed_ms(const uint32_t startCycle, const uint8_t time_ms)
+	{
+		const uint32_t delay = msToCycles(time_ms);
+		return GetCycle() - startCycle >= delay;
 	}
 	
 	inline bool Elapsed_us(const uint32_t startCycle, const uint16_t time_us)
@@ -95,6 +117,12 @@ namespace STM32T::Time
 		static_assert(is_int_v<T>);
 		
 		while (get_tick() - start < wait);
+	}
+	
+	inline void WaitAfter_ms(const uint32_t startCycle, const uint8_t wait_ms)
+	{
+		const uint32_t wait = msToCycles(wait_ms);
+		while (GetCycle() - startCycle < wait);
 	}
 	
 	inline void WaitAfter_us(const uint32_t startCycle, const uint16_t wait_us)
