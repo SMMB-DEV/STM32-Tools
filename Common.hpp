@@ -48,6 +48,16 @@ namespace STM32T
 		return x;
 	}
 	
+	inline constexpr char H2C(uint8_t x)
+	{
+		static constexpr char CHARS[16] =
+		{
+			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+		};
+		
+		return CHARS[x & 0xF];
+	}
+	
 	inline constexpr uint32_t pow10(uint8_t pow)
 	{
 		uint32_t val = 1;

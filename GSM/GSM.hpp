@@ -86,7 +86,7 @@ namespace STM32T
 			Bare		// ARGS
 		};
 		
-		virtual void SendUART(strv data)
+		void SendUART(strv data)
 		{
 			HAL_UART_Transmit(p_huart, (uint8_t*)data.data(), data.length(), HAL_UART_TIMEOUT_VALUE);
 		}
