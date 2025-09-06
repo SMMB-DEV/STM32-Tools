@@ -1,5 +1,6 @@
 #pragma once
 
+#include "./strv.hpp"
 #include "./Timing.hpp"
 
 #include "main.h"
@@ -56,8 +57,6 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	return 0; \
 }
 
-
-
 #define STM32T_SYS_WRITE_ITM() \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
@@ -77,8 +76,6 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	return -2;\
 }
 
-
-
 #define STM32T_SYS_WRITE_UART(PHUART) \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
@@ -89,9 +86,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	return HAL_UART_Transmit((PHUART), buf, len, HAL_MAX_DELAY) == HAL_OK ? 0 : -1; \
 }
 
-
-
-#define STM32T_SYS_WRITE_USB(connected) \
+#define STM32T_SYS_WRITE_USB \
 extern "C" USBD_HandleTypeDef hUsbDeviceFS; \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
@@ -101,115 +96,461 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	\
 	uint8_t res = USBD_OK; \
 	uint32_t start = HAL_GetTick(); \
-	while ((connected) && hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
+	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
 	return 0;	/* If non-zero is returned once, it stops working. */ \
 }
 
-
-
-
-
-
-
-#ifdef STM32T_LOG_GLOBAL
-#if STM32T_LOG_GLOBAL
-#define STM32T_LOG
-#endif
-#endif
-
-#ifndef STM32T_LOG
-constexpr bool _STM32T_LOG = false;
-#else
-constexpr bool _STM32T_LOG = true;
-#endif
-
-
-
-inline void LOG(void (*f)())
-{
-	if constexpr (_STM32T_LOG)
-		f();
+#define STM32T_SYS_WRITE_DYN() \
+namespace STM32T \
+{ \
+	inline bool (*_g_dynLog)(const uint8_t *buf, uint32_t len) = nullptr; \
+	inline void RedirectStdout(bool (*logger)(const uint8_t *buf, uint32_t len)) \
+	{ \
+		_g_dynLog = logger; \
+	} \
+} \
+extern "C" int stdout_putchar(int ch) { return ch; } \
+extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
+{ \
+	if (fh != FH_STDOUT) \
+		return fh == FH_STDERR ? 0 : -1; \
+	\
+	if (STM32T::_g_dynLog) \
+		return STM32T::_g_dynLog(buf, len) ? 0 : -1; \
+	else \
+		return 0; \
 }
 
-inline void LOGA(const uint8_t * arr, size_t len, const size_t line_count = 16)
+
+
+#if __has_include("usbd_cdc_if.h")
+#include "usbd_cdc_if.h"
+
+extern "C" USBD_HandleTypeDef hUsbDeviceFS;
+
+namespace STM32T::Log
 {
-	if constexpr (_STM32T_LOG)
+	inline void default_output_vcp(const char *buf, size_t len)
 	{
-		while (len)
+		uint8_t res;
+		uint32_t start = HAL_GetTick();
+		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 10);
+	}
+}
+#endif
+
+namespace STM32T
+{
+	namespace Log
+	{
+		enum class Level : uint8_t
 		{
-			for (size_t i = 0; len && i < line_count; i++, len--)
-				printf("%02X ", *arr++);
+			None, Fatal, Error, Warning, Info, Debug, Max = 255
+		};
+		
+		using output_t = void (*)(const char *buf, size_t len);
+		
+		inline void default_output_stdout(const char *buf, size_t len)
+		{
+			fwrite(buf, 1, len, stdout);
+			fflush(stdout);
+		}
+		
+		template <size_t OUTPUT_COUNT = 1>
+		class Logger
+		{
+		public:
+			Level level;
+			strv name;
+			std::array<output_t, OUTPUT_COUNT> outputs;
 			
-			printf("\n");
+			constexpr Logger(Level level, strv name) : level(level), name(name), outputs(std::array{default_output_stdout}) {}
+			constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs) : level(level), name(name), outputs(outputs) {}
+			
+			constexpr bool isEnabled() const
+			{
+				return level > Level::None;
+			}
+			
+			constexpr bool isEnabled(const Level level) const
+			{
+				return this->level >= level;
+			}
+			
+			void log(const Level level, const char *fmt, ...) const
+			{
+				if (isEnabled(level))
+				{
+					va_list args;
+					va_start(args, fmt);
+					log(level, fmt, args);
+					va_end(args);
+				}
+			}
+			
+			void log(const Level level, const char *fmt, va_list args) const
+			{
+				if (isEnabled(level))
+				{
+					size_t written = 0;
+					
+					const char *p = fmt;
+					for (; *p; p++)
+					{
+						if (*p != '%')
+							continue;
+						
+						dispatch_chunk(fmt, p - fmt);	// dispatch plain text
+						written += p - fmt;
+						
+						const char *const start = p++;
+						
+						char spec[16], flags[5 + 1], field_width[4 + 1], precision[4 + 1], modifier[2 + 1];
+						
+						if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
+							return;
+						
+						if (!extract_conv_spec("0123456789*", field_width, sizeof(field_width), p))
+							return;
+						
+						if (!extract_conv_spec(".0123456789*", precision, sizeof(precision), p))
+							return;
+						
+						if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
+							return;
+						
+						memcpy(spec, start, p - start + 1);
+						spec[p - start + 1] = '\0';
+						fmt = p + 1;
+						
+						int field_width_val;
+						bool field_width_present;
+						if ((field_width_present = strcmp(field_width, "*") == 0))
+							field_width_val = va_arg(args, int);
+						
+						int precision_val;
+						bool precision_present;
+						if ((precision_present = strcmp(precision, ".*") == 0))
+							precision_val = va_arg(args, int);
+						
+						char var[32 + 1];
+						int n = 0;
+						
+						auto format = [&]<typename T>()
+						{
+							if (field_width_present && precision_present)
+								n = snprintf(var, sizeof(var), spec, field_width_val, precision_val, va_arg(args, T));
+							else if (field_width_present)
+								n = snprintf(var, sizeof(var), spec, field_width_val, va_arg(args, T));
+							else if (precision_present)
+								n = snprintf(var, sizeof(var), spec, precision_val, va_arg(args, T));
+							else
+								n = snprintf(var, sizeof(var), spec, va_arg(args, T));
+						};
+						
+						// todo: check ll, etc.
+						switch (*p)
+						{
+							case 'd': case 'i':
+							{
+								if (strcmp(modifier, "l") == 0)
+									format.template operator()<long>();
+								else if (strcmp(modifier, "ll") == 0)
+									format.template operator()<long long>();
+								else if (strcmp(modifier, "j") == 0)
+									format.template operator()<intmax_t>();
+								else if (strcmp(modifier, "z") == 0)
+									format.template operator()<std::make_signed<size_t>>();
+								else if (strcmp(modifier, "t") == 0)
+									format.template operator()<ptrdiff_t>();
+								else
+									format.template operator()<int>();
+								
+								break;
+							}
+							
+							case 'u': case 'x': case 'X': case 'o':
+							{
+								if (strcmp(modifier, "l") == 0)
+									format.template operator()<unsigned long>();
+								else if (strcmp(modifier, "ll") == 0)
+									format.template operator()<unsigned long long>();
+								else if (strcmp(modifier, "j") == 0)
+									format.template operator()<uintmax_t>();
+								else if (strcmp(modifier, "z") == 0)
+									format.template operator()<size_t>();
+								else if (strcmp(modifier, "t") == 0)
+									format.template operator()<std::make_unsigned<ptrdiff_t>>();
+								else
+									format.template operator()<unsigned int>();
+								
+								break;
+							}
+							
+							case 'f': case 'F': case 'g': case 'G': case 'e': case 'E': case 'a': case 'A':
+							{
+								if (strcmp(modifier, "L") == 0)
+									format.template operator()<long double>();
+								else
+									format.template operator()<double>();
+								
+								break;
+							}
+							
+							case 'c':
+							{
+								if (strcmp(modifier, "l") == 0)
+									format.template operator()<wint_t>();
+								else
+									format.template operator()<int>();
+								
+								break;
+							}
+							
+							case 's':
+							{
+								if (strcmp(modifier, "l") == 0)
+									format.template operator()<const wchar_t *>();
+								else
+									format.template operator()<const char *>();
+								
+								break;
+							}
+							
+							case 'p':
+							{
+								format.template operator()<void *>();
+								break;
+							}
+							
+							case 'n':
+							{
+								if (strcmp(modifier, "hh") == 0)
+									*va_arg(args, signed char *) = written;
+								else if (strcmp(modifier, "h") == 0)
+									*va_arg(args, short *) = written;
+								else if (strcmp(modifier, "l") == 0)
+									*va_arg(args, long *) = written;
+								else if (strcmp(modifier, "ll") == 0)
+									*va_arg(args, long long *) = written;
+								else if (strcmp(modifier, "j") == 0)
+									*va_arg(args, intmax_t *) = written;
+								else if (strcmp(modifier, "z") == 0)
+									*va_arg(args, size_t *) = written;
+								else if (strcmp(modifier, "t") == 0)
+									*va_arg(args, ptrdiff_t *) = written;
+								else
+									*va_arg(args, int *) = written;
+								
+								break;
+							}
+							
+							case '%':
+							{
+								if (spec[0] != '\0') // must be empty
+									return;
+								
+								dispatch_chunk("%", 1);
+								written++;
+								break;
+							}
+							
+							default:
+								return;
+						}
+						
+						if (n < 0)
+							return;
+						
+						dispatch_chunk(var, std::min((size_t)n, sizeof(var) - 1));
+						written += std::min((size_t)n, sizeof(var) - 1);
+						
+						if (n > sizeof(var) - 1)
+						{
+							dispatch_chunk("...", 3);
+							written += 3;
+						}
+					}
+					
+					dispatch_chunk(fmt, p - fmt);
+				}
+			}
+			
+			template <class... Args>
+			void f(const char *fmt, Args... args) const { log(Level::Fatal, fmt, args...); }
+			
+			template <class... Args>
+			void e(const char *fmt, Args... args) const { log(Level::Error, fmt, args...); }
+			
+			template <class... Args>
+			void w(const char *fmt, Args... args) const { log(Level::Warning, fmt, args...); }
+			
+			template <class... Args>
+			void i(const char *fmt, Args... args) const { log(Level::Info, fmt, args...); }
+			
+			template <class... Args>
+			void d(const char *fmt, Args... args) const { log(Level::Debug, fmt, args...); }
+			
+		private:
+			void dispatch_chunk(const char *buf, size_t len) const
+			{
+				for (auto& out : outputs)
+					out(buf, len);
+			}
+			
+			static bool extract_conv_spec(const char *chars, char *spec, size_t spec_len, const char * &p)
+			{
+				const char *const start = p;
+				while (strchr(chars, *p))
+				{
+					*spec++ = *p++;
+					if (p - start >= spec_len)
+						return false;
+				}
+				
+				*spec = '\0';
+				
+				return *p != '\0';
+			}
+		};
+		
+		#ifndef STM32T_DEFAULT_LOG
+		#define STM32T_DEFAULT_LOG	(Level::None, ""sv, std::array{default_output_stdout})
+		#endif
+		
+		#ifdef STM32T_DEFAULT_LOG_DEBUG
+		inline constexpr Logger g_defaultLogger(Level::Debug, ""sv, std::array{default_output_stdout});
+		#elifdef STM32T_DEFAULT_LOG_INFO
+		inline constexpr Logger g_defaultLogger(Level::Info, ""sv, std::array{default_output_stdout});
+		#elifdef STM32T_DEFAULT_LOG_WARNING
+		inline constexpr Logger g_defaultLogger(Level::Warning, ""sv, std::array{default_output_stdout});
+		#elifdef STM32T_DEFAULT_LOG_ERROR
+		inline constexpr Logger g_defaultLogger(Level::Error, ""sv, std::array{default_output_stdout});
+		#elifdef STM32T_DEFAULT_LOG_FATAL
+		inline constexpr Logger g_defaultLogger(Level::Fatal, ""sv, std::array{default_output_stdout});
+		#else
+		inline constexpr Logger g_defaultLogger STM32T_DEFAULT_LOG;
+		#endif
+		
+		constexpr inline bool IsEnabled()
+		{
+			return g_defaultLogger.isEnabled();
+		}
+		
+		template <auto& logger, const Level level, class... Args>
+		[[gnu::always_inline]] void _LOG(const char *fmt, Args... args)
+		{
+			if constexpr (logger.isEnabled(level))
+				logger.log(level, fmt, args...);
+		}
+		
+		template <auto& logger, class... Args>
+		void LOG_N(const char *fmt, Args... args)
+		{
+			if constexpr (logger.isEnabled())
+				logger.log(Level::None, fmt, args...);
+		}
+		
+		template <class... Args>
+		[[gnu::always_inline]]
+		inline void LOG_N(const char *fmt, Args... args)
+		{
+			LOG_N<g_defaultLogger>(fmt, args...);
+		}
+		
+		template <auto& logger, class... Args>
+		void LOG_F(const char *fmt, Args... args) { _LOG<logger, Level::Fatal>(fmt, args...); }
+		
+		template <class... Args>
+		inline void LOG_F(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Fatal>(fmt, args...); }
+		
+		template <auto& logger, class... Args>
+		void LOG_E(const char *fmt, Args... args) { _LOG<logger, Level::Error>(fmt, args...); }
+		
+		template <class... Args>
+		inline void LOG_E(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Error>(fmt, args...); }
+		
+		template <auto& logger, class... Args>
+		void LOG_W(const char *fmt, Args... args) { _LOG<logger, Level::Warning>(fmt, args...); }
+		
+		template <class... Args>
+		inline void LOG_W(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Warning>(fmt, args...); }
+		
+		template <auto& logger, class... Args>
+		void LOG_I(const char *fmt, Args... args) { _LOG<logger, Level::Info>(fmt, args...); }
+		
+		template <class... Args>
+		inline void LOG_I(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Info>(fmt, args...); }
+		
+		template <auto& logger, class... Args>
+		void LOG_D(const char *fmt, Args... args) { _LOG<logger, Level::Debug>(fmt, args...); }
+		
+		template <class... Args>
+		inline void LOG_D(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Debug>(fmt, args...); }
+		
+		template <auto& logger>
+		inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
+		{
+			if constexpr (logger.isEnabled())
+			{
+				while (len)
+				{
+					for (size_t i = 0; len && i < line_count; i++, len--)
+						LOG_N<logger>("%02X ", *arr++);
+					
+					LOG_N<logger>("\n");
+				}
+			}
+		}
+		
+		inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
+		{
+			LOGA<g_defaultLogger>(arr, len, line_count);
+		}
+		
+		template <auto& logger>
+		inline void LOGSEP()
+		{
+			LOG_N<logger>("--------------------------------------------------------------------------------\n");
+		}
+		
+		inline void LOGSEP()
+		{
+			LOG_N("--------------------------------------------------------------------------------\n");
+		}
+		
+		inline void DoIfEnabled(void (*f)())
+		{
+			if constexpr (IsEnabled())
+				f();
+		}
+		
+		template <auto& logger = g_defaultLogger, const Level level = Level::Info>
+		inline void Startup()
+		{
+			DoIfEnabled([]()
+			{
+				_LOG<logger, level>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
+				
+				const uint32_t version = HAL_GetHalVersion();
+				
+				// major.minor.patch-rc
+				_LOG<logger, level>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n\n",
+					version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
+					HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
+					HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
+			});
 		}
 	}
 }
 
-template <class... Args>
-inline void LOGF(const char *fmt, Args... args)
-{
-	if constexpr (_STM32T_LOG)
-		printf(fmt, args...);
-}
-
-template <class... Args>
-inline void LOGFI(const size_t indent, const char *fmt, Args... args)
-{
-	if constexpr (_STM32T_LOG)
-	{
-		printf("%*s", indent * 4, "");
-		printf(fmt, args...);
-	}
-}
-
-template <class... Args>
-inline bool LOGFC(const bool c, const char *fmt, Args... args)
-{
-	if (c)
-		LOGF(fmt, args...);
-	
-	return c;
-}
-
-inline void LOGSEP()
-{
-	if constexpr (_STM32T_LOG)
-		printf("--------------------------------------------------------------------------------\n");
-}
 
 
-
-#define LOGT(__msg__, __min_time__, ...) \
-{ \
-	if constexpr (_STM32T_LOG) \
-	{ \
-		volatile uint32_t __start__ = HAL_GetTick(); \
-		__VA_ARGS__ \
-		uint32_t __elapsed__ = HAL_GetTick() - __start__; \
-		if (__elapsed__ >= __min_time__) \
-			printf(__msg__ ": %ums\n", __elapsed__); \
-	} \
-	else \
-	{ \
-		__VA_ARGS__ \
-	} \
-}
-
-namespace STM32T
-{
-	inline void Startup()
-	{
-		LOG([]()
-		{
-			printf("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
-		
-			const uint32_t version = HAL_GetHalVersion();
-			
-			// major.minor.patch-rc
-			printf("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n", version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF);
-			printf("RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n", HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
-			printf("HCLK: %.1f MHz\n", HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
-			printf("\n");
-		});
-	}
-}
+using STM32T::Log::LOG_N;
+using STM32T::Log::LOG_F;
+using STM32T::Log::LOG_E;
+using STM32T::Log::LOG_W;
+using STM32T::Log::LOG_I;
+using STM32T::Log::LOG_D;
+using STM32T::Log::LOGA;
+using STM32T::Log::LOGSEP;
