@@ -12,9 +12,9 @@ namespace STM32T
 {
 	class AM230x
 	{
-		// All times are in microseconds unless specified.
-		static constexpr uint32_t
-			BEGIN_MS = 1,
+		// All times are in microseconds.
+		static constexpr uint16_t
+			BEGIN = 1000,
 			RESP_DELAY_MAX = 200, RESP_LOW_MIN = 75, RESP_LOW_MAX = 95, RESP_HIGH_MIN = 75, RESP_HIGH_MAX = 95,
 			BIT_LOW_MIN = 48, BIT_LOW_MAX = 70, BIT_0_HIGH_MIN = 22, BIT_0_HIGH_MAX = 30, BIT_1_HIGH_MIN = 65, BIT_1_HIGH_MAX = 80,
 			END_MIN = 45, END_MAX = 65;
@@ -23,8 +23,6 @@ namespace STM32T
 		
 		bool ReceiveByte(uint8_t* const data)
 		{
-			using namespace STM32T;
-			
 			*data = 0;
 			
 			for (uint8_t mask = 0b1000'0000; mask; mask >>= 1)
@@ -58,7 +56,7 @@ namespace STM32T
 		{
 			// Start signal
 			m_sda.Reset();
-			HAL_Delay(BEGIN_MS);
+			Time::Delay_us(BEGIN);
 			m_sda.Set();
 			m_sda.Wait_us(true, RESP_DELAY_MAX);	// Wait for line to go high
 			
