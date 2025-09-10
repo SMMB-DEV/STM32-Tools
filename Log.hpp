@@ -130,11 +130,11 @@ extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 
 namespace STM32T::Log
 {
-	inline void default_output_vcp(const char *buf, size_t len)
+	inline void default_output_vcp(strv data)
 	{
 		uint8_t res;
 		uint32_t start = HAL_GetTick();
-		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 10);
+		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)data.data(), data.size())) == USBD_BUSY && HAL_GetTick() - start < 10);
 	}
 }
 #endif
@@ -148,12 +148,50 @@ namespace STM32T
 			None, Fatal, Error, Warning, Info, Debug, Max = 255
 		};
 		
-		using output_t = void (*)(const char *buf, size_t len);
-		
-		inline void default_output_stdout(const char *buf, size_t len)
+		inline strv LevelStr(Level level)
 		{
-			fwrite(buf, 1, len, stdout);
+			switch (level)
+			{
+				case Level::None:
+					return "None"sv;
+				
+				case Level::Fatal:
+					return "Fatal"sv;
+				
+				case Level::Error:
+					return "Error"sv;
+				
+				case Level::Warning:
+					return "Warning"sv;
+				
+				case Level::Info:
+					return "Info"sv;
+				
+				case Level::Debug:
+					return "Debug"sv;
+				
+				default:
+					return "Unknown"sv;
+			}
+		}
+		
+		using output_t = void (*)(strv data);
+		using timestamp_t = strv (*)();
+		
+		inline void default_output_stdout(strv data)
+		{
+			fwrite(data.data(), 1, data.size(), stdout);
 			fflush(stdout);
+		}
+		
+		inline strv default_timestamp()
+		{
+			static char str[16];
+			
+			const uint32_t now = HAL_GetTick();
+			int len = sprintf(str, "%10u", now);
+			
+			return strv(str, len);
 		}
 		
 		template <size_t OUTPUT_COUNT = 1>
@@ -163,9 +201,13 @@ namespace STM32T
 			Level level;
 			strv name;
 			std::array<output_t, OUTPUT_COUNT> outputs;
+			timestamp_t timestamp = default_timestamp;
 			
 			constexpr Logger(Level level, strv name) : level(level), name(name), outputs(std::array{default_output_stdout}) {}
 			constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs) : level(level), name(name), outputs(outputs) {}
+			constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs, timestamp_t timestamp) :
+				level(level), name(name), outputs(outputs), timestamp(timestamp) {}
+			constexpr Logger(Level level, strv name, timestamp_t timestamp) : level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
 			
 			constexpr bool isEnabled() const
 			{
@@ -192,6 +234,19 @@ namespace STM32T
 			{
 				if (isEnabled(level))
 				{
+					if (level > Level::None)
+					{
+						if (timestamp)
+							dispatch_format(timestamp());
+						
+						dispatch_format(LevelStr(level));
+						
+						if (!name.empty())
+							dispatch_format(name);
+						
+						dispatch_chunk(": ", 2);
+					}
+					
 					size_t written = 0;
 					
 					const char *p = fmt;
@@ -200,7 +255,7 @@ namespace STM32T
 						if (*p != '%')
 							continue;
 						
-						dispatch_chunk(fmt, p - fmt);	// dispatch plain text
+						dispatch_chunk({fmt, (size_t)(p - fmt)});	// dispatch plain text
 						written += p - fmt;
 						
 						const char *const start = p++;
@@ -233,7 +288,7 @@ namespace STM32T
 						if ((precision_present = strcmp(precision, ".*") == 0))
 							precision_val = va_arg(args, int);
 						
-						char var[32 + 1];
+						char var[64];
 						int n = 0;
 						
 						auto format = [&]<typename T>()
@@ -362,12 +417,12 @@ namespace STM32T
 						if (n < 0)
 							return;
 						
-						dispatch_chunk(var, std::min((size_t)n, sizeof(var) - 1));
+						dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
 						written += std::min((size_t)n, sizeof(var) - 1);
 						
 						if (n > sizeof(var) - 1)
 						{
-							dispatch_chunk("...", 3);
+							dispatch_chunk("..."sv);
 							written += 3;
 						}
 					}
@@ -395,7 +450,20 @@ namespace STM32T
 			void dispatch_chunk(const char *buf, size_t len) const
 			{
 				for (auto& out : outputs)
-					out(buf, len);
+					out({buf, len});
+			}
+			
+			void dispatch_chunk(strv data) const
+			{
+				for (auto& out : outputs)
+					out(data);
+			}
+			
+			void dispatch_format(strv format) const
+			{
+				dispatch_chunk("["sv);
+				dispatch_chunk(format);
+				dispatch_chunk("]"sv);
 			}
 			
 			static bool extract_conv_spec(const char *chars, char *spec, size_t spec_len, const char * &p)
@@ -451,11 +519,25 @@ namespace STM32T
 				logger.log(Level::None, fmt, args...);
 		}
 		
+		template <auto& logger, const Level level, class... Args>
+		void LOG_N(const char *fmt, Args... args)
+		{
+			if constexpr (logger.isEnabled() && logger.isEnabled(level))
+				logger.log(Level::None, fmt, args...);
+		}
+		
 		template <class... Args>
 		[[gnu::always_inline]]
 		inline void LOG_N(const char *fmt, Args... args)
 		{
 			LOG_N<g_defaultLogger>(fmt, args...);
+		}
+		
+		template <const Level level, class... Args>
+		[[gnu::always_inline]]
+		inline void LOG_N(const char *fmt, Args... args)
+		{
+			LOG_N<g_defaultLogger, level>(fmt, args...);
 		}
 		
 		template <auto& logger, class... Args>
@@ -525,17 +607,16 @@ namespace STM32T
 				f();
 		}
 		
-		template <auto& logger = g_defaultLogger, const Level level = Level::Info>
+		template <auto& logger = g_defaultLogger>
 		inline void Startup()
 		{
 			DoIfEnabled([]()
 			{
-				_LOG<logger, level>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
+				LOG_N<logger>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
 				
-				const uint32_t version = HAL_GetHalVersion();
+				const uint32_t version = HAL_GetHalVersion();	// major.minor.patch-rc
 				
-				// major.minor.patch-rc
-				_LOG<logger, level>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n\n",
+				LOG_N<logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n\n",
 					version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
 					HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
 					HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
