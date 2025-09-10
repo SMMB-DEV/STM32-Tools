@@ -127,47 +127,6 @@ namespace STM32T
 			return OK;
 		}
 		
-		[[deprecated]] ErrorCode Command(vec<strv>& tokens, char* buffer, uint16_t len, const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const bool allowSingleEnded = false)
-		{
-			if (type != CommandType::Bare)
-			{
-				SendUART("AT"sv);
-				SendUART(cmd);
-			}
-			
-			if (type == CommandType::Write || type == CommandType::Test)
-				SendUART("="sv);
-			
-			if (type == CommandType::Write || type == CommandType::Execute || type == CommandType::Bare)
-				SendUART(args);
-			else
-				SendUART("?"sv);
-			
-			if (type != CommandType::Bare)
-				SendUART("\r"sv);
-			
-			len--;		// Hopefully len isn't 0.
-			if (ReceiveUART(buffer, len, timeout, DEFAULT_IDLE_TIMEOUT) != OK)
-				return UART_ERR;
-			
-			buffer[len] = 0;	// make it safe for C str functions
-			
-			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
-			
-			return OK;
-		}
-		
-		bool CompareAndRemove(strv& token, const strv& remove)
-		{
-			if (token.compare(0, remove.size(), remove) == 0)
-			{
-				token.remove_prefix(remove.size());
-				return true;
-			}
-
-			return false;
-		}
-		
 		ErrorCode Standard(vec<strv>& tokens)
 		{
 			ErrorCode ret = UNKNOWN;
@@ -243,23 +202,6 @@ namespace STM32T
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated]] ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(),
-			const func<ErrorCode (vec<strv>&)>& op = nullptr, const bool allowSingleEnded = false)
-		{
-			char buffer[LEN];
-			uint16_t len = sizeof(buffer);
-			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
-			if (code != OK)
-				return code;
-			
-			vec<strv> tokens;
-			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
-			
-			// fixme: Standard() might not return the correct code.
-			return op ? op(tokens) : Standard(tokens);
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args,
 			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded = false)
 		{
@@ -276,33 +218,6 @@ namespace STM32T
 			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			return op(tokens);
-		}
-		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated]] ErrorCode Tokens(const uint32_t timeout, const CommandType type, const strv cmd,
-			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded, const char* const fmt, ...)
-		{
-			if (!fmt)
-				return ErrorCode::INVALID_PARAM;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			if (argsLen < 0)
-				return ErrorCode::UNKNOWN;
-			
-			va_end(print_args);
-			
-			if (argsLen > sizeof(args))	// did not fit inside {args}
-			{
-				Error_Handler();
-				return ERR;
-			}
-			
-			return Tokens<LEN>(timeout, type, cmd, strv(args, argsLen), op, allowSingleEnded);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -344,66 +259,6 @@ namespace STM32T
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated]] ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv& cmd, const strv& args = strv(),
-			const func<ErrorCode (vec<strv>&)>& op = nullptr)
-		{
-			return Tokens<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
-			{
-				if (tokens.size() != expectedTokens)
-					return Standard(tokens);
-				
-				const auto first = tokens[0];
-				bool ok = CompareAndRemove(tokens[0], cmd) && (CompareAndRemove(tokens[0], ": "sv) || CompareAndRemove(tokens[0], ":"sv));
-				
-				if (expectedTokens > 1)
-				{
-					ok &= tokens.back() == "OK"sv;
-					tokens.pop_back();
-				}
-				
-				if (!ok)
-				{
-					tokens[0] = first;
-					
-					for (const auto& token : tokens)
-						addURC(token);
-					
-					return ErrorCode::UNKNOWN;
-				}
-				
-				//return op ? op(tokens) : Standard(tokens);
-				return op ? op(tokens) : ErrorCode::OK;		// fixme: Doesn't handle URCs!
-			});
-		}
-		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated]] ErrorCode FirstLastToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd,
-			const func<ErrorCode (vec<strv>&)>& op, const char* const fmt, ...)
-		{
-			if (!fmt)
-				return INVALID_PARAM;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			if (argsLen < 0)
-				return INVALID_PARAM;
-			
-			va_end(print_args);
-			
-			if (argsLen > sizeof(args))	// Did not fit inside {args}
-			{
-				Error_Handler();
-				return INVALID_PARAM;
-			}
-			
-			return FirstLastToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), op);
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
 			const func<ErrorCode (vec<strv>&)>& op)
 		{
@@ -424,7 +279,7 @@ namespace STM32T
 				if (ok)
 				{
 					const auto first = tokens[0];
-					ok &= CompareAndRemove(tokens[0], cmd) && (CompareAndRemove(tokens[0], ": "sv) || CompareAndRemove(tokens[0], ":"sv));
+					ok &= tokens[0].remove_prefix(cmd) && (tokens[0].remove_prefix(": "sv) || tokens[0].remove_prefix(":"sv));
 					if (!ok)
 						tokens[0] = first;
 				}
@@ -520,7 +375,7 @@ namespace STM32T
 					done = true;
 					
 					const auto t = tokens[1];
-					const bool ok = CompareAndRemove(tokens[1], cmd) && (CompareAndRemove(tokens[1], ": "sv) || CompareAndRemove(tokens[1], ":"sv));
+					const bool ok = tokens[1].remove_prefix(cmd) && (tokens[1].remove_prefix(": "sv) || tokens[1].remove_prefix(":"sv));
 					if (!ok)
 					{
 						addURC(t);
