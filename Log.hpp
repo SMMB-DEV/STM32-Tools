@@ -130,11 +130,11 @@ extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 
 namespace STM32T::Log
 {
-	inline void default_output_vcp(strv data)
+	inline void default_output_vcp(strv data, bool last_chunk)
 	{
 		uint8_t res;
 		uint32_t start = HAL_GetTick();
-		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)data.data(), data.size())) == USBD_BUSY && HAL_GetTick() - start < 10);
+		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)data.data(), data.size())) == USBD_BUSY && HAL_GetTick() - start < 50);
 	}
 }
 #endif
@@ -152,36 +152,25 @@ namespace STM32T
 		{
 			switch (level)
 			{
-				case Level::None:
-					return "None"sv;
-				
-				case Level::Fatal:
-					return "Fatal"sv;
-				
-				case Level::Error:
-					return "Error"sv;
-				
-				case Level::Warning:
-					return "Warning"sv;
-				
-				case Level::Info:
-					return "Info"sv;
-				
-				case Level::Debug:
-					return "Debug"sv;
-				
-				default:
-					return "Unknown"sv;
+				case Level::None:		return "None"sv;
+				case Level::Fatal:		return "Fatal"sv;
+				case Level::Error:		return "Error"sv;
+				case Level::Warning:	return "Warn"sv;
+				case Level::Info:		return "Info"sv;
+				case Level::Debug:		return "Debug"sv;
+				default:				return "Unknown"sv;
 			}
 		}
 		
-		using output_t = void (*)(strv data);
+		using output_t = void (*)(strv data, bool last_chunk);
 		using timestamp_t = strv (*)();
 		
-		inline void default_output_stdout(strv data)
+		inline void default_output_stdout(strv data, bool last_chunk)
 		{
 			fwrite(data.data(), 1, data.size(), stdout);
-			fflush(stdout);
+			
+			if (last_chunk)
+				fflush(stdout);
 		}
 		
 		inline strv default_timestamp()
@@ -427,7 +416,7 @@ namespace STM32T
 						}
 					}
 					
-					dispatch_chunk(fmt, p - fmt);
+					dispatch_chunk({fmt, (size_t)(p - fmt)}, true);
 				}
 			}
 			
@@ -447,16 +436,16 @@ namespace STM32T
 			void d(const char *fmt, Args... args) const { log(Level::Debug, fmt, args...); }
 			
 		private:
-			void dispatch_chunk(const char *buf, size_t len) const
+			void dispatch_chunk(const char *buf, size_t len, bool last = false) const
 			{
 				for (auto& out : outputs)
-					out({buf, len});
+					out({buf, len}, last);
 			}
 			
-			void dispatch_chunk(strv data) const
+			void dispatch_chunk(strv data, bool last = false) const
 			{
 				for (auto& out : outputs)
-					out(data);
+					out(data, last);
 			}
 			
 			void dispatch_format(strv format) const
@@ -482,27 +471,36 @@ namespace STM32T
 			}
 		};
 		
-		#ifndef STM32T_DEFAULT_LOG
-		#define STM32T_DEFAULT_LOG	(Level::None, ""sv, std::array{default_output_stdout})
-		#endif
-		
-		#ifdef STM32T_DEFAULT_LOG_DEBUG
+	#ifdef STM32T_DEFAULT_LOG_DEBUG
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Debug, ""sv, std::array{default_output_stdout});
-		#elifdef STM32T_DEFAULT_LOG_INFO
+	#elifdef STM32T_DEFAULT_LOG_INFO
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Info, ""sv, std::array{default_output_stdout});
-		#elifdef STM32T_DEFAULT_LOG_WARNING
+	#elifdef STM32T_DEFAULT_LOG_WARNING
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Warning, ""sv, std::array{default_output_stdout});
-		#elifdef STM32T_DEFAULT_LOG_ERROR
+	#elifdef STM32T_DEFAULT_LOG_ERROR
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Error, ""sv, std::array{default_output_stdout});
-		#elifdef STM32T_DEFAULT_LOG_FATAL
+	#elifdef STM32T_DEFAULT_LOG_FATAL
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Fatal, ""sv, std::array{default_output_stdout});
-		#else
+	#elifdef STM32T_DEFAULT_LOG
+		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger STM32T_DEFAULT_LOG;
-		#endif
+	#else
+		inline constexpr Logger g_defaultLogger(Level::None, ""sv, std::array{default_output_stdout});
+	#endif
 		
 		constexpr inline bool IsEnabled()
 		{
 			return g_defaultLogger.isEnabled();
+		}
+		
+		constexpr inline bool IsEnabled(const Level level)
+		{
+			return g_defaultLogger.isEnabled(level);
 		}
 		
 		template <auto& logger, const Level level, class... Args>
