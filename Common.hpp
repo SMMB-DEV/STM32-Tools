@@ -459,8 +459,9 @@ namespace STM32T
 	{
 		static_assert(is_int_v<T>);
 		
+		T m_min, m_max;
+		
 	public:
-		const T min, max;
 		const uintmax_t range;
 		
 	private:
@@ -469,12 +470,12 @@ namespace STM32T
 	public:
 		bool IsUnlimited()
 		{
-			return min == std::numeric_limits<T>::min() && max == std::numeric_limits<T>::max();
+			return m_min == std::numeric_limits<T>::min() && m_max == std::numeric_limits<T>::max();
 		}
 		
 		
 		DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
-		DynClampedInt(const T val, const T min, const T max) : min(min), max(max), range(max - min), m_val(std::clamp(val, min, max)) {}
+		DynClampedInt(const T val, const T min, const T max) : m_min(min), m_max(max), range(max - min), m_val(std::clamp(val, min, max)) {}
 		
 		operator T() const volatile { return m_val; }
 		
@@ -482,13 +483,13 @@ namespace STM32T
 		
 		DynClampedInt& operator=(const T val)
 		{
-			m_val = std::clamp(val, min, max);
+			m_val = std::clamp(val, m_min, m_max);
 			return *this;
 		}
 		
 		volatile DynClampedInt& operator=(const T val) volatile
 		{
-			m_val = std::clamp(val, min, max);
+			m_val = std::clamp(val, m_min, m_max);
 			return *this;
 		}
 		
@@ -502,8 +503,8 @@ namespace STM32T
 		
 		DynClampedInt& operator++()	// prefix
 		{
-			if (m_val >= max)
-				m_val = min;
+			if (m_val >= m_max)
+				m_val = m_min;
 			else
 				m_val++;
 			
@@ -512,8 +513,8 @@ namespace STM32T
 		
 		DynClampedInt& operator--()	// prefix
 		{
-			if (m_val <= min)
-				m_val = max;
+			if (m_val <= m_min)
+				m_val = m_max;
 			else
 				m_val--;
 			
@@ -524,8 +525,8 @@ namespace STM32T
 		{
 			DynClampedInt val = *this;
 			
-			if (m_val >= max)
-				m_val = min;
+			if (m_val >= m_max)
+				m_val = m_min;
 			else
 				m_val++;
 			
@@ -536,8 +537,8 @@ namespace STM32T
 		{
 			DynClampedInt val = *this;
 			
-			if (m_val <= min)
-				m_val = max;
+			if (m_val <= m_min)
+				m_val = m_max;
 			else
 				m_val--;
 			
@@ -546,8 +547,8 @@ namespace STM32T
 		
 		volatile DynClampedInt& operator++() volatile	// prefix
 		{
-			if (m_val >= max)
-				m_val = min;
+			if (m_val >= m_max)
+				m_val = m_min;
 			else
 				m_val++;
 			
@@ -556,8 +557,8 @@ namespace STM32T
 		
 		volatile DynClampedInt& operator--() volatile	// prefix
 		{
-			if (m_val <= min)
-				m_val = max;
+			if (m_val <= m_min)
+				m_val = m_max;
 			else
 				m_val--;
 			
@@ -568,8 +569,8 @@ namespace STM32T
 		{
 			DynClampedInt val = *this;
 			
-			if (m_val >= max)
-				m_val = min;
+			if (m_val >= m_max)
+				m_val = m_min;
 			else
 				m_val++;
 			
@@ -580,8 +581,8 @@ namespace STM32T
 		{
 			DynClampedInt val = *this;
 			
-			if (m_val <= min)
-				m_val = max;
+			if (m_val <= m_min)
+				m_val = m_max;
 			else
 				m_val--;
 			
@@ -601,11 +602,11 @@ namespace STM32T
 				{
 					add %= range + 1;
 					
-					const uintmax_t rem = max - m_val;	// always <= RANGE
+					const uintmax_t rem = m_max - m_val;	// always <= RANGE
 					if (add > rem)
 					{
 						add -= rem + 1;
-						m_val = min;
+						m_val = m_min;
 					}
 					
 					m_val += add;
@@ -615,11 +616,11 @@ namespace STM32T
 					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
 					add_pos %= range + 1;
 					
-					const uintmax_t rem = m_val - min;
+					const uintmax_t rem = m_val - m_min;
 					if (add_pos > rem)
 					{
 						add_pos -= rem + 1;
-						m_val = max;
+						m_val = m_max;
 					}
 					
 					m_val -= add_pos;
@@ -642,11 +643,11 @@ namespace STM32T
 				{
 					sub %= range + 1;
 					
-					const uintmax_t rem = m_val - min;	// always <= RANGE
+					const uintmax_t rem = m_val - m_min;	// always <= RANGE
 					if (sub > rem)
 					{
 						sub -= rem + 1;
-						m_val = max;
+						m_val = m_max;
 					}
 					
 					m_val -= sub;
@@ -656,11 +657,11 @@ namespace STM32T
 					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
 					sub_pos %= range + 1;
 					
-					const uintmax_t rem = max - m_val;
+					const uintmax_t rem = m_max - m_val;
 					if (sub_pos > rem)
 					{
 						sub_pos -= rem + 1;
-						m_val = min;
+						m_val = m_min;
 					}
 					
 					m_val += sub_pos;
@@ -668,6 +669,20 @@ namespace STM32T
 			}
 			
 			return *this;
+		}
+		
+		void SetMax(T max)
+		{
+			m_max = max;
+			if (m_val > max)
+				m_val = max;
+		}
+		
+		void SetMin(T min)
+		{
+			m_min = min;
+			if (m_val > min)
+				m_val = min;
 		}
 	};
 	

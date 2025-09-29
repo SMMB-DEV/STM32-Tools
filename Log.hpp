@@ -155,7 +155,7 @@ namespace STM32T
 				case Level::None:		return "None"sv;
 				case Level::Fatal:		return "Fatal"sv;
 				case Level::Error:		return "Error"sv;
-				case Level::Warning:	return "Warn"sv;
+				case Level::Warning:	return "Warning"sv;
 				case Level::Info:		return "Info"sv;
 				case Level::Debug:		return "Debug"sv;
 				default:				return "Unknown"sv;
@@ -438,14 +438,16 @@ namespace STM32T
 		private:
 			void dispatch_chunk(const char *buf, size_t len, bool last = false) const
 			{
-				for (auto& out : outputs)
-					out({buf, len}, last);
+				for (auto out : outputs)
+					if (out)
+						out({buf, len}, last);
 			}
 			
 			void dispatch_chunk(strv data, bool last = false) const
 			{
-				for (auto& out : outputs)
-					out(data, last);
+				for (auto out : outputs)
+					if (out)
+						out(data, last);
 			}
 			
 			void dispatch_format(strv format) const
