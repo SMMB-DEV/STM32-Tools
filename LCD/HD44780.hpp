@@ -9,12 +9,14 @@ namespace STM32T
 {
 	class HD44780 : public ILCD
 	{
+		static constexpr uint16_t DEFAULT_TIMEOUT_US = 50;
+		
 		uint8_t (* const f_rw)(bool rw, bool rs, uint8_t data);
 		uint8_t m_addressCounter = 0;
 		const uint8_t m_colCount;
-		bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
+		const bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
 		
-		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = 50)
+		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = DEFAULT_TIMEOUT_US)
 		{
 			f_rw(0, rs, data);
 			
@@ -29,10 +31,10 @@ namespace STM32T
 			uint8_t data = f_rw(1, rs, 0);
 			
 			if (m_4Bit)
-				data |= (f_rw(1, rs, 0) >> 4);
+				data |= f_rw(1, rs, 0) >> 4;
 			
 			if (rs)
-				BusyWait(50, true);
+				BusyWait(DEFAULT_TIMEOUT_US, true);
 			else
 				m_addressCounter = data & 0b0111'1111;
 			
@@ -41,7 +43,7 @@ namespace STM32T
 		
 		bool BusyWait(uint16_t timeout_us, const bool tADD)
 		{
-			const uint32_t start = Time::GetCycle();
+			uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
 				if (Time::Elapsed_us(start, timeout_us))
@@ -50,8 +52,14 @@ namespace STM32T
 			
 			if (tADD)
 			{
-				Time::Delay_us(5);
-				Read(0);		// Update m_addressCounter
+				const uint8_t addressCounter = m_addressCounter;
+				start = Time::GetCycle();
+				while (m_addressCounter == addressCounter)
+				{
+					Read(0);		// Update m_addressCounter
+					if (Time::Elapsed_us(start, 8))
+						return false;
+				}
 			}
 			
 			return true;
@@ -64,7 +72,7 @@ namespace STM32T
 		
 	public:
 		/**
-	* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
+		* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
 		*				The E pin must also be cycled according to the datasheet.
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
@@ -110,10 +118,13 @@ namespace STM32T
 			Write(0, 0b0000'1000 | (on << 2) | (cursor << 1) | blink);
 		}
 		
-		void NextLine()
+		ILCD& NextLine(const line_t lines = 1) override
 		{
-			if (m_twoLines)
-				SetAddress((m_addressCounter & 0x40) + 0x40);	// 0x00 or 0x40
+			// todo: implement this correctly (4 * 20)
+			if (m_twoLines && lines % 2)
+				SetAddress(m_addressCounter >= 0x40 ? 0 : 0x40);
+			
+			return *this;
 		}
 		
 		HD44780& XL(uint8_t x, uint8_t l)
@@ -170,7 +181,7 @@ namespace STM32T
 				}
 			}
 			
-			if (auto_next_line && m_twoLines && (m_addressCounter & 0x3F) >= m_colCount)
+			if (auto_next_line && m_twoLines && (m_addressCounter % 0x40) >= m_colCount)
 				NextLine();
 			
 			Write(1, ch);

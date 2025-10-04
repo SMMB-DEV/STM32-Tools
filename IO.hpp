@@ -64,27 +64,27 @@ namespace STM32T
 			return &S_IO;
 		}
 		
-		__attribute__((always_inline)) bool Read() const
+		[[gnu::always_inline]] bool Read() const
 		{
 			return (Port->IDR & Pin) ? !active_low : active_low;
 		}
 		
-		__attribute__((always_inline)) bool Check() const
+		[[gnu::always_inline]] bool Check() const
 		{
 			return (Port->ODR & Pin) ? !active_low : active_low;
 		}
 		
-		__attribute__((always_inline)) void Set(bool state = true)
+		[[gnu::always_inline]] void Set(bool state = true)
 		{
 			Port->BSRR = Pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
 		}
 		
-		__attribute__((always_inline)) void Reset()
+		[[gnu::always_inline]] void Reset()
 		{
 			Set(false);
 		}
 		
-		__attribute__((always_inline)) void Toggle()
+		[[gnu::always_inline]] void Toggle()
 		{
 			Port->ODR ^= Pin;
 		}
