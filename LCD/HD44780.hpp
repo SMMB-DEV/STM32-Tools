@@ -35,8 +35,6 @@ namespace STM32T
 			
 			if (rs)
 				BusyWait(DEFAULT_TIMEOUT_US, true);
-			else
-				m_addressCounter = data & 0b0111'1111;
 			
 			return data;
 		}
@@ -52,14 +50,15 @@ namespace STM32T
 			
 			if (tADD)
 			{
-				const uint8_t addressCounter = m_addressCounter;
+				const uint8_t oldAddressCounter = m_addressCounter;
 				start = Time::GetCycle();
-				while (m_addressCounter == addressCounter)
-				{
-					Read(0);		// Update m_addressCounter
-					if (Time::Elapsed_us(start, 8))
-						return false;
-				}
+				
+				do
+					m_addressCounter = Read(0) & 0b0111'1111;
+				while (m_addressCounter == oldAddressCounter && !Time::Elapsed_us(start, 8));
+				
+				if (m_addressCounter == oldAddressCounter)		// Timeout
+					return false;
 			}
 			
 			return true;
