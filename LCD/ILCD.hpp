@@ -23,6 +23,8 @@ namespace STM32T
 		
 		virtual void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
 		
+		virtual void Test() {}
+		
 		void PutCharn(const char ch, size_t n, bool interpret_specials = true, bool auto_next_line = true)
 		{
 			while (n--)

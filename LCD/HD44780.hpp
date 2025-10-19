@@ -16,14 +16,14 @@ namespace STM32T
 		const uint8_t m_colCount;
 		const bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
 		
-		void Write(const bool rs, const uint8_t data, const uint16_t timeout_us = DEFAULT_TIMEOUT_US)
+		bool Write(const bool rs, const uint8_t data, const uint16_t timeout_us = DEFAULT_TIMEOUT_US)
 		{
 			f_rw(0, rs, data);
 			
 			if (m_4Bit)
 				f_rw(0, rs, data << 4);
 			
-			BusyWait(timeout_us, rs);
+			return BusyWait(timeout_us, rs);
 		}
 		
 		uint8_t Read(const bool rs)
@@ -41,6 +41,8 @@ namespace STM32T
 		
 		bool BusyWait(uint16_t timeout_us, const bool tADD)
 		{
+			const uint8_t oldAddressCounter = m_addressCounter;
+			
 			uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
@@ -50,7 +52,6 @@ namespace STM32T
 			
 			if (tADD)
 			{
-				const uint8_t oldAddressCounter = m_addressCounter;
 				start = Time::GetCycle();
 				
 				do
@@ -66,7 +67,8 @@ namespace STM32T
 		
 		void SetAddress(uint8_t addr)
 		{
-			Write(0, 0b1000'0000 | addr);
+			if (Write(0, 0b1000'0000 | addr))
+				m_addressCounter = addr;
 		}
 		
 	public:
@@ -184,6 +186,19 @@ namespace STM32T
 				NextLine();
 			
 			Write(1, ch);
+		}
+		
+		void Test() override
+		{
+			Clear();
+			PutStr("123456789O123456""1234");
+			HAL_Delay(3000);
+			
+			Clear();
+			XL(15, 0);
+			PutChar('A');
+			XL(14, 0);
+			PutChar('B');
 		}
 	};
 }
