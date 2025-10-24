@@ -473,22 +473,22 @@ namespace STM32T
 			}
 		};
 		
-	#ifdef STM32T_DEFAULT_LOG_DEBUG
+	#if defined(STM32T_DEFAULT_LOG_DEBUG)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Debug, ""sv, std::array{default_output_stdout});
-	#elifdef STM32T_DEFAULT_LOG_INFO
+	#elif defined(STM32T_DEFAULT_LOG_INFO)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Info, ""sv, std::array{default_output_stdout});
-	#elifdef STM32T_DEFAULT_LOG_WARNING
+	#elif defined(STM32T_DEFAULT_LOG_WARNING)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Warning, ""sv, std::array{default_output_stdout});
-	#elifdef STM32T_DEFAULT_LOG_ERROR
+	#elif defined(STM32T_DEFAULT_LOG_ERROR)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Error, ""sv, std::array{default_output_stdout});
-	#elifdef STM32T_DEFAULT_LOG_FATAL
+	#elif defined(STM32T_DEFAULT_LOG_FATAL)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger(Level::Fatal, ""sv, std::array{default_output_stdout});
-	#elifdef STM32T_DEFAULT_LOG
+	#elif defined(STM32T_DEFAULT_LOG)
 		#define STM32T_LOG_ENABLED
 		inline constexpr Logger g_defaultLogger STM32T_DEFAULT_LOG;
 	#else
