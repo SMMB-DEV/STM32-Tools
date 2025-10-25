@@ -452,6 +452,88 @@ namespace STM32T
 			
 			return *this;
 		}
+		
+		template <typename A>
+		volatile ClampedInt& operator+=(A add) volatile
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (is_unlimited)
+				m_val += add;
+			else
+			{
+				if (add >= 0)
+				{
+					add %= RANGE + 1;
+					
+					const uintmax_t rem = MAX - m_val;	// always <= RANGE
+					if (add > rem)
+					{
+						add -= rem + 1;
+						m_val = MIN;
+					}
+					
+					m_val += add;
+				}
+				else
+				{
+					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+					add_pos %= RANGE + 1;
+					
+					const uintmax_t rem = m_val - MIN;
+					if (add_pos > rem)
+					{
+						add_pos -= rem + 1;
+						m_val = MAX;
+					}
+					
+					m_val -= add_pos;
+				}
+			}
+			
+			return *this;
+		}
+		
+		template <typename A>
+		volatile ClampedInt& operator-=(A sub) volatile
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (is_unlimited)
+				m_val -= sub;
+			else
+			{
+				if (sub >= 0)
+				{
+					sub %= RANGE + 1;
+					
+					const uintmax_t rem = m_val - MIN;	// always <= RANGE
+					if (sub > rem)
+					{
+						sub -= rem + 1;
+						m_val = MAX;
+					}
+					
+					m_val -= sub;
+				}
+				else
+				{
+					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+					sub_pos %= RANGE + 1;
+					
+					const uintmax_t rem = MAX - m_val;
+					if (sub_pos > rem)
+					{
+						sub_pos -= rem + 1;
+						m_val = MIN;
+					}
+					
+					m_val += sub_pos;
+				}
+			}
+			
+			return *this;
+		}
 	};
 	
 	template <typename T>
@@ -671,6 +753,88 @@ namespace STM32T
 			return *this;
 		}
 		
+		template <typename A>
+		volatile DynClampedInt& operator+=(A add) volatile
+		{
+			static_assert(is_int_v<A>);
+			
+			if (IsUnlimited())
+				m_val += add;
+			else
+			{
+				if (add >= 0)
+				{
+					add %= range + 1;
+					
+					const uintmax_t rem = m_max - m_val;	// always <= RANGE
+					if (add > rem)
+					{
+						add -= rem + 1;
+						m_val = m_min;
+					}
+					
+					m_val += add;
+				}
+				else
+				{
+					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+					add_pos %= range + 1;
+					
+					const uintmax_t rem = m_val - m_min;
+					if (add_pos > rem)
+					{
+						add_pos -= rem + 1;
+						m_val = m_max;
+					}
+					
+					m_val -= add_pos;
+				}
+			}
+			
+			return *this;
+		}
+		
+		template <typename A>
+		volatile DynClampedInt& operator-=(A sub) volatile
+		{
+			static_assert(is_int_v<A>);
+			
+			if constexpr (IsUnlimited())
+				m_val -= sub;
+			else
+			{
+				if (sub >= 0)
+				{
+					sub %= range + 1;
+					
+					const uintmax_t rem = m_val - m_min;	// always <= RANGE
+					if (sub > rem)
+					{
+						sub -= rem + 1;
+						m_val = m_max;
+					}
+					
+					m_val -= sub;
+				}
+				else
+				{
+					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+					sub_pos %= range + 1;
+					
+					const uintmax_t rem = m_max - m_val;
+					if (sub_pos > rem)
+					{
+						sub_pos -= rem + 1;
+						m_val = m_min;
+					}
+					
+					m_val += sub_pos;
+				}
+			}
+			
+			return *this;
+		}
+		
 		void SetMax(T max)
 		{
 			m_max = max;
@@ -766,6 +930,82 @@ namespace STM32T
 				end = &((*end)->p_next);
 			
 			*end = new container(T{args...});
+		}
+	};
+	
+	template <class T, size_t MAX_SIZE>
+	class StaticQueue
+	{
+	private:
+		using index_t = ClampedInt<size_t, 0, MAX_SIZE - 1>;
+		
+		T m_items[MAX_SIZE];
+		
+		// m_front always modified in pop_front() and m_back always modified in push_back().
+		volatile index_t m_front = 0, m_back = 0;
+		
+	public:
+		StaticQueue() {}
+		~StaticQueue() {}
+		
+		bool empty() const
+		{
+			return m_front == m_back;
+		}
+		
+		bool full() const
+		{
+			index_t end = m_back;
+			return (++end).val() == m_front;
+		}
+		
+		size_t size() const
+		{
+			index_t begin = m_front, end = m_back;
+			
+			if (end >= begin)
+				return end - begin;
+			
+			return MAX_SIZE - (begin - end);
+		}
+		
+		bool push_back(T&& t)
+		{
+			if (full())
+				return false;
+			
+			m_items[m_back++] = std::move(t);
+			return true;
+		}
+		
+		bool push_back(const T& t)
+		{
+			if (full())
+				return false;
+			
+			m_items[m_back++] = t;
+			return true;
+		}
+		
+		std::optional<T> pop_front()
+		{
+			return empty() ? std::nullopt : std::move(m_items[m_front++]);
+		}
+		
+		size_t erase(size_t count)
+		{
+			size_t _size = size();
+			if (count > _size)
+				count = _size;
+			
+			m_front += count;
+			return count;
+		}
+		
+		T& operator[](size_t i)
+		{
+			index_t index = m_front;
+			return m_items[index += i];
 		}
 	};
 	
