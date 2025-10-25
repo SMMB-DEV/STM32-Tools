@@ -110,7 +110,8 @@ namespace STM32T
 		
 		HD44780& Clear()
 		{
-			Write(0, 0b0000'0001, 1600);	// Display clear
+			Write(0, 0b0000'0001, 1640);	// Display clear
+			m_addressCounter = 0;
 			return *this;
 		}
 		
