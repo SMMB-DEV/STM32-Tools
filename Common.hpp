@@ -2,6 +2,8 @@
 
 #include "main.h"
 
+#include "./Timing.hpp"
+
 #include <vector>
 #include <functional>
 #include <type_traits>
@@ -1103,6 +1105,45 @@ namespace STM32T
 			}
 			
 			return ret;
+		}
+	};
+	
+	class Filter
+	{
+		const uint32_t c_minCyc;
+		uint32_t m_prevCyc = 0, m_prevCyc2 = 0;
+		bool m_prevState = false, m_prevState2 = false;
+		
+	public:
+		Filter(uint16_t min_time_us) : c_minCyc(STM32T::Time::usToCycles(min_time_us)) {}
+		
+		/**
+		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
+		*/
+		uint32_t valid(bool state)
+		{
+			const uint32_t now = STM32T::Time::GetCycle();
+			
+			if (state == m_prevState)
+				return 0;
+			
+			const uint32_t duration = now - m_prevCyc;
+			
+			if (duration < c_minCyc)
+			{
+				m_prevState = m_prevState2;
+				m_prevCyc = m_prevCyc2;
+				
+				return 0;
+			}
+			
+			m_prevState2 = m_prevState;
+			m_prevState = state;
+			
+			m_prevCyc2 = m_prevCyc;
+			m_prevCyc = now;
+			
+			return STM32T::Time::CyclesTo_us(duration);
 		}
 	};
 	

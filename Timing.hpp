@@ -1,6 +1,8 @@
 #pragma once
 
-#include "./Common.hpp"
+#include "main.h"
+
+#include <type_traits>
 
 
 
@@ -114,7 +116,7 @@ namespace STM32T::Time
 	template <typename T>
 	inline void WaitAfter(const T start, const T wait, TickFuncPtr<T> get_tick = HAL_GetTick)
 	{
-		static_assert(is_int_v<T>);
+		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 		
 		while (get_tick() - start < wait);
 	}
