@@ -22,6 +22,16 @@ public:
 		s_list.reserve(8);
 	}
 	
+	static void Do(void (*callable)())
+	{
+		s_list.push_back({callable, 0, 0, false});
+	}
+	
+	static void DoAfter(void (*callable)(), uint32_t interval)
+	{
+		s_list.push_back({callable, interval, HAL_GetTick(), false});
+	}
+	
 	static void Repeat(void (*callable)(), uint32_t interval)
 	{
 		s_list.push_back({callable, interval, 0, true});
@@ -32,18 +42,43 @@ public:
 		s_list.push_back({callable, interval, HAL_GetTick() - interval + delay, true});
 	}
 	
-	static void Process()
+	static void Remove(void (*callable)())
 	{
 		for (auto it = s_list.begin(); it != s_list.end(); ++it)
 		{
-			if (const uint32_t now  = HAL_GetTick(); now - it->m_lastTime >= it->c_interval)
+			if (it->p_callable == callable)
 			{
-				it->p_callable();
+				s_list.erase(it);
+				return;
+			}
+		}
+	}
+	
+	static void Refresh(void (*callable)())
+	{
+		for (auto& r : s_list)
+		{
+			if (r.p_callable == callable)
+			{
+				r.m_lastTime = HAL_GetTick();
+				return;
+			}
+		}
+	}
+	
+	static void Process()
+	{
+		// Iterators are not used since the callables can modify the list.
+		for (size_t i = 0; i < s_list.size(); i++)
+		{
+			if (const uint32_t now  = HAL_GetTick(); now - s_list[i].m_lastTime >= s_list[i].c_interval)
+			{
+				s_list[i].p_callable();
 				
-				if (!it->c_repeat)
-					it = s_list.erase(it) - 1;
+				if (!s_list[i].c_repeat)
+					s_list.erase(s_list.begin() + i--);
 				else
-					it->m_lastTime = now;
+					s_list[i].m_lastTime = now;
 			}
 		}
 	}
