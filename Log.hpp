@@ -510,7 +510,7 @@ namespace STM32T::Log
 			logger.log(level, fmt, args...);
 	}
 	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_N(const char *fmt, Args... args)
 	{
 		if constexpr (logger.isEnabled())
@@ -524,13 +524,6 @@ namespace STM32T::Log
 			logger.log(Level::None, fmt, args...);
 	}
 	
-	template <class... Args>
-	[[gnu::always_inline]]
-	inline void LOG_N(const char *fmt, Args... args)
-	{
-		LOG_N<g_defaultLogger>(fmt, args...);
-	}
-	
 	template <const Level level, class... Args>
 	[[gnu::always_inline]]
 	inline void LOG_N(const char *fmt, Args... args)
@@ -538,37 +531,22 @@ namespace STM32T::Log
 		LOG_N<g_defaultLogger, level>(fmt, args...);
 	}
 	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_F(const char *fmt, Args... args) { _LOG<logger, Level::Fatal>(fmt, args...); }
 	
-	template <class... Args>
-	inline void LOG_F(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Fatal>(fmt, args...); }
-	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_E(const char *fmt, Args... args) { _LOG<logger, Level::Error>(fmt, args...); }
 	
-	template <class... Args>
-	inline void LOG_E(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Error>(fmt, args...); }
-	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_W(const char *fmt, Args... args) { _LOG<logger, Level::Warning>(fmt, args...); }
 	
-	template <class... Args>
-	inline void LOG_W(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Warning>(fmt, args...); }
-	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_I(const char *fmt, Args... args) { _LOG<logger, Level::Info>(fmt, args...); }
 	
-	template <class... Args>
-	inline void LOG_I(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Info>(fmt, args...); }
-	
-	template <auto& logger, class... Args>
+	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_D(const char *fmt, Args... args) { _LOG<logger, Level::Debug>(fmt, args...); }
 	
-	template <class... Args>
-	inline void LOG_D(const char *fmt, Args... args) { _LOG<g_defaultLogger, Level::Debug>(fmt, args...); }
-	
-	template <auto& logger>
+	template <auto& logger = g_defaultLogger>
 	inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
 	{
 		if constexpr (logger.isEnabled())
@@ -583,20 +561,10 @@ namespace STM32T::Log
 		}
 	}
 	
-	inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
-	{
-		LOGA<g_defaultLogger>(arr, len, line_count);
-	}
-	
-	template <auto& logger>
+	template <auto& logger = g_defaultLogger>
 	inline void LOGSEP()
 	{
 		LOG_N<logger>("--------------------------------------------------------------------------------\n");
-	}
-	
-	inline void LOGSEP()
-	{
-		LOG_N("--------------------------------------------------------------------------------\n");
 	}
 	
 	inline void DoIfEnabled(void (*f)())
