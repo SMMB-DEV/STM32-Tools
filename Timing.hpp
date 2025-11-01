@@ -77,6 +77,12 @@ namespace STM32T::Time
 		return cyc * 1000 / (STM32T_DELAY_CLK / 1'000'000);
 	}
 	
+	inline void Delay(uint32_t cyc)
+	{
+		const uint32_t start = GetCycle();
+		while (GetCycle() - start < cyc);
+	}
+	
 	inline void Delay_ms(uint8_t ms)
 	{
 		const uint32_t start = GetCycle(), delay = msToCycles(ms);
@@ -93,6 +99,11 @@ namespace STM32T::Time
 	{
 		const uint32_t start = GetCycle(), delay = nsToCycles(ns);
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
+	}
+	
+	inline bool Elapsed(const uint32_t startCycle, const uint32_t time_cycles)
+	{
+		return GetCycle() - startCycle >= time_cycles;
 	}
 	
 	inline bool Elapsed_ms(const uint32_t startCycle, const uint8_t time_ms)
@@ -119,6 +130,11 @@ namespace STM32T::Time
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 		
 		while (get_tick() - start < wait);
+	}
+	
+	inline void WaitAfter(const uint32_t startCycle, const uint32_t wait_cycles)
+	{
+		while (GetCycle() - startCycle < wait_cycles);
 	}
 	
 	inline void WaitAfter_ms(const uint32_t startCycle, const uint8_t wait_ms)
