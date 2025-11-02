@@ -208,214 +208,214 @@ namespace STM32T::Log
 		
 		void log(const Level level, const char *fmt, ...) const
 		{
-			if (isEnabled(level))
-			{
-				va_list args;
-				va_start(args, fmt);
-				log(level, fmt, args);
-				va_end(args);
-			}
+			if (!isEnabled(level))
+				return;
+			
+			va_list args;
+			va_start(args, fmt);
+			log(level, fmt, args);
+			va_end(args);
 		}
 		
 		void log(const Level level, const char *fmt, va_list args) const
 		{
-			if (isEnabled(level))
+			if (!isEnabled(level))
+				return;
+			
+			if (level > Level::None)
 			{
-				if (level > Level::None)
-				{
-					if (timestamp)
-						dispatch_format(timestamp());
-					
-					dispatch_format(LevelStr(level));
-					
-					if (!name.empty())
-						dispatch_format(name);
-					
-					dispatch_chunk(": ", 2);
-				}
+				if (timestamp)
+					dispatch_format(timestamp());
 				
-				size_t written = 0;
+				dispatch_format(LevelStr(level));
 				
-				const char *p = fmt;
-				for (; *p; p++)
-				{
-					if (*p != '%')
-						continue;
-					
-					dispatch_chunk({fmt, (size_t)(p - fmt)});	// dispatch plain text
-					written += p - fmt;
-					
-					const char *const start = p++;
-					
-					char spec[16], flags[5 + 1], field_width[4 + 1], precision[4 + 1], modifier[2 + 1];
-					
-					if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
-						return;
-					
-					if (!extract_conv_spec("0123456789*", field_width, sizeof(field_width), p))
-						return;
-					
-					if (!extract_conv_spec(".0123456789*", precision, sizeof(precision), p))
-						return;
-					
-					if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
-						return;
-					
-					memcpy(spec, start, p - start + 1);
-					spec[p - start + 1] = '\0';
-					fmt = p + 1;
-					
-					int field_width_val;
-					bool field_width_present;
-					if ((field_width_present = strcmp(field_width, "*") == 0))
-						field_width_val = va_arg(args, int);
-					
-					int precision_val;
-					bool precision_present;
-					if ((precision_present = strcmp(precision, ".*") == 0))
-						precision_val = va_arg(args, int);
-					
-					char var[64];
-					int n = 0;
-					
-					auto format = [&]<typename T>()
-					{
-						if (field_width_present && precision_present)
-							n = snprintf(var, sizeof(var), spec, field_width_val, precision_val, va_arg(args, T));
-						else if (field_width_present)
-							n = snprintf(var, sizeof(var), spec, field_width_val, va_arg(args, T));
-						else if (precision_present)
-							n = snprintf(var, sizeof(var), spec, precision_val, va_arg(args, T));
-						else
-							n = snprintf(var, sizeof(var), spec, va_arg(args, T));
-					};
-					
-					// todo: check ll, etc.
-					switch (*p)
-					{
-						case 'd': case 'i':
-						{
-							if (strcmp(modifier, "l") == 0)
-								format.template operator()<long>();
-							else if (strcmp(modifier, "ll") == 0)
-								format.template operator()<long long>();
-							else if (strcmp(modifier, "j") == 0)
-								format.template operator()<intmax_t>();
-							else if (strcmp(modifier, "z") == 0)
-								format.template operator()<std::make_signed<size_t>>();
-							else if (strcmp(modifier, "t") == 0)
-								format.template operator()<ptrdiff_t>();
-							else
-								format.template operator()<int>();
-							
-							break;
-						}
-						
-						case 'u': case 'x': case 'X': case 'o':
-						{
-							if (strcmp(modifier, "l") == 0)
-								format.template operator()<unsigned long>();
-							else if (strcmp(modifier, "ll") == 0)
-								format.template operator()<unsigned long long>();
-							else if (strcmp(modifier, "j") == 0)
-								format.template operator()<uintmax_t>();
-							else if (strcmp(modifier, "z") == 0)
-								format.template operator()<size_t>();
-							else if (strcmp(modifier, "t") == 0)
-								format.template operator()<std::make_unsigned<ptrdiff_t>>();
-							else
-								format.template operator()<unsigned int>();
-							
-							break;
-						}
-						
-						case 'f': case 'F': case 'g': case 'G': case 'e': case 'E': case 'a': case 'A':
-						{
-							if (strcmp(modifier, "L") == 0)
-								format.template operator()<long double>();
-							else
-								format.template operator()<double>();
-							
-							break;
-						}
-						
-						case 'c':
-						{
-							if (strcmp(modifier, "l") == 0)
-								format.template operator()<wint_t>();
-							else
-								format.template operator()<int>();
-							
-							break;
-						}
-						
-						case 's':
-						{
-							if (strcmp(modifier, "l") == 0)
-								format.template operator()<const wchar_t *>();
-							else
-								format.template operator()<const char *>();
-							
-							break;
-						}
-						
-						case 'p':
-						{
-							format.template operator()<void *>();
-							break;
-						}
-						
-						case 'n':
-						{
-							if (strcmp(modifier, "hh") == 0)
-								*va_arg(args, signed char *) = written;
-							else if (strcmp(modifier, "h") == 0)
-								*va_arg(args, short *) = written;
-							else if (strcmp(modifier, "l") == 0)
-								*va_arg(args, long *) = written;
-							else if (strcmp(modifier, "ll") == 0)
-								*va_arg(args, long long *) = written;
-							else if (strcmp(modifier, "j") == 0)
-								*va_arg(args, intmax_t *) = written;
-							else if (strcmp(modifier, "z") == 0)
-								*va_arg(args, size_t *) = written;
-							else if (strcmp(modifier, "t") == 0)
-								*va_arg(args, ptrdiff_t *) = written;
-							else
-								*va_arg(args, int *) = written;
-							
-							break;
-						}
-						
-						case '%':
-						{
-							if (spec[0] != '\0') // must be empty
-								return;
-							
-							dispatch_chunk("%", 1);
-							written++;
-							break;
-						}
-						
-						default:
-							return;
-					}
-					
-					if (n < 0)
-						return;
-					
-					dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
-					written += std::min((size_t)n, sizeof(var) - 1);
-					
-					if (n > sizeof(var) - 1)
-					{
-						dispatch_chunk("..."sv);
-						written += 3;
-					}
-				}
+				if (!name.empty())
+					dispatch_format(name);
 				
-				dispatch_chunk({fmt, (size_t)(p - fmt)}, true);
+				dispatch_chunk(": ", 2);
 			}
+			
+			size_t written = 0;
+			
+			const char *p = fmt;
+			for (; *p; p++)
+			{
+				if (*p != '%')
+					continue;
+				
+				dispatch_chunk({fmt, (size_t)(p - fmt)});	// dispatch plain text
+				written += p - fmt;
+				
+				const char *const start = p++;
+				
+				char spec[16], flags[5 + 1], field_width[4 + 1], precision[4 + 1], modifier[2 + 1];
+				
+				if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
+					return;
+				
+				if (!extract_conv_spec("0123456789*", field_width, sizeof(field_width), p))
+					return;
+				
+				if (!extract_conv_spec(".0123456789*", precision, sizeof(precision), p))
+					return;
+				
+				if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
+					return;
+				
+				memcpy(spec, start, p - start + 1);
+				spec[p - start + 1] = '\0';
+				fmt = p + 1;
+				
+				int field_width_val;
+				bool field_width_present;
+				if ((field_width_present = strcmp(field_width, "*") == 0))
+					field_width_val = va_arg(args, int);
+				
+				int precision_val;
+				bool precision_present;
+				if ((precision_present = strcmp(precision, ".*") == 0))
+					precision_val = va_arg(args, int);
+				
+				char var[64];
+				int n = 0;
+				
+				auto format = [&]<typename T>()
+				{
+					if (field_width_present && precision_present)
+						n = snprintf(var, sizeof(var), spec, field_width_val, precision_val, va_arg(args, T));
+					else if (field_width_present)
+						n = snprintf(var, sizeof(var), spec, field_width_val, va_arg(args, T));
+					else if (precision_present)
+						n = snprintf(var, sizeof(var), spec, precision_val, va_arg(args, T));
+					else
+						n = snprintf(var, sizeof(var), spec, va_arg(args, T));
+				};
+				
+				// todo: check ll, etc.
+				switch (*p)
+				{
+					case 'd': case 'i':
+					{
+						if (strcmp(modifier, "l") == 0)
+							format.template operator()<long>();
+						else if (strcmp(modifier, "ll") == 0)
+							format.template operator()<long long>();
+						else if (strcmp(modifier, "j") == 0)
+							format.template operator()<intmax_t>();
+						else if (strcmp(modifier, "z") == 0)
+							format.template operator()<std::make_signed<size_t>>();
+						else if (strcmp(modifier, "t") == 0)
+							format.template operator()<ptrdiff_t>();
+						else
+							format.template operator()<int>();
+						
+						break;
+					}
+					
+					case 'u': case 'x': case 'X': case 'o':
+					{
+						if (strcmp(modifier, "l") == 0)
+							format.template operator()<unsigned long>();
+						else if (strcmp(modifier, "ll") == 0)
+							format.template operator()<unsigned long long>();
+						else if (strcmp(modifier, "j") == 0)
+							format.template operator()<uintmax_t>();
+						else if (strcmp(modifier, "z") == 0)
+							format.template operator()<size_t>();
+						else if (strcmp(modifier, "t") == 0)
+							format.template operator()<std::make_unsigned<ptrdiff_t>>();
+						else
+							format.template operator()<unsigned int>();
+						
+						break;
+					}
+					
+					case 'f': case 'F': case 'g': case 'G': case 'e': case 'E': case 'a': case 'A':
+					{
+						if (strcmp(modifier, "L") == 0)
+							format.template operator()<long double>();
+						else
+							format.template operator()<double>();
+						
+						break;
+					}
+					
+					case 'c':
+					{
+						if (strcmp(modifier, "l") == 0)
+							format.template operator()<wint_t>();
+						else
+							format.template operator()<int>();
+						
+						break;
+					}
+					
+					case 's':
+					{
+						if (strcmp(modifier, "l") == 0)
+							format.template operator()<const wchar_t *>();
+						else
+							format.template operator()<const char *>();
+						
+						break;
+					}
+					
+					case 'p':
+					{
+						format.template operator()<void *>();
+						break;
+					}
+					
+					case 'n':
+					{
+						if (strcmp(modifier, "hh") == 0)
+							*va_arg(args, signed char *) = written;
+						else if (strcmp(modifier, "h") == 0)
+							*va_arg(args, short *) = written;
+						else if (strcmp(modifier, "l") == 0)
+							*va_arg(args, long *) = written;
+						else if (strcmp(modifier, "ll") == 0)
+							*va_arg(args, long long *) = written;
+						else if (strcmp(modifier, "j") == 0)
+							*va_arg(args, intmax_t *) = written;
+						else if (strcmp(modifier, "z") == 0)
+							*va_arg(args, size_t *) = written;
+						else if (strcmp(modifier, "t") == 0)
+							*va_arg(args, ptrdiff_t *) = written;
+						else
+							*va_arg(args, int *) = written;
+						
+						break;
+					}
+					
+					case '%':
+					{
+						if (spec[0] != '\0') // must be empty
+							return;
+						
+						dispatch_chunk("%", 1);
+						written++;
+						break;
+					}
+					
+					default:
+						return;
+				}
+				
+				if (n < 0)
+					return;
+				
+				dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
+				written += std::min((size_t)n, sizeof(var) - 1);
+				
+				if (n > sizeof(var) - 1)
+				{
+					dispatch_chunk("..."sv);
+					written += 3;
+				}
+			}
+			
+			dispatch_chunk({fmt, (size_t)(p - fmt)}, true);
 		}
 		
 		template <class... Args>
