@@ -15,8 +15,7 @@ namespace STM32T::Time
 	using DelayFuncPtr = void (*)(T);
 	
 	#ifndef STM32T_DELAY_CLK
-	#warning "STM32T_DELAY_CLK not defined! Defaulting to SystemCoreClock."
-	#define STM32T_DELAY_CLK	(SystemCoreClock)
+	#error "STM32T_DELAY_CLK not defined!"
 	#endif
 	
 	#ifdef DWT
@@ -39,12 +38,25 @@ namespace STM32T::Time
 	
 	[[gnu::always_inline]] inline uint32_t GetCycle() { return DWT->CYCCNT; }
 	#else
-	inline void Init() {}
+	inline void Init()
+	{
+		if (1000 * (SysTick->LOAD + 1) != STM32T_DELAY_CLK)
+			Error_Handler();
+	}
 	
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic error "-Wundefined-inline"
-	[[gnu::always_inline]] inline uint32_t GetCycle();
-	#pragma GCC diagnostic pop
+	inline uint32_t GetCycle()
+	{
+		static constexpr uint32_t MS = STM32T_DELAY_CLK / 1000;
+		
+		const uint32_t
+			big = HAL_GetTick(), small = SysTick->VAL,
+			big2 = HAL_GetTick(), small2 = SysTick->VAL;
+
+		if (big == big2)
+			return big * MS + (MS - small);
+		else
+			return big2 * MS + (MS - small2);
+	}
 	#endif	// DWT
 	
 	inline uint32_t msToCycles(const uint8_t time_ms)
