@@ -1108,26 +1108,29 @@ namespace STM32T
 		}
 	};
 	
+	template <typename TIME_T = uint32_t>
 	class Filter
 	{
-		const uint32_t c_minCyc;
-		uint32_t m_prevCyc = 0, m_prevCyc2 = 0;
+		TIME_T (*const fc_cyc)();
+		const TIME_T c_minCyc;
+		
+		TIME_T m_prevCyc = 0, m_prevCyc2 = 0;
 		bool m_prevState = false, m_prevState2 = false;
 		
 	public:
-		Filter(uint16_t min_time_us) : c_minCyc(STM32T::Time::usToCycles(min_time_us)) {}
+		Filter(TIME_T min_time, TIME_T (* cyc)() = Time::GetCycle) : c_minCyc(min_time), fc_cyc(cyc) {}
 		
 		/**
 		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
 		*/
-		uint32_t valid(bool state)
+		TIME_T valid(bool state)
 		{
-			const uint32_t now = STM32T::Time::GetCycle();
+			const TIME_T now = fc_cyc();
 			
 			if (state == m_prevState)
 				return 0;
 			
-			const uint32_t duration = now - m_prevCyc;
+			const TIME_T duration = now - m_prevCyc;
 			
 			if (duration < c_minCyc)
 			{
@@ -1143,7 +1146,7 @@ namespace STM32T
 			m_prevCyc2 = m_prevCyc;
 			m_prevCyc = now;
 			
-			return STM32T::Time::CyclesTo_us(duration);
+			return duration;
 		}
 	};
 	
