@@ -21,41 +21,42 @@ namespace STM32T
 		
 		virtual ILCD& NextLine(const line_t lines = 1) = 0;
 		
-		virtual void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
+		virtual ILCD& PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
 		
 		virtual void Test() {}
 		
-		void PutCharn(const char ch, size_t n, bool interpret_specials = true, bool auto_next_line = true)
+		ILCD& PutCharn(const char ch, size_t n, bool interpret_specials = true, bool auto_next_line = true)
 		{
 			while (n--)
 				PutChar(ch, interpret_specials, auto_next_line);
+			
+			return *this;
 		}
 		
-		void PutStr(const char* str)
+		ILCD& PutStr(const char* str)
 		{
 			while (*str)
 				PutChar(*str++);
+			
+			return *this;
 		}
 		
-		void PutStrn(const char* str, size_t n)
+		ILCD& PutStrn(const char* str, size_t n)
 		{
 			while (n--)
 				PutChar(*str++);
+			
+			return *this;
 		}
 		
-		[[deprecated("Use PutStr() instead.")]]
-		void PutStrv(strv view)
+		ILCD& PutStr(const strv view)
 		{
 			PutStrn(view.data(), view.length());
-		}
-		
-		void PutStr(strv view)
-		{
-			PutStrn(view.data(), view.length());
+			return *this;
 		}
 		
 		template <size_t BUF_SIZE = 64>
-		void PutStrf(const char* fmt, ...)
+		ILCD& PutStrf(const char* fmt, ...)
 		{
 			char buf[BUF_SIZE];
 			
@@ -65,10 +66,12 @@ namespace STM32T
 			va_end(args);
 			
 			PutStrn(buf, std::min((size_t)len, BUF_SIZE - 1));
+			
+			return *this;
 		}
 		
 		template <typename I, size_t BUF_SIZE = 32>
-		void PutInt(const I i, const int base = 10, const size_t min_field_width = 0, const char filler = '0')
+		ILCD& PutInt(const I i, const int base = 10, const size_t min_field_width = 0, const char filler = '0')
 		{
 			static_assert(std::is_integral_v<I>);
 			
@@ -78,7 +81,7 @@ namespace STM32T
 			if (result.ec != std::errc())
 			{
 				PutCharn('?', min_field_width);
-				return;
+				return *this;
 			}
 			
 			const size_t len = result.ptr - buf;
@@ -87,10 +90,12 @@ namespace STM32T
 				PutCharn(filler, min_field_width - len);
 			
 			PutStrn(buf, len);
+			
+			return *this;
 		}
 		
 		template <typename F, size_t BUF_SIZE = 32>
-		void PutFloat(const F f)
+		ILCD& PutFloat(const F f)
 		{
 			static_assert(std::is_floating_point_v<F>);
 			
@@ -101,6 +106,8 @@ namespace STM32T
 				PutChar('?');
 			else
 				PutStrn(buf, result.ptr - buf);
+			
+			return *this;
 		}
 	};
 }

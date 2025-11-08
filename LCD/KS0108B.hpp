@@ -122,7 +122,7 @@ namespace STM32T
 		
 		//void SetFa();
 		
-		void Test();
+		void Test() override;
 		
 		void Init();
 		
@@ -152,7 +152,7 @@ namespace STM32T
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
 		
-		void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override;
+		KS0108B& PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override;
 		
 		void PutCharBig(const uint8_t ch, bool interpret_specials = true);
 		void PutStrBig(const char* str);

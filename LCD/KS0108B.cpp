@@ -888,7 +888,7 @@ namespace STM32T
 		Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 	}
 
-	void KS0108B::PutChar(const char ch, bool interpret_specials, bool auto_next_line)
+	KS0108B& KS0108B::PutChar(const char ch, bool interpret_specials, bool auto_next_line)
 	{
 		//todo: space between characters
 		
@@ -901,11 +901,7 @@ namespace STM32T
 			{
 				case '\n':
 				case '\r':
-				{
-					NextLine();
-					
-					return;
-				}
+					return NextLine();
 				
 				case '\b':
 				{
@@ -916,7 +912,7 @@ namespace STM32T
 					PutChar(' ');
 					Goto(cursor, line);
 					
-					return;
+					return *this;
 				}
 				
 				case '\t':
@@ -924,7 +920,7 @@ namespace STM32T
 					PutChar(' ');
 					PutChar(' ');
 					
-					return;
+					return *this;
 				}
 				
 				case 127:	//DEL
@@ -933,7 +929,7 @@ namespace STM32T
 					PutChar(' ');
 					Goto(cursor, line);
 					
-					return;
+					return *this;
 				}
 			}
 		}
@@ -976,6 +972,8 @@ namespace STM32T
 			if (writeSpace)
 				WriteTop(0, m_row);
 		}
+		
+		return *this;
 	}
 	
 	void KS0108B::PutCharBig(const uint8_t ch, bool interpret_specials)

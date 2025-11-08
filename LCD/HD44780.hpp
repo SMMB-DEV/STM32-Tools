@@ -86,7 +86,7 @@ namespace STM32T
 		HD44780& Init()
 		{
 			Time::Init();
-			HAL_Delay(15);		// For VCC; probably not necessary.
+			Time::Delay_ms(15);		// For VCC; probably not necessary.
 			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(4100);
 			f_rw(0, 0, 0b0011'0000);
@@ -120,7 +120,7 @@ namespace STM32T
 			Write(0, 0b0000'1000 | (on << 2) | (cursor << 1) | blink);
 		}
 		
-		ILCD& NextLine(const line_t lines = 1) override
+		HD44780& NextLine(const line_t lines = 1) override
 		{
 			// todo: implement this correctly (4 * 20)
 			if (m_twoLines && lines % 2)
@@ -139,7 +139,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		void PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override
+		HD44780& PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override
 		{
 			if (interpret_specials)
 			{
@@ -147,10 +147,7 @@ namespace STM32T
 				{
 					case '\n':
 					case '\r':
-					{
-						NextLine();
-						return;
-					}
+						return NextLine();
 					
 					/*case '\b':
 					{
@@ -169,7 +166,7 @@ namespace STM32T
 						PutChar(' ');
 						PutChar(' ');
 						
-						return;
+						return *this;
 					}
 					
 					/*case 127:	//DEL
@@ -187,6 +184,8 @@ namespace STM32T
 				NextLine();
 			
 			Write(1, ch);
+			
+			return *this;
 		}
 		
 		void Test() override
