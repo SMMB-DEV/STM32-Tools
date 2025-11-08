@@ -994,9 +994,20 @@ namespace STM32T
 			return true;
 		}
 		
+		std::optional<T> pop_back()
+		{
+			if (empty())
+				return std::nullopt;
+			
+			return std::move(m_items[--m_back]);
+		}
+		
 		std::optional<T> pop_front()
 		{
-			return empty() ? std::nullopt : std::move(m_items[m_front++]);
+			if (empty())
+				return std::nullopt;
+			
+			return std::move(m_items[m_front++]);
 		}
 		
 		size_t erase(size_t count)
@@ -1133,30 +1144,32 @@ namespace STM32T
 		/**
 		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
 		*/
-		TIME_T valid(bool state)
+			void validate(bool state, const std::function<void(TIME_T)>& success, const std::function<void(TIME_T)>& filtered)
 		{
 			const TIME_T now = fc_cyc();
 			
 			if (state == m_prevState)
-				return 0;
+				return;
 			
 			const TIME_T duration = now - m_prevCyc;
 			
 			if (duration < c_minCyc)
 			{
+				filtered(duration);
+				
 				m_prevState = m_prevState2;
 				m_prevCyc = m_prevCyc2;
 				
-				return 0;
+				return;
 			}
+			
+			success(duration);
 			
 			m_prevState2 = m_prevState;
 			m_prevState = state;
 			
 			m_prevCyc2 = m_prevCyc;
 			m_prevCyc = now;
-			
-			return duration;
 		}
 		
 		void reset()
