@@ -19,32 +19,34 @@ class Runnable
 	static inline std::vector<Runnable> s_list;
 	
 public:
+	using callable_t = void (*)();
+	
 	static void Init()
 	{
 		s_list.reserve(8);
 	}
 	
-	static void Do(void (*callable)())
+	static void Do(callable_t callable)
 	{
 		s_list.push_back({callable, 0, 0, false});
 	}
 	
-	static void DoAfter(void (*callable)(), uint32_t interval)
+	static void DoAfter(callable_t callable, uint32_t interval)
 	{
 		s_list.push_back({callable, interval, HAL_GetTick(), false});
 	}
 	
-	static void Repeat(void (*callable)(), uint32_t interval)
+	static void Repeat(callable_t callable, uint32_t interval)
 	{
 		s_list.push_back({callable, interval, 0, true});
 	}
 	
-	static void DoAndRepeat(void (*callable)(), uint32_t interval, uint32_t delay = 0)
+	static void DoAndRepeat(callable_t callable, uint32_t interval, uint32_t delay = 0)
 	{
 		s_list.push_back({callable, interval, HAL_GetTick() - interval + delay, true});
 	}
 	
-	static void Remove(void (*callable)())
+	static void Remove(callable_t callable)
 	{
 		for (auto it = s_list.begin(); it != s_list.end(); ++it)
 		{
@@ -56,7 +58,7 @@ public:
 		}
 	}
 	
-	static void Refresh(void (*callable)())
+	static void Refresh(callable_t callable)
 	{
 		for (auto& r : s_list)
 		{

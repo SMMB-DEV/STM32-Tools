@@ -961,6 +961,11 @@ namespace STM32T
 			return (++end).val() == m_front;
 		}
 		
+		void clear()
+		{
+			m_front = m_back;
+		}
+		
 		size_t size() const
 		{
 			index_t begin = m_front, end = m_back;
@@ -1041,6 +1046,11 @@ namespace STM32T
 			index_t front = m_front;
 			--front;
 			return front == m_back;
+		}
+		
+		void clear()
+		{
+			m_front = m_back;
 		}
 		
 		/**
@@ -1147,6 +1157,12 @@ namespace STM32T
 			m_prevCyc = now;
 			
 			return duration;
+		}
+		
+		void reset()
+		{
+			m_prevCyc = m_prevCyc2 = fc_cyc();
+			m_prevState = m_prevState2;
 		}
 	};
 	
