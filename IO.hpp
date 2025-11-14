@@ -34,61 +34,21 @@ namespace STM32T
 		return true;
 	}
 	
-	class IO
+	class IOProxy
 	{
-		static constexpr uint32_t GPIO_NUMBER = 16;
-		
-		GPIO_TypeDef* const Port;
-		
 	public:
-		const uint16_t Pin;
+		virtual ~IOProxy() {}
 		
-	protected:
-		const bool active_low;
+		virtual bool Read() const = 0;
+		virtual bool Check() const = 0;
+		virtual bool Set(bool state = true) = 0;
 		
-		static inline GPIO_TypeDef S_DUMMY_GPIO = {0};
-		
-	public:
-		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
+		[[gnu::always_inline]] bool Reset()
 		{
-			assert_param(IS_GPIO_PIN(Pin));
+			return Set(false);
 		}
 		
-		static IO None()
-		{
-			return IO(&S_DUMMY_GPIO, GPIO_PIN_0);
-		}
-		
-		static IO* NonePtr()
-		{
-			static IO S_IO{&S_DUMMY_GPIO, GPIO_PIN_0};
-			return &S_IO;
-		}
-		
-		[[gnu::always_inline]] bool Read() const
-		{
-			return (Port->IDR & Pin) ? !active_low : active_low;
-		}
-		
-		[[gnu::always_inline]] bool Check() const
-		{
-			return (Port->ODR & Pin) ? !active_low : active_low;
-		}
-		
-		[[gnu::always_inline]] void Set(bool state = true)
-		{
-			Port->BSRR = Pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
-		}
-		
-		[[gnu::always_inline]] void Reset()
-		{
-			Set(false);
-		}
-		
-		[[gnu::always_inline]] void Toggle()
-		{
-			Port->ODR ^= Pin;
-		}
+		virtual void Toggle() = 0;
 		
 		template<typename T = uint32_t>
 		void Timed(const T time, Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
@@ -107,17 +67,6 @@ namespace STM32T
 				Timed(time1);
 				HAL_Delay(time2);
 			}
-		}
-		
-		/**
-		* @param mode - Must be a value of @ref GPIO_mode_define
-		* @param pull - Must be a value of @ref GPIO_pull_define
-		* @param speed - Must be a value of @ref GPIO_speed_define
-		*/
-		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
-		{
-			GPIO_InitTypeDef init{ .Pin = Pin, .Mode = mode, .Pull = pull, .Speed = speed };
-			HAL_GPIO_Init(Port, &init);
 		}
 		
 		bool Wait(const bool desired_state, const uint32_t timeout) const
@@ -180,21 +129,184 @@ namespace STM32T
 		}
 	};
 	
+	class IO : public IOProxy
+	{
+		static constexpr uint32_t GPIO_NUMBER = 16;
+		
+		GPIO_TypeDef* const Port;
+		
+	public:
+		const uint16_t Pin;
+		
+	protected:
+		const bool active_low;
+		
+		static inline GPIO_TypeDef S_DUMMY_GPIO = {0};
+		
+	public:
+		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
+		{
+			assert_param(IS_GPIO_PIN(Pin));
+		}
+		
+		static IO None()
+		{
+			return IO(&S_DUMMY_GPIO, GPIO_PIN_0);
+		}
+		
+		static IO* NonePtr()
+		{
+			static IO S_IO{&S_DUMMY_GPIO, GPIO_PIN_0};
+			return &S_IO;
+		}
+		
+		[[gnu::always_inline]] bool Read() const override
+		{
+			return (Port->IDR & Pin) ? !active_low : active_low;
+		}
+		
+		[[gnu::always_inline]] bool Check() const override
+		{
+			return (Port->ODR & Pin) ? !active_low : active_low;
+		}
+		
+		[[gnu::always_inline]] bool Set(bool state = true) override
+		{
+			Port->BSRR = Pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
+			
+			return true;	// todo: return actual change
+		}
+		
+		[[gnu::always_inline]] void Toggle() override
+		{
+			Port->ODR ^= Pin;
+		}
+		
+		/**
+		* @param mode - Must be a value of @ref GPIO_mode_define
+		* @param pull - Must be a value of @ref GPIO_pull_define
+		* @param speed - Must be a value of @ref GPIO_speed_define
+		*/
+		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
+		{
+			GPIO_InitTypeDef init{ .Pin = Pin, .Mode = mode, .Pull = pull, .Speed = speed };
+			HAL_GPIO_Init(Port, &init);
+		}
+	};
+	
 	template <size_t COUNT>
-	class IOs
+	class _IOs
 	{
 		static_assert(COUNT > 1 && COUNT <= 32);
 		
+		class PinProxy : public IOProxy
+		{
+			_IOs &m_ios;
+			const uint8_t c_pin;
+			
+		public:
+			PinProxy(_IOs &ios, uint8_t pin_number) : m_ios(ios), c_pin(pin_number) {}
+			
+			bool Read() const override
+			{
+				return m_ios.ReadBit(c_pin);
+			}
+			
+			bool Check() const override
+			{
+				return m_ios.CheckBit(c_pin);
+			}
+			
+			bool Set(bool state = true) override
+			{
+				return m_ios.SetBit(c_pin, state);
+			}
+			
+			void Toggle() override
+			{
+				m_ios.ToggleBit(c_pin);
+			}
+		};
+		
+	public:
+		virtual ~_IOs() {}
+		
+		static constexpr size_t PinCount() { return COUNT; }
+		
+		std::unique_ptr<IOProxy> Proxy(uint8_t pin_number)
+		{
+			return std::make_unique<PinProxy>(*this, pin_number);
+		}
+		
+		virtual uint32_t Read() const = 0;
+		
+		bool ReadBit(uint8_t bit_number)
+		{
+			return (Read() >> bit_number) & 1;
+		}
+		
+		virtual uint32_t Check() const = 0;
+		
+		bool CheckBit(uint8_t bit_number)
+		{
+			return (Check() >> bit_number) & 1;
+		}
+		
+		/**
+		* @retval True if any pin's state was changed (might not be implemented).
+		*/
+		virtual bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) = 0;
+		
+		bool SetBit(uint8_t bit_number, bool state)
+		{
+			return Set(state << bit_number, 1 << bit_number);
+		}
+		
+		/**
+		* @retval True if any pin's state was changed (might not be implemented).
+		*/
+		virtual bool Reset(const uint32_t mask = 0xFFFF'FFFF) = 0;
+		
+		void ResetBit(uint8_t bit_number)
+		{
+			Reset(1 << bit_number);
+		}
+		
+		virtual void Toggle(const uint32_t mask = 0xFFFF'FFFF) = 0;
+		
+		void ToggleBit(uint8_t bit_number)
+		{
+			Toggle(1 << bit_number);
+		}
+		
+		template<typename T = uint32_t>
+		void Timed(const T time, const uint32_t vals = 0xFFFF'FFFF, Time::DelayFuncPtr<T> delay = HAL_Delay, const uint32_t mask = 0xFFFF'FFFF)
+		{
+			static_assert(is_int_v<T>);
+			
+			Set(vals, mask);
+			delay(time);
+			Set(~vals, mask);
+		}
+		
+		template<typename T = uint32_t>
+		void TimedBit(const T time, uint8_t bit_number, STM32T::Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
+		{
+			Timed<T>(time, state << bit_number, delay, 1 << bit_number);
+		}
+	};
+	
+	template <size_t COUNT>
+	class [[deprecated("Use IOArray (alias) instead.")]] IOs : public _IOs<COUNT>
+	{
 		std::array<IO, COUNT> m_pins;
 		
 	public:
-		static constexpr size_t PinCount() { return COUNT; }
-		
 		IOs(std::array<IO, COUNT>&& pins) : m_pins(std::move(pins)) {}
 		
 		STM32T::IO& operator[](size_t index) { return m_pins[index]; }
 		
-		uint32_t Read() const
+		uint32_t Read() const override
 		{
 			uint32_t bits = 0;
 			for (size_t i = 0; i < COUNT; i++)
@@ -203,7 +315,7 @@ namespace STM32T
 			return bits;
 		}
 		
-		uint32_t Check() const
+		uint32_t Check() const override
 		{
 			uint32_t bits = 0;
 			for (size_t i = 0; i < COUNT; i++)
@@ -212,21 +324,23 @@ namespace STM32T
 			return bits;
 		}
 		
-		void Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF)
+		bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) override
 		{
 			for (uint32_t i = 0; i < COUNT; i++)
 			{
 				if (mask & (1 << i))
 					m_pins[i].Set((vals >> i) & 1);
 			}
+			
+			return true;
 		}
 		
-		void Reset(const uint32_t mask = 0xFFFF'FFFF)
+		bool Reset(const uint32_t mask = 0xFFFF'FFFF) override
 		{
-			Set(0x0000'0000, mask);
+			return Set(0x0000'0000, mask);
 		}
 		
-		void Toggle(const uint32_t mask = 0xFFFF'FFFF)
+		void Toggle(const uint32_t mask = 0xFFFF'FFFF) override
 		{
 			for (uint32_t i = 0; i < COUNT; i++)
 			{
@@ -235,6 +349,9 @@ namespace STM32T
 			}
 		}
 	};
+	
+	template <size_t COUNT>
+	using IOArray = IOs<COUNT>;
 	
 	struct ScopeIO
 	{
