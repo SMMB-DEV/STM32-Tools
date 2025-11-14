@@ -49,6 +49,11 @@ namespace STM32T
 	{
 		return x;
 	}
+
+	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept
+	{
+		return x;
+	}
 	
 	inline constexpr char H2C(uint8_t x)
 	{
@@ -1144,7 +1149,7 @@ namespace STM32T
 		/**
 		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
 		*/
-			void validate(bool state, const std::function<void(TIME_T)>& success, const std::function<void(TIME_T)>& filtered)
+		void validate(bool state, void (*success)(TIME_T, bool), void (*filtered)(TIME_T, bool))
 		{
 			const TIME_T now = fc_cyc();
 			
@@ -1155,7 +1160,7 @@ namespace STM32T
 			
 			if (duration < c_minCyc)
 			{
-				filtered(duration);
+				filtered(duration, state);
 				
 				m_prevState = m_prevState2;
 				m_prevCyc = m_prevCyc2;
@@ -1163,7 +1168,7 @@ namespace STM32T
 				return;
 			}
 			
-			success(duration);
+			success(duration, state);
 			
 			m_prevState2 = m_prevState;
 			m_prevState = state;
