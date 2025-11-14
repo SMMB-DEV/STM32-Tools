@@ -199,6 +199,7 @@ namespace STM32T
 	{
 		static_assert(COUNT > 1 && COUNT <= 32);
 		
+	public:
 		class PinProxy : public IOProxy
 		{
 			_IOs &m_ios;
@@ -228,14 +229,13 @@ namespace STM32T
 			}
 		};
 		
-	public:
 		virtual ~_IOs() {}
 		
 		static constexpr size_t PinCount() { return COUNT; }
 		
-		std::unique_ptr<IOProxy> Proxy(uint8_t pin_number)
+		PinProxy Proxy(uint8_t pin_number)
 		{
-			return std::make_unique<PinProxy>(*this, pin_number);
+			return PinProxy(*this, pin_number);
 		}
 		
 		virtual uint32_t Read() const = 0;
