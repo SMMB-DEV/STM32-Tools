@@ -187,17 +187,38 @@ namespace STM32T
 			return *this;
 		}
 		
+		/**
+		* @param data - Must have at least 8 elements.
+		*/
+		HD44780& CreateChar(uint8_t addr, const uint8_t *data)
+		{
+			const uint8_t old_addr = m_addressCounter;
+			SetCGAddress((addr << 3) & 0b0011'1111);
+			
+			for (uint8_t i = 0; i < 8; i++)
+				Write(1, data[i]);
+			
+			SetAddress(old_addr);
+			
+			return *this;
+		}
+		
 		void Test() override
 		{
 			Clear();
 			PutStr("123456789O123456""1234");
-			HAL_Delay(3000);
+			HAL_Delay(2000);
 			
 			Clear();
 			XL(15, 0);
 			PutChar('A');
 			XL(14, 0);
 			PutChar('B');
+			HAL_Delay(2000);
+			
+			CreateChar(0, (uint8_t []){1, 2, 4, 8, 16, 1, 2, 4});
+			//XL(0, 0);
+			PutChar(0);
 		}
 	};
 }
