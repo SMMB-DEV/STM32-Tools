@@ -23,7 +23,12 @@ namespace STM32T
 			if (m_4Bit)
 				f_rw(0, rs, data << 4);
 			
-			return BusyWait(timeout_us, rs);
+			const bool ok = BusyWait(timeout_us);
+			
+			if (rs && ok)
+				m_addressCounter = (m_addressCounter + 1) & 0x7F;
+			
+			return ok;
 		}
 		
 		uint8_t Read(const bool rs)
@@ -34,31 +39,20 @@ namespace STM32T
 				data |= f_rw(1, rs, 0) >> 4;
 			
 			if (rs)
-				BusyWait(DEFAULT_TIMEOUT_US, true);
+			{
+				if (BusyWait(DEFAULT_TIMEOUT_US))
+					m_addressCounter = (m_addressCounter - 1) & 0x7F;
+			}
 			
 			return data;
 		}
 		
-		bool BusyWait(uint16_t timeout_us, const bool tADD)
+		bool BusyWait(uint16_t timeout_us)
 		{
-			const uint8_t oldAddressCounter = m_addressCounter;
-			
 			uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
 			{
 				if (Time::Elapsed_us(start, timeout_us))
-					return false;
-			}
-			
-			if (tADD)
-			{
-				start = Time::GetCycle();
-				
-				do
-					m_addressCounter = Read(0) & 0b0111'1111;
-				while (m_addressCounter == oldAddressCounter && !Time::Elapsed_us(start, 8));
-				
-				if (m_addressCounter == oldAddressCounter)		// Timeout
 					return false;
 			}
 			
@@ -69,6 +63,11 @@ namespace STM32T
 		{
 			if (Write(0, 0b1000'0000 | addr))
 				m_addressCounter = addr;
+		}
+		
+		void SetCGAddress(uint8_t addr)
+		{
+			Write(0, 0b0100'0000 | addr);
 		}
 		
 	public:
