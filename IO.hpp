@@ -133,7 +133,7 @@ namespace STM32T
 	{
 		static constexpr uint32_t GPIO_NUMBER = 16;
 		
-		GPIO_TypeDef* const Port;
+		GPIO_TypeDef *const Port;
 		
 	public:
 		const uint16_t Pin;

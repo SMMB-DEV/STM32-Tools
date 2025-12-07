@@ -10,10 +10,6 @@
 
 
 
-#define _countof(arr)				(sizeof(arr) / sizeof(arr[0]))
-
-
-
 namespace STM32T
 {
 	template <class T>
@@ -53,6 +49,12 @@ namespace STM32T
 	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept
 	{
 		return x;
+	}
+	
+	template<class T, size_t N>
+	[[deprecated("Use std::size() instead.")]] inline constexpr size_t _countof(const T (&arr)[N]) noexcept
+	{
+		return N;
 	}
 	
 	inline constexpr char H2C(uint8_t x)
@@ -1371,3 +1373,5 @@ namespace STM32T
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
 }
+
+using STM32T::_countof;

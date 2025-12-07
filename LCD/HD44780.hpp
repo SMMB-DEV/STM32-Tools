@@ -85,13 +85,12 @@ namespace STM32T
 		HD44780& Init()
 		{
 			Time::Init();
-			Time::Delay_ms(15);		// For VCC; probably not necessary.
+			Time::Delay_ms(15);			// For VCC; probably not necessary.
 			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(4100);
 			f_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(100);
 			f_rw(0, 0, 0b0011'0000);
-			
 			Time::Delay_us(100);		// Instead of BusyWait() because interface is stil in 8-bit mode.
 			
 			f_rw(0, 0, 0b0010'0000 | (!m_4Bit << 4) | (m_twoLines << 3));	// 5x8 font by default
@@ -102,7 +101,7 @@ namespace STM32T
 			
 			Display(true, false, false);
 			Clear();
-			Write(0, 0b0000'0110);			// Entry mode set: Increment, No display shift
+			Write(0, 0b0000'0110);		// Entry mode set: Increment, No display shift
 			
 			return *this;
 		}
@@ -216,9 +215,21 @@ namespace STM32T
 			PutChar('B');
 			HAL_Delay(2000);
 			
-			CreateChar(0, (uint8_t []){1, 2, 4, 8, 16, 1, 2, 4});
-			//XL(0, 0);
-			PutChar(0);
+			CreateChar(1, (uint8_t []){1, 2, 4, 8, 16, 1, 2, 4});
+			PutChar(1);
+			HAL_Delay(2000);
+			
+			Clear();
+			for (uint16_t i = 0; i < 256; i += 16)
+			{
+				HAL_Delay(1000);
+				XL(0, 0);
+				
+				for (uint8_t j = 0; j < 16; j++)
+					PutChar(i + j, false);
+				
+				PutInt(i);
+			}
 		}
 	};
 }
