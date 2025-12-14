@@ -16,7 +16,9 @@ class Runnable
 	Runnable(void (*callable)(), uint32_t interval, uint32_t last_time, bool repeat)
 		: p_callable(callable), c_interval(interval), m_lastTime(last_time), c_repeat(repeat) {}
 	
+	
 	static inline std::vector<Runnable> s_list;
+	static inline size_t s_lastIndex = 0;
 	
 public:
 	using callable_t = void (*)();
@@ -70,21 +72,32 @@ public:
 		}
 	}
 	
-	static void Process()
+	static void ProcessSingle()
 	{
-		// Iterators are not used since the callables can modify the list.
-		for (size_t i = 0; i < s_list.size(); i++)
+		if (s_lastIndex >= s_list.size())
+			s_lastIndex = 0;
+		
+		for (; s_lastIndex < s_list.size(); s_lastIndex++)
 		{
-			if (const uint32_t now  = HAL_GetTick(); now - s_list[i].m_lastTime >= s_list[i].c_interval)
+			if (const uint32_t now  = HAL_GetTick(); now - s_list[s_lastIndex].m_lastTime >= s_list[s_lastIndex].c_interval)
 			{
-				s_list[i].p_callable();
+				s_list[s_lastIndex].p_callable();
 				
-				if (!s_list[i].c_repeat)
-					s_list.erase(s_list.begin() + i--);
+				if (!s_list[s_lastIndex].c_repeat)
+					s_list.erase(s_list.begin() + s_lastIndex--);
 				else
-					s_list[i].m_lastTime = now;
+					s_list[s_lastIndex].m_lastTime = now;
+				
+				return;
 			}
 		}
+	}
+	
+	static void Process()
+	{
+		do
+			ProcessSingle();
+		while (s_lastIndex < s_list.size());
 	}
 };
 }
