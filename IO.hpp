@@ -240,14 +240,14 @@ namespace STM32T
 		
 		virtual uint32_t Read() const = 0;
 		
-		bool ReadBit(uint8_t bit_number)
+		virtual bool ReadBit(uint8_t bit_number) const
 		{
 			return (Read() >> bit_number) & 1;
 		}
 		
 		virtual uint32_t Check() const = 0;
 		
-		bool CheckBit(uint8_t bit_number)
+		virtual bool CheckBit(uint8_t bit_number)
 		{
 			return (Check() >> bit_number) & 1;
 		}
@@ -257,7 +257,7 @@ namespace STM32T
 		*/
 		virtual bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) = 0;
 		
-		bool SetBit(uint8_t bit_number, bool state)
+		virtual bool SetBit(uint8_t bit_number, bool state)
 		{
 			return Set(state << bit_number, 1 << bit_number);
 		}
@@ -267,14 +267,17 @@ namespace STM32T
 		*/
 		virtual bool Reset(const uint32_t mask = 0xFFFF'FFFF) = 0;
 		
-		void ResetBit(uint8_t bit_number)
+		virtual bool ResetBit(uint8_t bit_number)
 		{
-			Reset(1 << bit_number);
+			return Reset(1 << bit_number);
 		}
 		
-		virtual void Toggle(const uint32_t mask = 0xFFFF'FFFF) = 0;
+		virtual void Toggle(const uint32_t mask = 0xFFFF'FFFF)
+		{
+			Set(Check() ^ mask, mask);
+		}
 		
-		void ToggleBit(uint8_t bit_number)
+		virtual void ToggleBit(uint8_t bit_number)
 		{
 			Toggle(1 << bit_number);
 		}
@@ -297,12 +300,12 @@ namespace STM32T
 	};
 	
 	template <size_t COUNT>
-	class [[deprecated("Use IOArray (alias) instead.")]] IOs : public _IOs<COUNT>
+	class IOArray : public _IOs<COUNT>
 	{
 		std::array<IO, COUNT> m_pins;
 		
 	public:
-		IOs(std::array<IO, COUNT>&& pins) : m_pins(std::move(pins)) {}
+		IOArray(std::array<IO, COUNT>&& pins) : m_pins(std::move(pins)) {}
 		
 		STM32T::IO& operator[](size_t index) { return m_pins[index]; }
 		
@@ -315,6 +318,11 @@ namespace STM32T
 			return bits;
 		}
 		
+		bool ReadBit(uint8_t bit_number) const override
+		{
+			return m_pins[bit_number].Read();
+		}
+		
 		uint32_t Check() const override
 		{
 			uint32_t bits = 0;
@@ -324,20 +332,37 @@ namespace STM32T
 			return bits;
 		}
 		
+		bool CheckBit(uint8_t bit_number) override
+		{
+			return m_pins[bit_number].Check();
+		}
+		
 		bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) override
 		{
+			bool changed = false;
+			
 			for (uint32_t i = 0; i < COUNT; i++)
 			{
 				if (mask & (1 << i))
-					m_pins[i].Set((vals >> i) & 1);
+					changed |= m_pins[i].Set((vals >> i) & 1);
 			}
 			
-			return true;
+			return changed;
+		}
+		
+		bool SetBit(uint8_t bit_number, bool state) override
+		{
+			return m_pins[bit_number].Set(state);
 		}
 		
 		bool Reset(const uint32_t mask = 0xFFFF'FFFF) override
 		{
 			return Set(0x0000'0000, mask);
+		}
+		
+		bool ResetBit(uint8_t bit_number) override
+		{
+			return m_pins[bit_number].Reset();
 		}
 		
 		void Toggle(const uint32_t mask = 0xFFFF'FFFF) override
@@ -348,10 +373,15 @@ namespace STM32T
 					m_pins[i].Toggle();
 			}
 		}
+		
+		void ToggleBit(uint8_t bit_number) override
+		{
+			m_pins[bit_number].Toggle();
+		}
 	};
 	
 	template <size_t COUNT>
-	using IOArray = IOs<COUNT>;
+	using IOs [[deprecated("Use IOArray instead.")]] = IOArray<COUNT>;
 	
 	struct ScopeIO
 	{
