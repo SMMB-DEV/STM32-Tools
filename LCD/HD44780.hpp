@@ -11,37 +11,37 @@ namespace STM32T
 	{
 		static constexpr uint16_t DEFAULT_TIMEOUT_US = 50;
 		
-		uint8_t (* const f_rw)(bool rw, bool rs, uint8_t data);
-		uint8_t m_addressCounter = 0;
-		const uint8_t m_colCount;
-		const bool m_twoLines, m_4Bit;	// todo: Store the number of lines as well as m_twoLines.
+		uint8_t (* const cf_rw)(bool rw, bool rs, uint8_t data);
+		uint8_t m_addr = 0;
+		const uint8_t c_colCount;
+		const bool c_twoLines, c_4Bit;	// todo: Store the number of lines as well as c_twoLines.
 		
 		bool Write(const bool rs, const uint8_t data, const uint16_t timeout_us = DEFAULT_TIMEOUT_US)
 		{
-			f_rw(0, rs, data);
+			cf_rw(0, rs, data);
 			
-			if (m_4Bit)
-				f_rw(0, rs, data << 4);
+			if (c_4Bit)
+				cf_rw(0, rs, data << 4);
 			
 			const bool ok = BusyWait(timeout_us);
 			
 			if (rs && ok)
-				m_addressCounter = (m_addressCounter + 1) & 0x7F;
+				m_addr = (m_addr + 1) & 0x7F;
 			
 			return ok;
 		}
 		
 		uint8_t Read(const bool rs)
 		{
-			uint8_t data = f_rw(1, rs, 0);
+			uint8_t data = cf_rw(1, rs, 0);
 			
-			if (m_4Bit)
-				data |= f_rw(1, rs, 0) >> 4;
+			if (c_4Bit)
+				data |= cf_rw(1, rs, 0) >> 4;
 			
 			if (rs)
 			{
 				if (BusyWait(DEFAULT_TIMEOUT_US))
-					m_addressCounter = (m_addressCounter - 1) & 0x7F;
+					m_addr = (m_addr - 1) & 0x7F;
 			}
 			
 			return data;
@@ -59,10 +59,14 @@ namespace STM32T
 			return true;
 		}
 		
-		void SetAddress(uint8_t addr)
+		void SetAddress(uint8_t addr, bool force = false)
 		{
-			if (Write(0, 0b1000'0000 | addr))
-				m_addressCounter = addr;
+			addr &= 0b0111'1111;
+			if (force || m_addr != addr)
+			{
+				if (Write(0, 0b1000'0000 | addr))
+					m_addr = addr;
+			}
 		}
 		
 		void SetCGAddress(uint8_t addr)
@@ -78,7 +82,7 @@ namespace STM32T
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
 		*/
 		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const uint8_t line_count, const uint8_t col_count, bool _4_bit = true)
-			: f_rw(rw), m_twoLines(line_count != 1), m_colCount(col_count), m_4Bit(_4_bit) {}
+			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
 		
 		~HD44780() {}
 		
@@ -86,18 +90,18 @@ namespace STM32T
 		{
 			Time::Init();
 			Time::Delay_ms(15);			// For VCC; probably not necessary.
-			f_rw(0, 0, 0b0011'0000);
+			cf_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(4100);
-			f_rw(0, 0, 0b0011'0000);
+			cf_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(100);
-			f_rw(0, 0, 0b0011'0000);
+			cf_rw(0, 0, 0b0011'0000);
 			Time::Delay_us(100);		// Instead of BusyWait() because interface is stil in 8-bit mode.
 			
-			f_rw(0, 0, 0b0010'0000 | (!m_4Bit << 4) | (m_twoLines << 3));	// 5x8 font by default
+			cf_rw(0, 0, 0b0010'0000 | (!c_4Bit << 4) | (c_twoLines << 3));	// 5x8 font by default
 			Time::Delay_us(100);
 			
-			if (m_4Bit)
-				Write(0, 0b0010'0000 | (m_twoLines << 3));
+			if (c_4Bit)
+				Write(0, 0b0010'0000 | (c_twoLines << 3));
 			
 			Display(true, false, false);
 			Clear();
@@ -109,7 +113,7 @@ namespace STM32T
 		HD44780& Clear()
 		{
 			Write(0, 0b0000'0001, 1640);	// Display clear
-			m_addressCounter = 0;
+			m_addr = 0;
 			return *this;
 		}
 		
@@ -121,15 +125,15 @@ namespace STM32T
 		HD44780& NextLine(const line_t lines = 1) override
 		{
 			// todo: implement this correctly (4 * 20)
-			if (m_twoLines && lines % 2)
-				SetAddress(m_addressCounter >= 0x40 ? 0 : 0x40);
+			if (c_twoLines && lines % 2)
+				SetAddress(m_addr >= 0x40 ? 0 : 0x40);
 			
 			return *this;
 		}
 		
 		HD44780& XL(uint8_t x, uint8_t l)
 		{
-			if (m_twoLines)
+			if (c_twoLines)
 				SetAddress(l * 0x40 + x % 0x40);
 			else
 				SetAddress(x);
@@ -178,7 +182,7 @@ namespace STM32T
 				}
 			}
 			
-			if (auto_next_line && m_twoLines && (m_addressCounter % 0x40) >= m_colCount)
+			if (auto_next_line && c_twoLines && (m_addr % 0x40) >= c_colCount)
 				NextLine();
 			
 			Write(1, ch);
@@ -191,13 +195,13 @@ namespace STM32T
 		*/
 		HD44780& CreateChar(uint8_t addr, const uint8_t *data)
 		{
-			const uint8_t old_addr = m_addressCounter;
+			const uint8_t old_addr = m_addr;
 			SetCGAddress((addr << 3) & 0b0011'1111);
 			
 			for (uint8_t i = 0; i < 8; i++)
 				Write(1, data[i]);
 			
-			SetAddress(old_addr);
+			SetAddress(old_addr, true);
 			
 			return *this;
 		}
