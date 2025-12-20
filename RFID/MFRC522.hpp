@@ -620,7 +620,7 @@ namespace STM32T
 			SoftReset();
 			
 			uint8_t ZEROS[25] = { 0 };
-			Write(Reg::FIFOData, ZEROS, _countof(ZEROS));
+			Write(Reg::FIFOData, ZEROS, std::size(ZEROS));
 			Command(Cmd::Mem);
 			Write(Reg::AutoTest, 0b0000'1001);
 			Write(Reg::FIFOData, 0);

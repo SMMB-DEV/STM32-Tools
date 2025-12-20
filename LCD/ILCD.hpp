@@ -70,6 +70,11 @@ namespace STM32T
 			return *this;
 		}
 		
+		ILCD& PutStrMid(const strv str, const size_t field_width)
+		{
+			return PutStrf("%*.*s%*s", str.size() + (field_width - str.size()) / 2, str.size(), str.data(), (field_width - str.size() + 1) / 2, "");
+		}
+		
 		template <typename I, size_t BUF_SIZE = 32>
 		ILCD& PutInt(const I i, const int base = 10, const size_t min_field_width = 0, const char filler = '0')
 		{
