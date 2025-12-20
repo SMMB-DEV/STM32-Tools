@@ -3,6 +3,7 @@
 #include "main.h"
 
 #include <type_traits>
+#include <limits>
 
 
 
@@ -14,9 +15,21 @@ namespace STM32T::Time
 	template <typename T>
 	using DelayFuncPtr = void (*)(T);
 	
+	using cycle_t = uint32_t;
+	
+	using ms_time_t = uint8_t;
+	using us_time_t = uint16_t;
+	using ns_time_t = uint16_t;
+	
+	using ms_cycle_t = uint32_t;
+	using us_cycle_t = uint32_t;
+	using ns_cycle_t = uint64_t;
+	
 	#ifndef STM32T_DELAY_CLK
 	#error "STM32T_DELAY_CLK not defined!"
 	#endif
+	
+	static_assert(STM32T_DELAY_CLK % 1'000'000 == 0, "STM32T_DELAY_CLK must be divisible by 1,000,000!");
 	
 	#ifdef DWT
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
@@ -59,78 +72,84 @@ namespace STM32T::Time
 	}
 	#endif	// DWT
 	
-	inline uint32_t msToCycles(const uint8_t time_ms)
+	inline constexpr cycle_t msToCycles(const ms_time_t time_ms)
 	{
+		static_assert(std::numeric_limits<ms_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000) <= std::numeric_limits<cycle_t>::max());
 		return time_ms * (STM32T_DELAY_CLK / 1'000);
 	}
 	
-	inline uint32_t usToCycles(const uint16_t time_us)
+	inline constexpr cycle_t usToCycles(const us_time_t time_us)
 	{
+		static_assert(std::numeric_limits<us_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<cycle_t>::max());
 		return time_us * (STM32T_DELAY_CLK / 1'000'000);
 	}
 	
-	inline uint32_t nsToCycles(const uint16_t time_ns)
+	inline constexpr cycle_t nsToCycles(const ns_time_t time_ns)
 	{
+		static_assert(std::numeric_limits<ns_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000'000) / 1000 <= std::numeric_limits<cycle_t>::max());
 		return time_ns * (STM32T_DELAY_CLK / 1'000'000) / 1000;
 	}
 	
-	inline uint32_t CyclesTo_ms(uint32_t cyc)
+	inline constexpr ms_cycle_t CyclesTo_ms(cycle_t cyc)
 	{
+		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_DELAY_CLK / 1'000) <= std::numeric_limits<ms_cycle_t>::max());
 		return cyc / (STM32T_DELAY_CLK / 1'000);
 	}
 	
-	inline uint32_t CyclesTo_us(uint32_t cyc)
+	inline constexpr us_cycle_t CyclesTo_us(cycle_t cyc)
 	{
+		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<us_cycle_t>::max());
 		return cyc / (STM32T_DELAY_CLK / 1'000'000);
 	}
 	
-	inline uint32_t CyclesTo_ns(uint32_t cyc)
+	inline constexpr ns_cycle_t CyclesTo_ns(cycle_t cyc)
 	{
-		return cyc * 1000 / (STM32T_DELAY_CLK / 1'000'000);
+		static_assert(std::numeric_limits<cycle_t>::max() * uintmax_t(1000) / (STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<ns_cycle_t>::max());
+		return cyc * uint64_t(1000) / (STM32T_DELAY_CLK / 1'000'000);
 	}
 	
-	inline void Delay(uint32_t cyc)
+	inline void Delay(cycle_t cyc)
 	{
 		const uint32_t start = GetCycle();
 		while (GetCycle() - start < cyc);
 	}
 	
-	inline void Delay_ms(uint8_t ms)
+	inline void Delay_ms(ms_time_t ms)
 	{
 		const uint32_t start = GetCycle(), delay = msToCycles(ms);
 		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_DELAY_CLK is divisible by 1'000'000).
 	}
 	
-	inline void Delay_us(uint16_t us)
+	inline void Delay_us(us_time_t us)
 	{
 		const uint32_t start = GetCycle(), delay = usToCycles(us);
 		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_DELAY_CLK is divisible by 1'000'000).
 	}
 	
-	inline void Delay_ns(uint16_t ns)
+	inline void Delay_ns(ns_time_t ns)
 	{
 		const uint32_t start = GetCycle(), delay = nsToCycles(ns);
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
 	}
 	
-	inline bool Elapsed(const uint32_t startCycle, const uint32_t time_cycles)
+	inline bool Elapsed(const cycle_t startCycle, const cycle_t time_cycles)
 	{
 		return GetCycle() - startCycle >= time_cycles;
 	}
 	
-	inline bool Elapsed_ms(const uint32_t startCycle, const uint8_t time_ms)
+	inline bool Elapsed_ms(const cycle_t startCycle, const ms_time_t time_ms)
 	{
 		const uint32_t delay = msToCycles(time_ms);
 		return GetCycle() - startCycle >= delay;
 	}
 	
-	inline bool Elapsed_us(const uint32_t startCycle, const uint16_t time_us)
+	inline bool Elapsed_us(const cycle_t startCycle, const us_time_t time_us)
 	{
 		const uint32_t delay = usToCycles(time_us);
 		return GetCycle() - startCycle >= delay;
 	}
 	
-	inline bool Elapsed_ns(const uint32_t startCycle, const uint16_t time_ns)
+	inline bool Elapsed_ns(const cycle_t startCycle, const ns_time_t time_ns)
 	{
 		const uint32_t delay = nsToCycles(time_ns);
 		return GetCycle() - startCycle > delay;
@@ -144,20 +163,26 @@ namespace STM32T::Time
 		while (get_tick() - start < wait);
 	}
 	
-	inline void WaitAfter(const uint32_t startCycle, const uint32_t wait_cycles)
+	inline void WaitAfter(const cycle_t startCycle, const cycle_t wait_cycles)
 	{
 		while (GetCycle() - startCycle < wait_cycles);
 	}
 	
-	inline void WaitAfter_ms(const uint32_t startCycle, const uint8_t wait_ms)
+	inline void WaitAfter_ms(const cycle_t startCycle, const ms_time_t wait_ms)
 	{
 		const uint32_t wait = msToCycles(wait_ms);
 		while (GetCycle() - startCycle < wait);
 	}
 	
-	inline void WaitAfter_us(const uint32_t startCycle, const uint16_t wait_us)
+	inline void WaitAfter_us(const cycle_t startCycle, const us_time_t wait_us)
 	{
 		const uint32_t wait = usToCycles(wait_us);
 		while (GetCycle() - startCycle < wait);
+	}
+	
+	inline void WaitAfter_ns(const cycle_t startCycle, const ns_time_t wait_ns)
+	{
+		const uint32_t wait = nsToCycles(wait_ns);
+		while (GetCycle() - startCycle <= wait);
 	}
 }
