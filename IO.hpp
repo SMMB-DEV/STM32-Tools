@@ -170,7 +170,10 @@ namespace STM32T
 		
 		[[gnu::always_inline]] void Toggle() override
 		{
-			Port->ODR ^= Pin;
+			//Port->ODR ^= Pin;
+			
+			const uint32_t odr = Port->ODR;
+			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);	// Simply XORing ODR is not atomic.
 		}
 		
 		/**

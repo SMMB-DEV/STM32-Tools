@@ -70,9 +70,28 @@ namespace STM32T
 			return *this;
 		}
 		
-		ILCD& PutStrMid(const strv str, const size_t field_width)
+		ILCD& PutStrCtr(const size_t field_width, const strv str)
 		{
 			return PutStrf("%*.*s%*s", str.size() + (field_width - str.size()) / 2, str.size(), str.data(), (field_width - str.size() + 1) / 2, "");
+		}
+		
+		template <size_t BUF_SIZE = 64>
+		ILCD& PutStrCtr(const size_t field_width, const char* fmt, ...)
+		{
+			char buf[BUF_SIZE];
+			
+			va_list args;
+			va_start(args, fmt);
+			const int len = vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+			
+			return PutStrCtr(field_width, {buf, len});
+		}
+		
+		[[deprecated("Use PutStrCtr() instead.")]]
+		ILCD& PutStrMid(const strv str, const size_t field_width)
+		{
+			return PutStrCtr(field_width, str);
 		}
 		
 		template <typename I, size_t BUF_SIZE = 32>

@@ -9,7 +9,7 @@ namespace STM32T
 {
 	class HD44780 : public ILCD
 	{
-		static constexpr uint16_t DEFAULT_TIMEOUT_US = 50;
+		static constexpr Time::us_time_t DEFAULT_TIMEOUT_US = 53;
 		
 		uint8_t (* const cf_rw)(bool rw, bool rs, uint8_t data);
 		uint8_t m_addr = 0;
@@ -26,7 +26,7 @@ namespace STM32T
 			const bool ok = BusyWait(timeout_us);
 			
 			if (rs && ok)
-				m_addr = (m_addr + 1) & 0x7F;
+				return AddressWait((m_addr + 1) & 0x7F);
 			
 			return ok;
 		}
@@ -40,14 +40,14 @@ namespace STM32T
 			
 			if (rs)
 			{
-				if (BusyWait(DEFAULT_TIMEOUT_US))
-					m_addr = (m_addr - 1) & 0x7F;
+				BusyWait(DEFAULT_TIMEOUT_US);
+				AddressWait((m_addr - 1) & 0x7F);
 			}
 			
 			return data;
 		}
 		
-		bool BusyWait(uint16_t timeout_us)
+		bool BusyWait(Time::us_time_t timeout_us)
 		{
 			uint32_t start = Time::GetCycle();
 			while (Read(0) & 0b1000'0000)		// Busy Flag
@@ -59,18 +59,36 @@ namespace STM32T
 			return true;
 		}
 		
+		bool AddressWait(const uint8_t expectedAddr, Time::us_time_t timeout_us = 6)
+		{
+			Time::cycle_t start = Time::GetCycle();
+			
+			while ((Read(0) & 0b0111'1111) != expectedAddr)
+			{
+				if (Time::Elapsed_us(start, timeout_us))
+				{
+					m_addr = expectedAddr;
+					return false;
+				}
+			}
+			
+			m_addr = expectedAddr;
+			return true;
+		}
+		
 		void SetAddress(uint8_t addr, bool force = false)
 		{
 			addr &= 0b0111'1111;
 			if (force || m_addr != addr)
 			{
-				if (Write(0, 0b1000'0000 | addr))
-					m_addr = addr;
+				Write(0, 0b1000'0000 | addr);
+				m_addr = addr;
 			}
 		}
 		
 		void SetCGAddress(uint8_t addr)
 		{
+			addr &= 0b0011'1111;
 			Write(0, 0b0100'0000 | addr);
 		}
 		
@@ -80,8 +98,19 @@ namespace STM32T
 		*				The E pin must also be cycled according to the datasheet.
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
+		* @deprecated
 		*/
+		[[deprecated]]
 		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const uint8_t line_count, const uint8_t col_count, bool _4_bit = true)
+			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
+		
+		/**
+		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
+		* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
+		*				The E pin must also be cycled according to the datasheet.
+		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
+		*/
+		HD44780(const uint8_t col_count, const uint8_t line_count, uint8_t (* const rw)(bool rw, bool rs, uint8_t data), bool _4_bit = true)
 			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
 		
 		~HD44780() {}
@@ -112,8 +141,9 @@ namespace STM32T
 		
 		HD44780& Clear()
 		{
-			Write(0, 0b0000'0001, 1640);	// Display clear
-			m_addr = 0;
+			Write(0, 0b0000'0001, 4260);	// Display clear
+			AddressWait(0, 1000);			// todo: Adjust according to a valid datasheet.
+			
 			return *this;
 		}
 		
