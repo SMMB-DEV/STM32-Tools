@@ -34,10 +34,10 @@ namespace STM32T
 		return true;
 	}
 	
-	class IOProxy
+	class _IO
 	{
 	public:
-		virtual ~IOProxy() {}
+		virtual ~_IO() {}
 		
 		virtual bool Read() const = 0;
 		virtual bool Check() const = 0;
@@ -120,14 +120,14 @@ namespace STM32T
 		}
 	};
 	
-	class IO : public IOProxy
+	class IO : public _IO
 	{
 		static constexpr uint32_t GPIO_NUMBER = 16;
 		
-		GPIO_TypeDef *const Port;
+		GPIO_TypeDef *const cp_port;
 		
 	public:
-		const uint16_t Pin;
+		const uint16_t c_pin;
 		
 	protected:
 		const bool active_low;
@@ -135,9 +135,9 @@ namespace STM32T
 		static inline GPIO_TypeDef S_DUMMY_GPIO = {0};
 		
 	public:
-		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : Port(Port), Pin(Pin), active_low(active_low)
+		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : cp_port(Port), c_pin(Pin), active_low(active_low)
 		{
-			assert_param(IS_GPIO_PIN(Pin));
+			assert_param(IS_GPIO_PIN(c_pin));
 		}
 		
 		static IO None()
@@ -153,27 +153,27 @@ namespace STM32T
 		
 		[[gnu::always_inline]] bool Read() const override
 		{
-			return (Port->IDR & Pin) ? !active_low : active_low;
+			return (cp_port->IDR & c_pin) ? !active_low : active_low;
 		}
 		
 		[[gnu::always_inline]] bool Check() const override
 		{
-			return (Port->ODR & Pin) ? !active_low : active_low;
+			return (cp_port->ODR & c_pin) ? !active_low : active_low;
 		}
 		
 		[[gnu::always_inline]] bool Set(bool state = true) override
 		{
-			Port->BSRR = Pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
+			cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
 			
 			return true;	// todo: return actual change
 		}
 		
 		[[gnu::always_inline]] void Toggle() override
 		{
-			//Port->ODR ^= Pin;
+			//cp_port->ODR ^= c_pin;
 			
-			const uint32_t odr = Port->ODR;
-			Port->BSRR = ((odr & Pin) << GPIO_NUMBER) | (~odr & Pin);	// Simply XORing ODR is not atomic.
+			const uint32_t odr = cp_port->ODR;
+			cp_port->BSRR = ((odr & c_pin) << GPIO_NUMBER) | (~odr & c_pin);	// Simply XORing ODR is not atomic.
 		}
 		
 		/**
@@ -183,8 +183,8 @@ namespace STM32T
 		*/
 		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
 		{
-			GPIO_InitTypeDef init{ .Pin = Pin, .Mode = mode, .Pull = pull, .Speed = speed };
-			HAL_GPIO_Init(Port, &init);
+			GPIO_InitTypeDef init{ .Pin = c_pin, .Mode = mode, .Pull = pull, .Speed = speed };
+			HAL_GPIO_Init(cp_port, &init);
 		}
 		
 		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
@@ -203,14 +203,16 @@ namespace STM32T
 		static_assert(COUNT > 1 && COUNT <= 32);
 		
 	public:
-		class PinProxy : public IOProxy
+		class PinProxy : public _IO
 		{
+			friend class _IOs;
+			
 			_IOs &m_ios;
 			const uint8_t c_pin;
 			
-		public:
 			PinProxy(_IOs &ios, uint8_t pin_number) : m_ios(ios), c_pin(pin_number) {}
 			
+		public:
 			bool Read() const override
 			{
 				return m_ios.ReadBit(c_pin);
