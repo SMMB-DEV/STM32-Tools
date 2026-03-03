@@ -206,22 +206,22 @@ namespace STM32T
 		{
 			static wchar_t s_buf[20];
 			
-			int len = swprintf(s_buf, _countof(s_buf), L"%hhu.%hhu.%hhu", Major(), Minor(), Patch()), len2;
+			int len = swprintf(s_buf, std::size(s_buf), L"%hhu.%hhu.%hhu", Major(), Minor(), Patch()), len2;
 			
 			const uint8_t pr = PreRelease();
 			
 			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
-				len2 = swprintf(s_buf + len, _countof(s_buf) - len, L"-inv");
+				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-inv");
 			else if (pr == Normal)
 				len2 = 0;
 			else if (pr >= RC0)
-				len2 = swprintf(s_buf + len, _countof(s_buf) - len, L"-rc%hhu", pr - RC0);
+				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-rc%hhu", pr - RC0);
 			else if (pr >= Beta0)
-				len2 = swprintf(s_buf + len, _countof(s_buf) - len, L"-beta%hhu", pr - Beta0);
+				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-beta%hhu", pr - Beta0);
 			else if (pr >= Alpha0)
-				len2 = swprintf(s_buf + len, _countof(s_buf) - len, L"-alpha%hhu", pr - Alpha0);
+				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-alpha%hhu", pr - Alpha0);
 			else
-				len2 = swprintf(s_buf + len, _countof(s_buf) - len, L"-x");
+				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-x");
 			
 			len += len2;
 			

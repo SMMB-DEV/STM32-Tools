@@ -893,7 +893,7 @@ namespace STM32T
 		//todo: space between characters
 		
 		if (ch >= MAX_CHARS)
-			return;
+			return *this;
 		
 		if (interpret_specials)
 		{

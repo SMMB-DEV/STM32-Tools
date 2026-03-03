@@ -115,9 +115,9 @@ namespace STM32T
 			if (type != CommandType::Bare)
 				SendUART("\r"sv);
 			
-			if (buffer)
+			if (buffer && len)
 			{
-				uint16_t len2 = len - 1;	// Hopefully len isn't 0.
+				uint16_t len2 = len - 1;
 				if (const ErrorCode code = ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT); code != OK)
 					return code;
 				
