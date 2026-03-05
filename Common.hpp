@@ -59,12 +59,38 @@ namespace STM32T
 	
 	inline constexpr char H2C(uint8_t x)
 	{
-		static constexpr char CHARS[16] =
+		constexpr char CHARS[16] =
 		{
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
 		};
 		
 		return CHARS[x & 0xF];
+	}
+	
+	inline constexpr char C2H(uint8_t ch)
+	{
+		constexpr uint8_t HEX[256] =
+		{
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  15
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  31
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  47
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  63
+			0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  79
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  95
+			0xFF, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 111
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 127
+			
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		};
+		
+		return HEX[ch];
 	}
 	
 	inline constexpr uint32_t pow10(uint8_t pow)
@@ -945,7 +971,7 @@ namespace STM32T
 	template <class T, size_t MAX_SIZE>
 	class StaticQueue
 	{
-	private:
+	protected:
 		using index_t = ClampedInt<size_t, 0, MAX_SIZE - 1>;
 		
 		T m_items[MAX_SIZE];
@@ -1035,41 +1061,28 @@ namespace STM32T
 	};
 	
 	template <class T, size_t MAX_SIZE = 256>
-	class PriorityQueue
+	class PriorityQueue : protected StaticQueue<T, MAX_SIZE>
 	{
+		using parent = StaticQueue<T, MAX_SIZE>;
+		
 	public:
 		using prio_t = uint8_t;
 		
 	private:
-		using index_t = volatile ClampedInt<uint8_t, 0, MAX_SIZE - 1>;
-		static_assert(MAX_SIZE <= (1 << (sizeof(uint8_t) * 8)) && MAX_SIZE > 0);
+		using typename parent::index_t;
+		using parent::m_back;
+		using parent::m_front;
+		using parent::m_items;
 		
-		T m_items[MAX_SIZE];
 		prio_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
-		
-		// m_front always modified in pop_front() and m_back always modified in push_back().
-		index_t m_front = 0, m_back = 0;
 		
 	public:
 		PriorityQueue() {}
 		~PriorityQueue() {}
 		
-		bool empty() const
-		{
-			return m_front == m_back;
-		}
-		
-		bool full() const
-		{
-			index_t front = m_front;
-			--front;
-			return front == m_back;
-		}
-		
-		void clear()
-		{
-			m_front = m_back;
-		}
+		using parent::empty;
+		using parent::full;
+		using parent::clear;
 		
 		/**
 		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
@@ -1079,9 +1092,8 @@ namespace STM32T
 			if (full() || !prio)
 				return;
 			
-			m_items[m_back] = std::move(t);
 			m_prio[m_back] = prio;
-			m_back++;
+			parent::push_back(std::move(t));
 		}
 		
 		/**
@@ -1092,9 +1104,8 @@ namespace STM32T
 			if (full() || !prio)
 				return;
 			
-			m_items[m_back] = t;
 			m_prio[m_back] = prio;
-			m_back++;
+			parent::push_back(t);
 		}
 		
 		std::optional<T> pop_front()
@@ -1121,18 +1132,17 @@ namespace STM32T
 			
 			
 			m_prio[prio_index] = 0;
-			T ret = std::move(m_items[prio_index]);
 			
 			// Remove handled items at the beginning of the list
-			for (index_t i = front; i != back; i++)
+			for (index_t i = front; i != back; ++i)
 			{
 				if (m_prio[i])
 					break;
 				
-				m_front++;
+				++m_front;
 			}
 			
-			return ret;
+			return std::move(m_items[prio_index]);
 		}
 	};
 	
@@ -1274,104 +1284,13 @@ namespace STM32T
 		return _t.val;
 	}
 	
-#ifdef HAL_RTC_MODULE_ENABLED
-	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
 	{
-		// 24-Hour/Binary Format
-		
-		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
 			return;
 		
-		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
-		
-		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
-		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
-		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
-		
-		int16_t mins = (sec / 60) % 60;
-		int16_t hours = (sec / (60 * 60)) % 24;
-		int8_t days = sec / (24 * 60 * 60);
-		sec %= 60;
-		
-		if (sec > 0)
 		{
-			time.Seconds += sec;
-			if (time.Seconds >= 60)
-			{
-				time.Seconds -= 60;
-				time.Minutes++;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes >= 60)
-			{
-				time.Minutes -= 60;
-				time.Hours++;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours >= 24)
-			{
-				time.Hours -= 24;
-				days++;
-			}
-			
-			date.Date += days;
-			if (date.Date > monthDays)
-			{
-				date.Date -= monthDays;
-				date.Month++;
-				
-				if (date.Month > 12)
-				{
-					date.Month -= 12;
-					date.Year++;
-					date.Year %= 100;
-				}
-			}
-		}
-		else
-		{
-			time.Seconds += sec;
-			if (time.Seconds > 60)
-			{
-				time.Seconds += 60;
-				time.Minutes--;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes > 60)	//underflow
-			{
-				time.Minutes += 60;
-				time.Hours--;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours > 24)	//underflow
-			{
-				time.Hours += 24;
-				days--;
-			}
-			
-			const uint8_t prevMonth = date.Month == 1 ? 12 : date.Month - 1;
-			date.Date += days;
-			if (date.Date == 0 || date.Date > monthDays)	//underflow
-			{
-				date.Date = MONTH_DAYS[prevMonth - 1] + (prevMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
-				date.Month = prevMonth;
-				
-				if (prevMonth == 12)
-				{
-					date.Year--;
-					if (date.Year > 100)	//underflow
-						date.Year += 100;
-				}
-			}
 		}
 		
-		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
-#endif	// HAL_RTC_MODULE_ENABLED
 }
 
 using STM32T::_countof;

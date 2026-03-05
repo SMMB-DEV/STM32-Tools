@@ -132,6 +132,16 @@ namespace STM32T::Time
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
 	}
 	
+	inline bool Elapsed_Tick(const uint32_t start, const uint32_t msec)
+	{
+		return HAL_GetTick() - start > msec;
+	}
+	
+	inline bool Elapsed_Tick(const uint32_t start, const uint32_t now, const uint32_t msec)
+	{
+		return now - start > msec;
+	}
+	
 	inline bool Elapsed(const cycle_t startCycle, const cycle_t time_cycles)
 	{
 		return GetCycle() - startCycle >= time_cycles;
@@ -155,12 +165,24 @@ namespace STM32T::Time
 		return GetCycle() - startCycle > delay;
 	}
 	
+	inline ms_time_t Remaining_Tick(const uint32_t start, const uint32_t msec)
+	{
+		const uint32_t now = HAL_GetTick();
+		return Elapsed_Tick(start, now, msec) ? 0 : (msec - (now - start));
+	}
+	
 	template <typename T>
+	[[deprecated]]
 	inline void WaitAfter(const T start, const T wait, TickFuncPtr<T> get_tick = HAL_GetTick)
 	{
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
 		
 		while (get_tick() - start < wait);
+	}
+	
+	inline void WaitAfter_Tick(const uint32_t start, const uint32_t wait)
+	{
+		while (HAL_GetTick() - start <= wait);
 	}
 	
 	inline void WaitAfter(const cycle_t startCycle, const cycle_t wait_cycles)
@@ -185,4 +207,106 @@ namespace STM32T::Time
 		const uint32_t wait = nsToCycles(wait_ns);
 		while (GetCycle() - startCycle <= wait);
 	}
+	
+#ifdef HAL_RTC_MODULE_ENABLED
+	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
+	{
+		// 24-Hour/Binary Format
+		
+		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
+			return;
+		
+		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
+		
+		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
+		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
+		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
+		
+		int16_t mins = (sec / 60) % 60;
+		int16_t hours = (sec / (60 * 60)) % 24;
+		int8_t days = sec / (24 * 60 * 60);
+		
+		if (sec > 0)
+		{
+			sec %= 60;
+			
+			time.Seconds += sec;
+			if (time.Seconds >= 60)
+			{
+				time.Seconds -= 60;
+				time.Minutes++;
+			}
+			
+			time.Minutes += mins;
+			if (time.Minutes >= 60)
+			{
+				time.Minutes -= 60;
+				time.Hours++;
+			}
+			
+			time.Hours += hours;
+			if (time.Hours >= 24)
+			{
+				time.Hours -= 24;
+				days++;
+			}
+			
+			date.Date += days;
+			if (date.Date > monthDays)
+			{
+				date.Date -= monthDays;
+				date.Month++;
+				
+				if (date.Month > 12)
+				{
+					date.Month -= 12;
+					date.Year++;
+					date.Year %= 100;
+				}
+			}
+		}
+		else
+		{
+			sec %= 60;
+			
+			time.Seconds += sec;
+			if (time.Seconds > 60)	// underflow
+			{
+				time.Seconds += 60;
+				time.Minutes--;
+			}
+			
+			time.Minutes += mins;
+			if (time.Minutes > 60)	// underflow
+			{
+				time.Minutes += 60;
+				time.Hours--;
+			}
+			
+			time.Hours += hours;
+			if (time.Hours > 24)	// underflow
+			{
+				time.Hours += 24;
+				days--;
+			}
+			
+			const uint8_t prevMonth = date.Month == 1 ? 12 : date.Month - 1;
+			date.Date += days;
+			if (date.Date == 0 || date.Date > monthDays)	// underflow
+			{
+				date.Date = MONTH_DAYS[prevMonth - 1] + (prevMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
+				date.Month = prevMonth;
+				
+				if (prevMonth == 12)
+				{
+					date.Year--;
+					if (date.Year > 100)	// underflow
+						date.Year += 100;
+				}
+			}
+		}
+		
+		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
+	}
+#endif	// HAL_RTC_MODULE_ENABLED
 }

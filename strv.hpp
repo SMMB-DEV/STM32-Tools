@@ -59,9 +59,11 @@ namespace STM32T
 		using typename base::size_type;
 		using typename base::value_type;
 		
+		using base::data;
 		using base::size;
 		using base::remove_prefix;
 		using base::remove_suffix;
+		using base::find;
 		using base::find_first_not_of;
 		using base::find_last_not_of;
 		
