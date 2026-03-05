@@ -694,6 +694,9 @@ namespace STM32T
 		Circle(110, 30, 8);
 		FillCircle(110, 52, 10);
 		
+		FillRectangle(60, 10, 90, 20);
+		Clear(65, 15, 85, 15);
+		
 		XY(0, 4);
 		PutStr("Normal");
 		NextLine(2);
@@ -704,6 +707,8 @@ namespace STM32T
 			HAL_Delay(1000);
 			NegateRectangle(0, 4, 6 * 6, 4 + 7);
 		}
+		
+		// todo: add tests for bitmap functions
 	}
 
 	void KS0108B::Init()
@@ -1201,6 +1206,26 @@ namespace STM32T
 			return;
 		
 		FillRectangle(x, y, x + bmp_x - 1, y + bmp_y - 1, fill);
+	}
+	
+	void KS0108B::ReplaceBitmap(const uint8_t *old_bmp, uint16_t old_x, uint8_t old_y, const uint8_t *bmp, uint16_t x, uint8_t y, bool fill)
+	{
+		const uint16_t bmp_x = pack_le<uint16_t>(bmp), bmp_y = pack_le<uint16_t>(bmp + 2);
+		const uint16_t old_bmp_x = pack_le<uint16_t>(old_bmp), old_bmp_y = pack_le<uint16_t>(old_bmp + 2);
+		
+		if (old_y < y)
+			Clear(old_x, old_y, old_x + old_bmp_x - 1, y - 1, fill);
+		
+		if (old_y + old_bmp_y > y + bmp_y)
+			Clear(old_x, y + bmp_y, old_x + old_bmp_x - 1, old_y + old_bmp_y - 1, fill);
+		
+		if (old_x < x)
+			Clear(old_x, std::max(old_y, y), x - 1, std::min(old_y + old_bmp_y, y + bmp_y) - 1, fill);
+		
+		if (old_x + old_bmp_x > x + bmp_x)
+			Clear(x + bmp_x, std::max(old_y, y), old_x + old_bmp_x - 1, std::min(old_y + old_bmp_y, y + bmp_y) - 1, fill);
+		
+		Bitmap(bmp, x, y);
 	}
 
 	/*void KS0108B::PutNum(int32_t num)

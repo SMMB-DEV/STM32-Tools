@@ -170,6 +170,7 @@ namespace STM32T
 		*/
 		void Bitmap(const uint8_t *bmp, uint16_t x, uint8_t y);
 		void ClearBitmap(const uint8_t *bmp, uint16_t x, uint8_t y, bool fill = false);
+		void ReplaceBitmap(const uint8_t *old_bmp, uint16_t old_x, uint8_t old_y, const uint8_t *bmp, uint16_t x, uint8_t y, bool fill = false);
 		
 		void Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw = true);
 		
