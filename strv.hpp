@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <functional>
+#include <charconv>
 
 
 
@@ -76,6 +77,7 @@ namespace STM32T
 			return base::substr(pos, count);
 		}
 		
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens.")]]
 		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// Assuming view is null-terminated.
@@ -104,6 +106,32 @@ namespace STM32T
 			}
 		}
 		
+		void tokenize2(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded) const
+		{
+			// Assuming view is null-terminated.
+			
+			bstrv view = *this;
+			const const_pointer start = view.data();
+			
+			while (!view.empty())
+			{
+				size_t end = view.find(sep, 0);
+				if (end == npos)
+				{
+					if (!ignoreSingleEnded)
+						tokens.push_back(view);
+				
+					return;
+				}
+				
+				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
+					tokens.push_back(view.substr(0, end));
+				
+				view.remove_prefix(end + sep.size());
+			}
+		}
+		
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens.")]]
 		void tokenize(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// note: Assuming view is null-terminated.
@@ -132,9 +160,35 @@ namespace STM32T
 			}
 		}
 		
+		void tokenize2(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded) const
+		{
+			// note: Assuming view is null-terminated.
+			
+			bstrv view = *this;
+			const const_pointer start = view.data();
+			
+			while (!view.empty())
+			{
+				size_t end = view.find(sep, 0);
+				if (end == npos)
+				{
+					if (!ignoreSingleEnded)
+						op(view);
+				
+					return;
+				}
+				
+				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
+					op(view.substr(0, end));
+				
+				view.remove_prefix(end + sep.size());
+			}
+		}
+		
 		/**
 		* @note If op returns true, this function returns.
 		*/
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens.")]]
 		void tokenize(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// note: Assuming view is null-terminated.
@@ -162,6 +216,51 @@ namespace STM32T
 				
 				view.remove_prefix(end + sep.size());
 			}
+		}
+		
+		void tokenize2(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded) const
+		{
+			// note: Assuming view is null-terminated.
+			
+			bstrv view = *this;
+			const const_pointer start = view.data();
+			
+			while (!view.empty())
+			{
+				size_t end = view.find(sep, 0);
+				if (end == npos)
+				{
+					if (!ignoreSingleEnded)
+						op(view);
+				
+					return;
+				}
+				
+				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
+					if (op(view.substr(0, end)))
+						return;
+				
+				view.remove_prefix(end + sep.size());
+			}
+		}
+		
+		size_t tokenize(const bstrv delim, bstrv *tokens, size_t max_tokens, const bool end_req, const bool add_empty = true) const
+		{
+			size_t idx = 0, start = 0, end = find(delim, start);
+			while (end != npos && idx < max_tokens)
+			{
+				const size_t new_len = end - start;
+				if (new_len || add_empty)
+					tokens[idx++] = {data() + start, new_len};
+				
+				start = end + delim.size();
+				end = find(delim, start);
+			}
+			
+			if (!end_req && (start < size() || add_empty) && idx < max_tokens)
+				tokens[idx++] = {data() + start, size() - start};
+			
+			return idx;
 		}
 		
 		bstrv& ltrim(base trimChars = WHITESPACE)
@@ -219,6 +318,27 @@ namespace STM32T
 		bool compare_remove(base remove)
 		{
 			return compare_remove_prefix(remove);
+		}
+		
+		
+		
+		template <typename I>
+		size_t ExtractInteger(I& integer, size_t from = 0, size_t count = bstrv<CharT>::npos) const
+		{
+			const size_t to = (from + count > from && from + count < size()) ? from + count : size();
+			
+			while (from < to && std::isspace(data()[from]))
+				from++;
+			
+			if (from < to && data()[from] == CharT('+'))
+				from++;
+			
+			if (to <= from)
+				return 0;
+			
+			const std::from_chars_result result = std::from_chars(data() + from, data() + to, integer);
+			
+			return result.ec == std::errc() ? result.ptr - (data() + from) : 0;
 		}
 	};
 	

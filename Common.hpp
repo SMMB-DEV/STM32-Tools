@@ -1284,12 +1284,42 @@ namespace STM32T
 		return _t.val;
 	}
 	
+	template <class F, class R, class... Args>
+	inline void Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, void (* const fail)(), Args&&... args)
 	{
+		if (_try(std::forward<Args>(args)...) == ok)
 			return;
 		
+		while (retry--)
 		{
+			HAL_Delay(delay_ms);
+			if (_try(std::forward<Args>(args)...) == ok)
+				return;
 		}
 		
+		if (fail)
+			fail();
+	}
+
+	#define RETRY(_retry_count, _delay_ms, _try, _ok, _fail) \
+	{ \
+		uint8_t _retry = _retry_count; \
+		if (_try != _ok) \
+		{ \
+			bool _success = false; \
+			while (_retry--) \
+			{ \
+				HAL_Delay(_delay_ms); \
+				if (_try == _ok) \
+				{ \
+					_success = true; \
+					break; \
+				} \
+			} \
+			\
+			if (!_success) \
+				_fail; \
+		} \
 	}
 }
 

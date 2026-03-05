@@ -4,7 +4,7 @@
 #define   _SIM800x_HPP_
 
 
-#include "GSM.hpp"
+#include "./GSM.hpp"
 
 #include <cstdarg>
 
@@ -16,7 +16,7 @@ Send "ATE0&W\r" to the module via the serial port.*/
 class SIM800x : public STM32T::GSM
 {
 private:
-	static constexpr uint8_t H2D[] =
+	static constexpr uint8_t H2D[] =	// todo: move to Common
 	{
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  15
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  31
@@ -95,27 +95,6 @@ public:
 			
 			sprintf(fmt, "%02hhu/%02hhu/%02hhu,%02hhu:%02hhu:%02hhu", yy, MM, dd, hh, mm, ss);
 			return fmt;
-		}
-	};
-
-	class URC : public strv
-	{
-	public:
-		uint32_t timestamp;
-		
-		URC() : strv(), timestamp(0) {}
-		URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), timestamp(timestamp) {}
-		URC(const strv& other, const uint32_t timestamp) : strv(other), timestamp(timestamp) {}
-		
-		bool compare_remove(const std::string_view& remove)
-		{
-			if (compare(0, remove.size(), remove) == 0)
-			{
-				remove_prefix(remove.size());
-				return true;
-			}
-
-			return false;
 		}
 	};
 	

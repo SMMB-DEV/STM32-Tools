@@ -13,26 +13,49 @@
 namespace STM32T
 {
 #ifdef HAL_UART_MODULE_ENABLED
-	
+
 #ifndef HAL_UART_TIMEOUT_VALUE
 #define HAL_UART_TIMEOUT_VALUE		(HAL_MAX_DELAY)
 #endif
-	
+
+
+#define CME_CODE(code)		CME_##code = code * -10
+
+#define CME_CODE_10(code)	CME_CODE(code##0), CME_CODE(code##1), CME_CODE(code##2), CME_CODE(code##3), CME_CODE(code##4), \
+CME_CODE(code##5), CME_CODE(code##6), CME_CODE(code##7), CME_CODE(code##8), CME_CODE(code##9)
+
+#define CME_CODE_100(code)	CME_CODE_10(code##0), CME_CODE_10(code##1), CME_CODE_10(code##2), CME_CODE_10(code##3), CME_CODE_10(code##4), \
+CME_CODE_10(code##5), CME_CODE_10(code##6), CME_CODE_10(code##7), CME_CODE_10(code##8), CME_CODE_10(code##9)
+
+
+	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t SEND_GUARD = 0, uint32_t SEND_DELAY = 0, size_t DEF_RESP_LEN = 64, size_t DEF_ARG_LEN = 64>
 	class GSM
 	{
+		uint32_t m_lastSend = 0;
+		
 	public:
-		enum ErrorCode : uint8_t
+		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15;
+		
+		enum ErrorCode : int16_t
 		{
-			OK,
-			INVALID_PARAM,
-			UART_ERR,
-			TIMEOUT,
-			WRONG_FORMAT,	// In response
-			ERR,
-			FAIL,			// To execute command (received data was OK)
-			BUF_FULL,
-			ABORT,
-			UNKNOWN
+			OK				= +0,
+			INVALID_PARAM	= -1,	// todo: remove
+			INVALID			= -1,
+			UART_ERR		= -2,
+			TIMEOUT			= -3,
+			WRONG_FORMAT	= -4,	// In response
+			ERR				= -5,
+			FAIL			= -6,	// To execute command (received data was OK)
+			BUF_FULL		= -7,	// todo: remove
+			BIG_PARAM		= -7,
+			ABORT			= -8,	// todo: remove?
+			UNKNOWN			= -9,
+			
+			
+			CME_0 = ERROR,
+			CME_CODE(1), CME_CODE(2), CME_CODE(3), CME_CODE(4), CME_CODE(5), CME_CODE(6), CME_CODE(7), CME_CODE(8), CME_CODE(9),
+			CME_CODE_10(1), CME_CODE_10(2), CME_CODE_10(3), CME_CODE_10(4), CME_CODE_10(5), CME_CODE_10(6), CME_CODE_10(7), CME_CODE_10(8), CME_CODE_10(9),
+			CME_CODE_100(1), CME_CODE_100(2), CME_CODE_100(3), CME_CODE_100(4), CME_CODE_100(5), CME_CODE_100(6), CME_CODE_100(7), CME_CODE_100(8), CME_CODE_100(9)
 		};
 		
 		class URC : public strv
@@ -56,11 +79,13 @@ namespace STM32T
 		};
 		
 	protected:
-		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = 300, DEFAULT_IDLE_TIMEOUT = 20;
-		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
+		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
+		static constexpr size_t DEFAULT_RESPONSE_LEN = DEF_RESP_LEN, DEFAULT_ARG_LEN = DEF_ARG_LEN;
 		
 		
 		UART_HandleTypeDef* const p_huart;
+		bool m_noSendWait = false, m_noSendDelay = false;
+		
 		
 		virtual void addURC(const strv token) = 0;
 	
@@ -73,7 +98,7 @@ namespace STM32T
 		void addURCFromBuf(const strv buf)
 		{
 			vec<strv> tokens;
-			buf.tokenize("\r\n"sv, tokens, true);
+			buf.tokenize2("\r\n"sv, tokens, true);
 			addURCs(tokens);
 		}
 		
@@ -91,13 +116,26 @@ namespace STM32T
 			HAL_UART_Transmit(p_huart, (uint8_t*)data.data(), data.length(), HAL_UART_TIMEOUT_VALUE);
 		}
 		
-		/**
-		* @param len - The length to be received is passed to the function, then len is modified inside the function to the number of bytes actually received.
-		*/
-		virtual ErrorCode ReceiveUART(char *buffer, uint16_t& len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
+		virtual int16_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
 		
 		ErrorCode Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, uint16_t& len)
 		{
+			const bool data_sent = type != CommandType::Bare || !args.empty();
+			
+			if constexpr (SEND_GUARD_TIME)
+			{
+				if (data_sent)
+				{
+					if (m_noSendWait)
+						m_noSendWait = false;
+					else
+					{
+						while (HAL_GetTick() - m_lastSend <= SEND_GUARD_TIME);
+						m_lastSend = HAL_GetTick();
+					}
+				}
+			}
+			
 			if (type != CommandType::Bare)
 			{
 				SendUART("AT"sv);
@@ -115,11 +153,22 @@ namespace STM32T
 			if (type != CommandType::Bare)
 				SendUART("\r"sv);
 			
+			if constexpr (SEND_DELAY_TIME)
+			{
+				if (data_sent)
+				{
+					if (m_noSendDelay)
+						m_noSendDelay = false;
+					else
+						HAL_Delay(SEND_DELAY_TIME);
+				}
+			}
+			
 			if (buffer && len)
 			{
-				uint16_t len2 = len - 1;
-				if (const ErrorCode code = ReceiveUART(buffer, len2, timeout, DEFAULT_IDLE_TIMEOUT); code != OK)
-					return code;
+				int16_t len2 = ReceiveUART(buffer, len - 1, timeout, DEFAULT_IDLE_TIMEOUT);
+				if (len2 < OK)
+					return ErrorCode(len2);
 				
 				buffer[len = len2] = 0;		// Make it safe for C str functions
 			}
@@ -132,15 +181,18 @@ namespace STM32T
 			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
-				if (bool ok = tokens[i] == "OK"sv; ok || tokens[i].find("ERROR"sv) != strv::npos)	// OK or ERROR
+				if (tokens[i] == "OK"sv)
 				{
-					ret = ok ? OK : ERR;
+					ret = OK;
 					tokens.erase(tokens.begin() + i);
 					break;
 				}
 			}
 			
-			addURCs(tokens);
+			if (ret == UNKNOWN)
+				ret = Error(tokens);
+			else
+				addURCs(tokens);
 			
 			return ret;
 		}
@@ -150,6 +202,14 @@ namespace STM32T
 			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
+				uint16_t cme;
+				if (1 == std::sscanf(tokens[i].data(), "+CME ERROR: %3hu", &cme))
+				{
+					tokens.erase(tokens.begin() + i);
+					ret = cme == 0 ? ERR : ErrorCode(cme * -10);
+					break;
+				}
+				
 				if (tokens[i].find("ERROR"sv) != strv::npos)
 				{
 					tokens.erase(tokens.begin() + i);
@@ -195,15 +255,15 @@ namespace STM32T
 			
 			va_end(print_args);
 			
-			if (argsLen > sizeof(args))	// did not fit inside {args}
-				Error_Handler();
+			if (argsLen >= sizeof(args))	// did not fit inside {args}
+				return BIG_PARAM;
 			
 			return NoToken<LEN>(timeout, type, cmd, handler, strv(args, argsLen));
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args,
-			const func<ErrorCode (vec<strv>&)>& op, const bool allowSingleEnded = false)
+		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (vec<strv>&)>& op,
+			const bool allowSingleEnded = false)
 		{
 			if (!op)
 				return INVALID_PARAM;
@@ -215,7 +275,31 @@ namespace STM32T
 				return code;
 			
 			vec<strv> tokens;
-			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
+			
+			return op(tokens);
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode Tokens3(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (vec<strv>&)>& op,
+			const bool allowSingleEnded = false)
+		{
+			if (!op)
+				return INVALID_PARAM;
+			
+			char buffer[LEN];
+			uint16_t len = sizeof(buffer);
+			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
+			if (code != OK)
+				return code;
+			
+			vec<strv> tokens;
+			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
+			
+			if (tokens.size() == 0 || tokens.back() != "OK"sv)
+				return Error(tokens);
+			
+			tokens.pop_back();
 			
 			return op(tokens);
 		}
@@ -236,7 +320,7 @@ namespace STM32T
 		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv token, const bool allowSingleEnded, const char* const fmt, ...)
 		{
 			if (!fmt)
-				return ErrorCode::INVALID_PARAM;
+				return INVALID;
 			
 			char args[ARG_LEN];
 			
@@ -249,11 +333,8 @@ namespace STM32T
 			
 			va_end(print_args);
 			
-			if (argsLen > sizeof(args))	// did not fit inside {args}
-			{
-				Error_Handler();
-				return ERR;
-			}
+			if (argsLen >= sizeof(args))
+				return BIG_PARAM;
 			
 			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen), token, allowSingleEnded);
 		}
@@ -286,8 +367,9 @@ namespace STM32T
 				
 				if (!ok)
 				{
-					addURCs(tokens);
-					return UNKNOWN;
+					//addURCs(tokens);
+					//return UNKNOWN;
+					return Error(tokens);
 				}
 				
 				return op(tokens);
@@ -324,11 +406,8 @@ namespace STM32T
 			
 			va_end(print_args);
 			
-			if (argsLen > sizeof(args))		// Did not fit inside {args}
-			{
-				Error_Handler();
-				return INVALID_PARAM;
-			}
+			if (argsLen >= sizeof(args))
+				return BIG_PARAM;
 			
 			return ResponseToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), ok_pos, op);
 		}
@@ -351,11 +430,8 @@ namespace STM32T
 			
 			va_end(print_args);
 			
-			if (argsLen > sizeof(args))		// Did not fit inside {args}
-			{
-				Error_Handler();
-				return INVALID_PARAM;
-			}
+			if (argsLen >= sizeof(args))
+				return BIG_PARAM;
 			
 			return ResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op, ok_last);
 		}
@@ -364,6 +440,7 @@ namespace STM32T
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
 			bool done = false;
+			const uint32_t start = HAL_GetTick() + SEND_GUARD_TIME;
 			
 			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
 			{
@@ -391,7 +468,9 @@ namespace STM32T
 			if (code != OK || done)
 				return code;
 			
-			return ResponseToken<LEN>(1, timeout, CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
+			m_noSendWait = true;
+			
+			return ResponseToken<LEN>(1, Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -411,17 +490,15 @@ namespace STM32T
 			
 			va_end(print_args);
 			
-			if (argsLen > sizeof(args))		// Did not fit inside {args}
-			{
-				Error_Handler();
-				return INVALID_PARAM;
-			}
+			if (argsLen >= sizeof(args))
+				return BIG_PARAM;
 			
 			return DelayedResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode StrToken(char * const buf, size_t max_len, const strv cmd, const CommandType type, const strv args = strv())
+		[[deprecated("Use StrToken2() instead.")]]
+		ErrorCode StrToken(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
 			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
 			{
@@ -438,6 +515,27 @@ namespace STM32T
 				buf[len] = 0;
 				
 				return OK;
+			}, args);
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		int16_t StrToken2(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
+		{
+			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str) -> ErrorCode
+			{
+				const strv orig = str;
+				
+				if (!str.remove_suffix("\r\n\r\nOK\r\n"sv) || !str.remove_prefix("\r\n"sv))
+				{
+					addURCFromBuf(orig);
+					return UNKNOWN;
+				}
+				
+				const size_t len = std::min(str.length(), max_len - 1);
+				memcpy(buf, str.data(), len);
+				buf[len] = 0;
+				
+				return ErrorCode(len);
 			}, args);
 		}
 		
@@ -546,9 +644,9 @@ namespace STM32T
 		
 		GSM(UART_HandleTypeDef* uart) : p_huart(uart) {}
 		
-		ErrorCode AT()
+		ErrorCode AT(const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
-			return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, strv());
+			return SingleToken(timeout, CommandType::Execute, {});
 		}
 		
 		void Custom(strv command)
@@ -557,24 +655,82 @@ namespace STM32T
 			Command(0, CommandType::Execute, command, strv(), nullptr, temp);
 		}
 		
-		ErrorCode GetBrand(char * const buf, const size_t max_len)
+		int16_t GetBrand(char *const buf, const size_t max_len)
 		{
-			return StrToken(buf, max_len, "+CGMI"sv, CommandType::Execute);
+			return StrToken2(buf, max_len, CommandType::Execute, "+CGMI"sv);
 		}
 		
-		ErrorCode GetModel(char * const buf, const size_t max_len)
+		int16_t GetModel(char *const buf, const size_t max_len)
 		{
-			return StrToken(buf, max_len, "+CGMM"sv, CommandType::Execute);
+			return StrToken2(buf, max_len, CommandType::Execute, "+CGMM"sv);
 		}
 		
-		ErrorCode GetRevision(char * const buf, const size_t max_len)
+		/**
+		* @param rev - Will be null-terminated.
+		*/
+		int16_t GetRevision(char *const rev, const size_t max_len)
 		{
-			return StrToken(buf, max_len, "+CGMR"sv, CommandType::Execute);
+			return StrToken2(rev, max_len, CommandType::Execute, "+CGMR"sv);
 		}
 		
-		ErrorCode GetIMEI(char * const buf, const size_t max_len)
+		/**
+		* @param imei - Must have at least IMEI_LEN + 1 bytes. It will have exactly IMEI_LEN characters and will be null-terminated on success.
+		*/
+		ErrorCode GetIMEI(char *const imei)
 		{
-			return StrToken(buf, max_len, "+CGSN"sv, CommandType::Execute);
+			static_assert(IMEI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
+			
+			int16_t len = StrToken2(imei, IMEI_LEN + 1, CommandType::Execute, "+CGSN"sv);
+			if (len != IMEI_LEN)
+				return WRONG_FORMAT;
+			
+			uint8_t sum = 0;
+			for (size_t i = 0; i < IMEI_LEN; i += 2)
+				sum += imei[i] - '0';
+			
+			for (size_t i = 1; i < IMEI_LEN; i += 2)
+			{
+				const uint8_t _double = (imei[i] - '0') * 2;
+				sum += _double / 10 + _double % 10;
+			}
+			
+			return (sum % 10 == 0) ? OK : WRONG_FORMAT;
+		}
+		
+		ErrorCode GetIMEI(uint64_t &imei)
+		{
+			char imei_s[IMEI_LEN + 1];
+			ErrorCode code = GetIMEI(imei_s);
+			if (code != OK)
+				return code;
+			
+			return strv(imei_s, IMEI_LEN).ExtractInteger(imei) == IMEI_LEN ? OK : WRONG_FORMAT;
+		}
+		
+		/**
+		* @param imsi - Must have at least IMSI_LEN + 1 bytes. It will have exactly IMSI_LEN characters and will be null-terminated on success.
+		*/
+		ErrorCode GetIMSI(char *const imsi)
+		{
+			static_assert(IMSI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
+			
+			const int16_t len = StrToken2(imsi, IMSI_LEN + 1, CommandType::Execute, "+CIMI"sv);
+			return len == IMSI_LEN ? OK : WRONG_FORMAT;
+		}
+		
+		ErrorCode GetIMSI(uint16_t &mcc, uint8_t &mnc)
+		{
+			char imsi[IMSI_LEN + 1];
+			
+			const ErrorCode code = GetIMSI(imsi);
+			if (code != OK)
+				return code;
+			
+			strv imsi_sv(imsi, IMSI_LEN);
+			if (imsi_sv.ExtractInteger(mcc, 0, 3) != 3 || imsi_sv.ExtractInteger(mnc, 3, 2) != 2)
+				return WRONG_FORMAT;
+			
+			return OK;
 		}
 	};
 #endif	// HAL_UART_MODULE_ENABLED
