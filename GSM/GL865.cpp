@@ -1,13 +1,5 @@
 #include "./GL865.hpp"
 
-#include "../Log.hpp"
-
-extern STM32T::strv log_ts();
-static constexpr STM32T::Log::Logger lg(STM32T::Log::Level::Debug, "GSM"sv,
-	std::array<STM32T::Log::output_t, 2>{STM32T::Log::default_output_stdout, STM32T::Log::default_output_vcp}, log_ts);
-
-
-
 using STM32T::vec;
 using STM32T::operator"" _Ki;
 

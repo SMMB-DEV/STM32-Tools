@@ -2,6 +2,7 @@
 
 #include "./GSM.hpp"
 #include "../IO.hpp"
+#include "../Log.hpp"
 
 
 
@@ -11,8 +12,10 @@ using std::operator"" sv;
 
 
 
-class GL865 : public STM32T::GSM<100, 16, 60, 4>
+class GL865 : public STM32T::GSM<100, 16, 50, 4>
 {
+	static constexpr STM32T::Log::Logger lg{STM32T::Log::Level::Debug, "GSM"sv};
+	
 	static constexpr uint32_t MAX_DNS_TIME = 20'000;
 	
 	STM32T::IO m_pwr;
@@ -374,7 +377,7 @@ public:
 			HAL_Delay(5000 + 1000);
 			
 			using namespace std::placeholders;
-			STM32T::Retry(3, 1000, std::bind(&GL865::Setup, this, _1), true, Error_Handler, 1000);
+			STM32T::Retry(3, 1000, std::bind(&GL865::Setup, this, 1000), OK, Error_Handler);
 		}
 		
 		HAL_Delay(1000);
