@@ -51,8 +51,7 @@ namespace STM32T
 		
 		ILCD& PutStr(const strv view)
 		{
-			PutStrn(view.data(), view.length());
-			return *this;
+			return PutStrn(view.data(), view.length());
 		}
 		
 		template <size_t BUF_SIZE = 64>
@@ -65,9 +64,17 @@ namespace STM32T
 			const int len = vsnprintf(buf, sizeof(buf), fmt, args);
 			va_end(args);
 			
-			PutStrn(buf, std::min((size_t)len, BUF_SIZE - 1));
+			return PutStrn(buf, std::min((size_t)len, BUF_SIZE - 1));
+		}
+		
+		template <size_t BUF_SIZE = 64>
+		ILCD& PutTimef(const char* fmt, const std::tm *tm)
+		{
+			char buf[BUF_SIZE];
 			
-			return *this;
+			const size_t len = std::strftime(buf, std::size(buf), fmt, tm);
+			
+			return PutStrn(buf, len);
 		}
 		
 		ILCD& PutStrCtr(const size_t field_width, const strv str)
@@ -113,9 +120,7 @@ namespace STM32T
 			if (len < min_field_width)
 				PutCharn(filler, min_field_width - len);
 			
-			PutStrn(buf, len);
-			
-			return *this;
+			return PutStrn(buf, len);
 		}
 		
 		template <typename F, size_t BUF_SIZE = 32>
