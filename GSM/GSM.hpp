@@ -19,13 +19,22 @@ namespace STM32T
 #endif
 
 
-#define CME_CODE(code)		CME_##code = code * -10
+#define CME_CODE(code)		CME_##code = -(1000 + code)
 
 #define CME_CODE_10(code)	CME_CODE(code##0), CME_CODE(code##1), CME_CODE(code##2), CME_CODE(code##3), CME_CODE(code##4), \
 CME_CODE(code##5), CME_CODE(code##6), CME_CODE(code##7), CME_CODE(code##8), CME_CODE(code##9)
 
 #define CME_CODE_100(code)	CME_CODE_10(code##0), CME_CODE_10(code##1), CME_CODE_10(code##2), CME_CODE_10(code##3), CME_CODE_10(code##4), \
 CME_CODE_10(code##5), CME_CODE_10(code##6), CME_CODE_10(code##7), CME_CODE_10(code##8), CME_CODE_10(code##9)
+
+	
+#define CMS_CODE(code)		CMS_##code = -(2000 + code)
+
+#define CMS_CODE_10(code)	CMS_CODE(code##0), CMS_CODE(code##1), CMS_CODE(code##2), CMS_CODE(code##3), CMS_CODE(code##4), \
+CMS_CODE(code##5), CMS_CODE(code##6), CMS_CODE(code##7), CMS_CODE(code##8), CMS_CODE(code##9)
+
+#define CMS_CODE_100(code)	CMS_CODE_10(code##0), CMS_CODE_10(code##1), CMS_CODE_10(code##2), CMS_CODE_10(code##3), CMS_CODE_10(code##4), \
+CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(code##8), CMS_CODE_10(code##9)
 
 
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t SEND_GUARD = 0, uint32_t SEND_DELAY = 0, size_t DEF_RESP_LEN = 64, size_t DEF_ARG_LEN = 64>
@@ -39,23 +48,29 @@ CME_CODE_10(code##5), CME_CODE_10(code##6), CME_CODE_10(code##7), CME_CODE_10(co
 		enum ErrorCode : int16_t
 		{
 			OK				= +0,
-			INVALID_PARAM	= -1,	// todo: remove
+			INVALID_PARAM	= -1,
 			INVALID			= -1,
 			UART_ERR		= -2,
 			TIMEOUT			= -3,
 			WRONG_FORMAT	= -4,	// In response
-			ERR				= -5,
-			FAIL			= -6,	// To execute command (received data was OK)
+			ERR				= -5,	// Failure on the module side
+			FAIL			= -6,	// Failure on the MCU side
 			BUF_FULL		= -7,	// todo: remove
 			BIG_PARAM		= -7,
 			ABORT			= -8,	// todo: remove?
 			UNKNOWN			= -9,
 			
 			
-			CME_0 = ERROR,
+			CME_CODE(0),
 			CME_CODE(1), CME_CODE(2), CME_CODE(3), CME_CODE(4), CME_CODE(5), CME_CODE(6), CME_CODE(7), CME_CODE(8), CME_CODE(9),
 			CME_CODE_10(1), CME_CODE_10(2), CME_CODE_10(3), CME_CODE_10(4), CME_CODE_10(5), CME_CODE_10(6), CME_CODE_10(7), CME_CODE_10(8), CME_CODE_10(9),
-			CME_CODE_100(1), CME_CODE_100(2), CME_CODE_100(3), CME_CODE_100(4), CME_CODE_100(5), CME_CODE_100(6), CME_CODE_100(7), CME_CODE_100(8), CME_CODE_100(9)
+			CME_CODE_100(1), CME_CODE_100(2), CME_CODE_100(3), CME_CODE_100(4), CME_CODE_100(5), CME_CODE_100(6), CME_CODE_100(7), CME_CODE_100(8), CME_CODE_100(9),
+			
+			
+			CMS_CODE(0),
+			CMS_CODE(1), CMS_CODE(2), CMS_CODE(3), CMS_CODE(4), CMS_CODE(5), CMS_CODE(6), CMS_CODE(7), CMS_CODE(8), CMS_CODE(9),
+			CMS_CODE_10(1), CMS_CODE_10(2), CMS_CODE_10(3), CMS_CODE_10(4), CMS_CODE_10(5), CMS_CODE_10(6), CMS_CODE_10(7), CMS_CODE_10(8), CMS_CODE_10(9),
+			CMS_CODE_100(1), CMS_CODE_100(2), CMS_CODE_100(3), CMS_CODE_100(4), CMS_CODE_100(5)	//, CMS_CODE_100(6), CMS_CODE_100(7), CMS_CODE_100(8), CMS_CODE_100(9)
 		};
 		
 		class URC : public strv
@@ -202,11 +217,18 @@ CME_CODE_10(code##5), CME_CODE_10(code##6), CME_CODE_10(code##7), CME_CODE_10(co
 			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
-				uint16_t cme;
-				if (1 == std::sscanf(tokens[i].data(), "+CME ERROR: %3hu", &cme))
+				uint16_t code;
+				if (1 == std::sscanf(tokens[i].data(), "+CME ERROR: %3hu", &code))
 				{
 					tokens.erase(tokens.begin() + i);
-					ret = cme == 0 ? ERR : ErrorCode(cme * -10);
+					ret = ErrorCode(-1000 - code);
+					break;
+				}
+				
+				if (1 == std::sscanf(tokens[i].data(), "+CMS ERROR: %3hu", &code))
+				{
+					tokens.erase(tokens.begin() + i);
+					ret = ErrorCode(-2000 - code);
 					break;
 				}
 				
