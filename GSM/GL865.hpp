@@ -14,7 +14,7 @@ using std::operator"" sv;
 
 class GL865 : public STM32T::GSM<100, 16, 50, 4>
 {
-	static constexpr STM32T::Log::Logger lg{STM32T::Log::Level::Debug, "GSM"sv};
+	static constexpr STM32T::Log::Logger lg = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
 	
 	static constexpr uint32_t MAX_DNS_TIME = 20'000;
 	

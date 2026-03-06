@@ -196,6 +196,11 @@ namespace STM32T::Log
 			level(level), name(name), outputs(outputs), timestamp(timestamp) {}
 		constexpr Logger(Level level, strv name, timestamp_t timestamp) : level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
 		
+		constexpr Logger Clone(Level level, strv name) const
+		{
+			return Logger(level, name, outputs, timestamp);
+		}
+		
 		constexpr bool isEnabled() const
 		{
 			return level > Level::None;
@@ -419,6 +424,9 @@ namespace STM32T::Log
 		}
 		
 		template <class... Args>
+		void n(const char *fmt, Args... args) const { if (isEnabled()) log(Level::None, fmt, args...); }
+		
+		template <class... Args>
 		void f(const char *fmt, Args... args) const { log(Level::Fatal, fmt, args...); }
 		
 		template <class... Args>
@@ -510,12 +518,7 @@ namespace STM32T::Log
 			logger.log(level, fmt, args...);
 	}
 	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_N(const char *fmt, Args... args)
-	{
-		if constexpr (logger.isEnabled())
-			logger.log(Level::None, fmt, args...);
-	}
+	
 	
 	template <auto& logger, const Level level, class... Args>
 	void LOG_N(const char *fmt, Args... args)
@@ -530,6 +533,15 @@ namespace STM32T::Log
 	{
 		LOG_N<g_defaultLogger, level>(fmt, args...);
 	}
+	
+	template <auto& logger = g_defaultLogger, class... Args>
+	void LOG_N(const char *fmt, Args... args)
+	{
+		if constexpr (logger.isEnabled())
+			logger.log(Level::None, fmt, args...);
+	}
+	
+	
 	
 	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_F(const char *fmt, Args... args) { _LOG<logger, Level::Fatal>(fmt, args...); }
