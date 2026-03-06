@@ -179,24 +179,22 @@ namespace STM32T
 		
 		operator strv() const
 		{
-			int len = sprintf(s_buf_strv, "%hhu.%hhu.%hhu", Major(), Minor(), Patch()), len2;
+			int len = sprintf(s_buf_strv, "%hhu.%hhu.%hhu", Major(), Minor(), Patch());
 			
 			const uint8_t pr = PreRelease();
 			
 			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
-				len2 = sprintf(s_buf_strv + len, "-inv");
+				len += sprintf(s_buf_strv + len, "-inv");
 			else if (pr == Normal)
-				len2 = 0;
+				len += 0;
 			else if (pr >= RC0)
-				len2 = sprintf(s_buf_strv + len, "-rc%hhu", pr - RC0);
+				len += sprintf(s_buf_strv + len, "-rc%hhu", pr - RC0);
 			else if (pr >= Beta0)
-				len2 = sprintf(s_buf_strv + len, "-beta%hhu", pr - Beta0);
+				len += sprintf(s_buf_strv + len, "-beta%hhu", pr - Beta0);
 			else if (pr >= Alpha0)
-				len2 = sprintf(s_buf_strv + len, "-alpha%hhu", pr - Alpha0);
+				len += sprintf(s_buf_strv + len, "-alpha%hhu", pr - Alpha0);
 			else
-				len2 = sprintf(s_buf_strv + len, "-x");
-			
-			len += len2;
+				len += sprintf(s_buf_strv + len, "-x");
 			
 			return strv(s_buf_strv, len);
 		}
@@ -206,24 +204,22 @@ namespace STM32T
 		{
 			static wchar_t s_buf[20];
 			
-			int len = swprintf(s_buf, std::size(s_buf), L"%hhu.%hhu.%hhu", Major(), Minor(), Patch()), len2;
+			int len = swprintf(s_buf, std::size(s_buf), L"%hhu.%hhu.%hhu", Major(), Minor(), Patch());
 			
 			const uint8_t pr = PreRelease();
 			
 			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
-				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-inv");
+				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-inv");
 			else if (pr == Normal)
-				len2 = 0;
+				len += 0;
 			else if (pr >= RC0)
-				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-rc%hhu", pr - RC0);
+				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-rc%hhu", pr - RC0);
 			else if (pr >= Beta0)
-				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-beta%hhu", pr - Beta0);
+				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-beta%hhu", pr - Beta0);
 			else if (pr >= Alpha0)
-				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-alpha%hhu", pr - Alpha0);
+				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-alpha%hhu", pr - Alpha0);
 			else
-				len2 = swprintf(s_buf + len, std::size(s_buf) - len, L"-x");
-			
-			len += len2;
+				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-x");
 			
 			return wstrv(s_buf, len);
 		}

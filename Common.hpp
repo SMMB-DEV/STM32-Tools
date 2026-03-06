@@ -157,7 +157,16 @@ namespace STM32T
 	}
 	
 	template <typename T>
+	[[deprecated("Use next_multiple() instead.")]]
 	inline constexpr T round_up(T n, T multiple)
+	{
+		static_assert(is_int_v<T>);
+		
+		return ceil(n, multiple) * multiple;
+	}
+	
+	template <typename T>
+	inline constexpr T next_multiple(T n, T multiple)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -968,11 +977,12 @@ namespace STM32T
 		}
 	};
 	
-	template <class T, size_t MAX_SIZE>
+	template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
 	class StaticQueue
 	{
 	protected:
-		using index_t = ClampedInt<size_t, 0, MAX_SIZE - 1>;
+		static_assert(std::is_unsigned_v<INDEX_T>);
+		using index_t = ClampedInt<INDEX_T, 0, MAX_SIZE - 1>;
 		
 		T m_items[MAX_SIZE];
 		
@@ -1061,9 +1071,9 @@ namespace STM32T
 	};
 	
 	template <class T, size_t MAX_SIZE = 256>
-	class PriorityQueue : protected StaticQueue<T, MAX_SIZE>
+	class PriorityQueue : protected StaticQueue<T, MAX_SIZE, uint8_t>
 	{
-		using parent = StaticQueue<T, MAX_SIZE>;
+		using parent = StaticQueue<T, MAX_SIZE, uint8_t>;
 		
 	public:
 		using prio_t = uint8_t;

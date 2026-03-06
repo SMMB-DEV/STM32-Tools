@@ -122,27 +122,27 @@ namespace STM32T
 	
 	class IO : public _IO
 	{
-		static constexpr uint32_t GPIO_NUMBER = 16;
-		
-		GPIO_TypeDef *const cp_port;
-		
-	public:
-		const uint16_t c_pin;
-		
 	protected:
-		const bool active_low;
+		static constexpr uint32_t GPIO_NUMBER = 16;
 		
 		static inline GPIO_TypeDef S_DUMMY_GPIO = {0};
 		
 	public:
+		GPIO_TypeDef *const cp_port;
+		const uint16_t c_pin;
+		bool active_low;
+		
+		IO(const IO& other) = default;
+		IO(IO&& other) = default;
+		
 		IO(GPIO_TypeDef* const Port, const uint16_t Pin, const bool active_low = false) : cp_port(Port), c_pin(Pin), active_low(active_low)
 		{
 			assert_param(IS_GPIO_PIN(c_pin));
 		}
 		
-		static IO None()
+		static IO None(bool active_low = false)
 		{
-			return IO(&S_DUMMY_GPIO, GPIO_PIN_0);
+			return IO(&S_DUMMY_GPIO, GPIO_PIN_0, active_low);
 		}
 		
 		static IO* NonePtr()
