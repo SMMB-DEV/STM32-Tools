@@ -97,6 +97,8 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
 		static constexpr size_t DEFAULT_RESPONSE_LEN = DEF_RESP_LEN, DEFAULT_ARG_LEN = DEF_ARG_LEN;
 		
+		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv;
+		
 		
 		UART_HandleTypeDef* const p_huart;
 		bool m_noSendWait = false, m_noSendDelay = false;

@@ -31,67 +31,6 @@ bool GL865::NetworkWait(const uint32_t timeout)
 	return false;
 }
 
-GL865::ErrorCode GL865::SendSMS(strv number, wstrv msg)
-{
-	return SendSMS(number, {msg});
-}
-
-GL865::ErrorCode GL865::SendSMS(strv number, std::initializer_list<wstrv> msgs)
-{
-	static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
-	
-	LOG_D<lg>("Sending SM to %.*s...\n", number.size(), number.data());
-	
-	auto number2 = std::make_unique<char[]>(number.size() * 4);
-	for (size_t i = 0; i < number.size(); i++)
-	{
-		char *buf = number2.get() + i * 4;
-		
-		using namespace STM32T;
-		buf[0] = H2C(number[i] >> 12);
-		buf[1] = H2C(number[i] >> 8);
-		buf[2] = H2C(number[i] >> 4);
-		buf[3] = H2C(number[i]);
-	}
-	
-	ErrorCode code = Tokens2(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4}, [&](vec<strv>& tokens) -> ErrorCode
-	{
-		return tokens.size() == 1 && tokens[0] == "> "sv ? OK : ERR;
-	}, true);
-	
-	if (code != OK)
-	{
-		SendUART("\x1B"sv);		// ESC
-		return code;
-	}
-	
-	for (auto &msg : msgs)
-	{
-		for (auto& ch : msg)
-		{
-			using namespace STM32T;
-			
-			char ucs2[sizeof(ch) * 2] = {H2C(ch >> 12), H2C(ch >> 8), H2C(ch >> 4), H2C(ch)};
-			SendUART(strv(ucs2, std::size(ucs2)));
-		}
-	}
-	
-	// \r\n+CMGS: 255\r\n\r\nOK\r\n
-	uint8_t n;
-	ErrorCode res = ResponseToken(60'000, CommandType::Bare, "+CMGS"sv, "\x1A"sv, [&n](strv token) -> ErrorCode	// CTRL+Z
-	{
-		LOG_D<lg>("Token: %.*s\n", token.size(), token.data());
-		return sscanf(token.data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT;
-	});
-	
-	if (res == OK)
-		LOG_D<lg>("SM sent successfully (%hhu).\n", n);
-	else
-		LOG_W<lg>("SM could not be sent (%hhu)!\n", res);
-	
-	return res;
-}
-
 GL865::ErrorCode GL865::Call(strv number, const uint32_t timeout)
 {
 	LOG_D<lg>("Calling %.*s...\n", number.size(), number.data());

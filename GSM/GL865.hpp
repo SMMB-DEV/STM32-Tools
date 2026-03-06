@@ -61,6 +61,24 @@ class GL865 : public STM32T::GSM<100, 16, 50, 4>
 		}
 		
 		return orig_len;
+		
+	}
+	
+	ErrorCode Setup(const uint32_t timeout_ms = 1000)
+	{
+		m_noSendWait = true;
+		
+		static constexpr strv CMD = "E0;&K0;&P;+IPR=115200;#SLED=2;"
+			"+CGDCONT=1,\"IP\",\"mcinet\";"			// ",\"0.0.0.0\";"
+			"+CGDCONT=2,\"IP\",\"mtnirancell\";"	// ",\"0.0.0.0\";"
+			"+CGDCONT=3,\"IP\",\"rightel\";"		// ",\"0.0.0.0\";"
+			"#SCFGEXT=1,0,1,0,0,1;"					// <conneId>,<srMode>,<recvDataMode>,<keepalive>[,<ListenAutoRsp>[,<sendDataMode>]]
+			"#SCFGEXT=2,0,1,0,0,1;"
+			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;"
+			"+CSAS;#SLEDSAV;&W"sv;
+		
+		// The first time might fail due to echo still being enabled, but the next tries should succeed.
+		return SingleToken<CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
 	}
 	
 	ErrorCode ConfigSocket(const uint8_t conn_id, const uint8_t cid, const uint32_t conn_to)
@@ -79,23 +97,6 @@ public:
 	* @param pwr_mon - Must be high when the PWRMON pin is high.
 	*/
 	GL865(UART_HandleTypeDef* huart, STM32T::IO pwr, STM32T::IO pwr_mon) : GSM(huart), m_pwr(pwr), c_pwrMon(pwr_mon) {}
-	
-	ErrorCode Setup(const uint32_t timeout_ms = 1000)
-	{
-		m_noSendWait = true;
-		
-		static constexpr strv CMD = "E0;&K0;&P;+IPR=115200;#SLED=2;"
-			"+CGDCONT=1,\"IP\",\"mcinet\";"			// ",\"0.0.0.0\";"
-			"+CGDCONT=2,\"IP\",\"mtnirancell\";"	// ",\"0.0.0.0\";"
-			"+CGDCONT=3,\"IP\",\"rightel\";"		// ",\"0.0.0.0\";"
-			"#SCFGEXT=1,0,1,0,0,1;"					// <conneId>,<srMode>,<recvDataMode>,<keepalive>[,<ListenAutoRsp>[,<sendDataMode>]]
-			"#SCFGEXT=2,0,1,0,0,1;"
-			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;"
-			"+CSAS;#SLEDSAV;&W"sv;
-		
-		// The first time might fail due to echo still being enabled, but the next tries should succeed.
-		return SingleToken<CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
-	}
 	
 	ErrorCode NetworkCheck(uint8_t& stat);
 	bool NetworkWait(const uint32_t timeout);
@@ -169,8 +170,69 @@ public:
 		}, "1,\"%.*s\"", ussd.size(), ussd.data());
 	}
 	
-	ErrorCode SendSMS(strv number, wstrv msg);
-	ErrorCode SendSMS(strv number, std::initializer_list<wstrv> msgs);
+	ErrorCode SMSend(strv number, const wstrv *msgs, const size_t msg_count)
+	{
+		static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
+		
+		LOG_D<lg>("Sending SM to %.*s...\n", number.size(), number.data());
+		
+		auto number2 = std::make_unique<char[]>(number.size() * 4);
+		for (size_t i = 0; i < number.size(); i++)
+		{
+			char *buf = number2.get() + i * 4;
+			
+			using namespace STM32T;
+			buf[0] = H2C(number[i] >> 12);
+			buf[1] = H2C(number[i] >> 8);
+			buf[2] = H2C(number[i] >> 4);
+			buf[3] = H2C(number[i]);
+		}
+		
+		ErrorCode code = SingleToken(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4}, "> "sv, true);
+		if (code != OK)
+		{
+			SendUART(ESC);
+			return code;
+		}
+		
+		for (size_t i = 0; i < msg_count; i++)
+		{
+			for (auto& ch : msgs[i])
+			{
+				using namespace STM32T;
+				
+				char ucs2[sizeof(ch) * 2] = {H2C(ch >> 12), H2C(ch >> 8), H2C(ch >> 4), H2C(ch)};
+				SendUART(strv(ucs2, std::size(ucs2)));
+			}
+		}
+		
+		m_noSendWait = true;
+		
+		// \r\n+CMGS: 255\r\n\r\nOK\r\n
+		uint8_t n;
+		ErrorCode res = ResponseToken(60'000, CommandType::Bare, "+CMGS"sv, CTRL_Z, [&n](strv token) -> ErrorCode
+		{
+			return sscanf(token.data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT;
+		});
+		
+		if (res == OK)
+			LOG_D<lg>("SM sent successfully (%hhu).\n", n);
+		else
+			LOG_W<lg>("SM could not be sent (%hhu)!\n", res);
+		
+		return res;
+	}
+	
+	ErrorCode SMSend(strv number, std::initializer_list<wstrv> msgs)
+	{
+		return SMSend(number, msgs.begin(), msgs.size());
+	}
+	
+	ErrorCode SMSend(strv number, wstrv msg)
+	{
+		return SMSend(number, &msg, 1);
+	}
+	
 	ErrorCode Call(strv number, const uint32_t timeout = 30'000);
 	ErrorCode HangUp();
 	
@@ -281,15 +343,13 @@ public:
 	
 	ErrorCode SocketSend(const uint8_t conn_id, strv data)
 	{
-		static constexpr char CTRL_Z = 0x1A, ESC = 0x1B;
-		
 		if (data.size() > 1500 || conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID)
 			return INVALID;
 		
 		ErrorCode code = SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SSEND"sv, "> "sv, true, "%hhu", conn_id);
 		if (code != OK)
 		{
-			SendUART({&ESC, 1});
+			SendUART(ESC);
 			return code;
 		}
 		
@@ -303,7 +363,7 @@ public:
 		
 		m_noSendWait = true;
 		
-		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, {&CTRL_Z, 1});
+		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
 	}
 	
 	int16_t SocketRead(const uint8_t conn_id, char *const data, const uint16_t len, uint32_t timeout_ms = DEFAUL_RECEIVE_TIMEOUT)
