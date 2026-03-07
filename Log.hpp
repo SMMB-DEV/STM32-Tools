@@ -479,27 +479,23 @@ namespace STM32T::Log
 		}
 	};
 	
-#if defined(STM32T_DEFAULT_LOG_DEBUG)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger(Level::Debug, ""sv, std::array{default_output_stdout});
-#elif defined(STM32T_DEFAULT_LOG_INFO)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger(Level::Info, ""sv, std::array{default_output_stdout});
-#elif defined(STM32T_DEFAULT_LOG_WARNING)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger(Level::Warning, ""sv, std::array{default_output_stdout});
-#elif defined(STM32T_DEFAULT_LOG_ERROR)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger(Level::Error, ""sv, std::array{default_output_stdout});
-#elif defined(STM32T_DEFAULT_LOG_FATAL)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger(Level::Fatal, ""sv, std::array{default_output_stdout});
-#elif defined(STM32T_DEFAULT_LOG)
-	#define STM32T_LOG_ENABLED
-	inline constexpr Logger g_defaultLogger STM32T_DEFAULT_LOG;
-#else
-	inline constexpr Logger g_defaultLogger(Level::None, ""sv, std::array{default_output_stdout});
-#endif
+	#ifndef STM32T_DEFAULT_LOG_LEVEL
+	#define	STM32T_DEFAULT_LOG_LEVEL		Level::None
+	#endif
+	
+	#ifndef STM32T_DEFAULT_LOG_NAME
+	#define	STM32T_DEFAULT_LOG_NAME			""sv
+	#endif
+	
+	#ifndef STM32T_DEFAULT_LOG_OUTPUT
+	#define	STM32T_DEFAULT_LOG_OUTPUT		std::array{default_output_stdout}
+	#endif
+	
+	#ifndef STM32T_DEFAULT_LOG_TIMESTAMP
+	#define	STM32T_DEFAULT_LOG_TIMESTAMP	default_timestamp
+	#endif
+	
+	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP);
 	
 	constexpr inline bool IsEnabled()
 	{
@@ -566,7 +562,7 @@ namespace STM32T::Log
 			while (len)
 			{
 				for (size_t i = 0; len && i < line_count; i++, len--)
-					LOG_N<logger>("%02X ", *arr++);
+					LOG_N<logger>(" %02X", *arr++);
 				
 				LOG_N<logger>("\n");
 			}
@@ -585,6 +581,31 @@ namespace STM32T::Log
 			f();
 	}
 	
+	template <typename R>
+	inline R DoIfEnabled(R (*f)())
+	{
+		if constexpr (IsEnabled())
+			return f();
+		else
+			return R();
+	}
+	
+	template <const Level level>
+	inline void DoIfEnabled(void (*f)())
+	{
+		if constexpr (IsEnabled(level))
+			f();
+	}
+	
+	template <const Level level, typename R>
+	inline R DoIfEnabled(R (*f)())
+	{
+		if constexpr (IsEnabled(level))
+			return f();
+		else
+			return R();
+	}
+	
 	template <auto& logger = g_defaultLogger>
 	inline void Startup()
 	{
@@ -594,10 +615,36 @@ namespace STM32T::Log
 			
 			const uint32_t version = HAL_GetHalVersion();	// major.minor.patch-rc
 			
-			LOG_N<logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n\n",
+			LOG_N<logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n",
 				version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
 				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
 				HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
+			
+			// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
+			const uint32_t reset_flags = RCC->CSR;
+			__HAL_RCC_CLEAR_RESET_FLAGS();
+			
+			LOG_N<logger>("Cause of reset: |");
+			
+			if (reset_flags & RCC_CSR_PINRSTF)
+				LOG_N<logger>(" Reset Pin |");
+			
+			if (reset_flags & RCC_CSR_PORRSTF)
+				LOG_N<logger>(" POR/PDR |");
+			
+			if (reset_flags & RCC_CSR_SFTRSTF)
+				LOG_N<logger>(" Software |");
+			
+			if (reset_flags & RCC_CSR_IWDGRSTF)
+				LOG_N<logger>(" IWDG |");
+			
+			if (reset_flags & RCC_CSR_WWDGRSTF)
+				LOG_N<logger>(" WWDG |");
+			
+			if (reset_flags & RCC_CSR_LPWRRSTF)
+				LOG_N<logger>(" Low Power |");
+			
+			LOG_N<logger>("\n\n");
 		});
 	}
 }
