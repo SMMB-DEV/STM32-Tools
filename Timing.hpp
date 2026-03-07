@@ -165,7 +165,7 @@ namespace STM32T::Time
 		return GetCycle() - startCycle > delay;
 	}
 	
-	inline ms_time_t Remaining_Tick(const uint32_t start, const uint32_t msec)
+	inline uint32_t Remaining_Tick(const uint32_t start, const uint32_t msec)
 	{
 		const uint32_t now = HAL_GetTick();
 		return Elapsed_Tick(start, now, msec) ? 0 : (msec - (now - start));

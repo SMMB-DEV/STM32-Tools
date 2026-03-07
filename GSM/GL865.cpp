@@ -31,17 +31,6 @@ bool GL865::NetworkWait(const uint32_t timeout)
 	return false;
 }
 
-GL865::ErrorCode GL865::Call(strv number, const uint32_t timeout)
-{
-	LOG_D<lg>("Calling %.*s...\n", number.size(), number.data());
-	return SingleToken(timeout, CommandType::Execute, "D"sv, "OK"sv, false, "%.*s;", number.size(), number.data());
-}
-
-GL865::ErrorCode GL865::HangUp()
-{
-	return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "H"sv);
-}
-
 GL865::ErrorCode GL865::FTPOpen(strv address, strv user, strv pass)
 {
 	return SingleToken<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "OK"sv, false, "%.*s,%.*s,%.*s,1", address.length(), address.data(), user.length(), user.data(), pass.length(), pass.data());

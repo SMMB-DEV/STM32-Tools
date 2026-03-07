@@ -74,7 +74,7 @@ class GL865 : public STM32T::GSM<100, 16, 50, 4>
 			"+CGDCONT=3,\"IP\",\"rightel\";"		// ",\"0.0.0.0\";"
 			"#SCFGEXT=1,0,1,0,0,1;"					// <conneId>,<srMode>,<recvDataMode>,<keepalive>[,<ListenAutoRsp>[,<sendDataMode>]]
 			"#SCFGEXT=2,0,1,0,0,1;"
-			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;"
+			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;#DIALMODE=1;"
 			"+CSAS;#SLEDSAV;&W"sv;
 		
 		// The first time might fail due to echo still being enabled, but the next tries should succeed.
@@ -170,7 +170,7 @@ public:
 		}, "1,\"%.*s\"", ussd.size(), ussd.data());
 	}
 	
-	ErrorCode SMSend(strv number, const wstrv *msgs, const size_t msg_count)
+	ErrorCode SMSend(strv number, const wstrv *msgs, const size_t msg_count, const uint32_t timeout = 60'000)
 	{
 		static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
 		
@@ -188,7 +188,8 @@ public:
 			buf[3] = H2C(number[i]);
 		}
 		
-		ErrorCode code = SingleToken(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4}, "> "sv, true);
+		const uint32_t start = HAL_GetTick();
+		ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4});
 		if (code != OK)
 		{
 			SendUART(ESC);
@@ -210,7 +211,7 @@ public:
 		
 		// \r\n+CMGS: 255\r\n\r\nOK\r\n
 		uint8_t n;
-		ErrorCode res = ResponseToken(60'000, CommandType::Bare, "+CMGS"sv, CTRL_Z, [&n](strv token) -> ErrorCode
+		ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv, CTRL_Z, [&n](strv token) -> ErrorCode
 		{
 			return sscanf(token.data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT;
 		});
@@ -223,18 +224,26 @@ public:
 		return res;
 	}
 	
-	ErrorCode SMSend(strv number, std::initializer_list<wstrv> msgs)
+	ErrorCode SMSend(strv number, std::initializer_list<wstrv> msgs, const uint32_t timeout = 60'000)
 	{
-		return SMSend(number, msgs.begin(), msgs.size());
+		return SMSend(number, msgs.begin(), msgs.size(), timeout);
 	}
 	
-	ErrorCode SMSend(strv number, wstrv msg)
+	ErrorCode SMSend(strv number, wstrv msg, const uint32_t timeout = 60'000)
 	{
-		return SMSend(number, &msg, 1);
+		return SMSend(number, &msg, 1, timeout);
 	}
 	
-	ErrorCode Call(strv number, const uint32_t timeout = 30'000);
-	ErrorCode HangUp();
+	ErrorCode Call(strv number, const uint32_t timeout = 30'000)
+	{
+		LOG_D<lg>("Calling %.*s...\n", number.size(), number.data());
+		return SingleToken(timeout, CommandType::Execute, "D"sv, "OK"sv, false, "%.*s;", number.size(), number.data());
+	}
+	
+	ErrorCode HangUp(const uint32_t timeout = 30'000)
+	{
+		return SingleToken(timeout, CommandType::Execute, "H"sv);
+	}
 	
 	/**
 	* @param rssi - Signal strength in dbm. Not vailable if positive or zero.
@@ -346,7 +355,7 @@ public:
 		if (data.size() > 1500 || conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID)
 			return INVALID;
 		
-		ErrorCode code = SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SSEND"sv, "> "sv, true, "%hhu", conn_id);
+		ErrorCode code = WaitForReady(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SSEND"sv, "%hhu", conn_id);
 		if (code != OK)
 		{
 			SendUART(ESC);

@@ -247,6 +247,28 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			return ret;
 		}
 		
+		/**
+		* @note Calls va_end()
+		*/
+		std::pair<int16_t, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
+		{
+			if (!fmt)
+				return {INVALID, nullptr};
+			
+			auto buf = std::make_unique<char[]>(arg_len);
+			
+			const int len = vsnprintf(buf.get(), arg_len, fmt, args);
+			va_end(args);
+			
+			if (len < 0)
+				return {FAIL, nullptr};
+			
+			if (len >= arg_len)
+				return {BIG_PARAM, nullptr};
+			
+			return {len, std::move(buf)};
+		}
+		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const strv args = strv())
 		{
@@ -363,6 +385,23 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen), token, allowSingleEnded);
 		}
 		
+		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv())
+		{
+			return SingleToken(timeout, type, cmd, args, "> "sv, true);
+		}
+		
+		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const char *fmt, ...)
+		{
+			va_list args;
+			va_start(args, fmt);
+			auto [len, buf] = FormatArgsDyn(fmt, args);
+			
+			if (len < OK)
+				return ErrorCode(len);
+			
+			return WaitForReady(timeout, type, cmd, {buf.get(), size_t(len)});
+		}
+		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
 			const func<ErrorCode (vec<strv>&)>& op)
@@ -464,7 +503,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
 			bool done = false;
-			const uint32_t start = HAL_GetTick() + SEND_GUARD_TIME;
+			const uint32_t start = HAL_GetTick();	// todo: handle send guard time
 			
 			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
 			{
