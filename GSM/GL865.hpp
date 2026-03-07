@@ -10,6 +10,10 @@ using STM32T::strv;
 using STM32T::wstrv;
 using std::operator"" sv;
 
+#ifdef GL865_IWDG_TIMEOUT
+extern "C" IWDG_HandleTypeDef hiwdg;
+#endif	// GL865_IWDG_TIMEOUT
+
 
 
 class GL865 : public STM32T::GSM<100, 16, 50, 4>
@@ -43,12 +47,36 @@ class GL865 : public STM32T::GSM<100, 16, 50, 4>
 	int16_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) override
 	{
 		const uint32_t start = HAL_GetTick();
-		const uint16_t orig_len = len;
 		
 		__HAL_UART_CLEAR_OREFLAG(p_huart);
-		HAL_StatusTypeDef stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, timeout);
-		if (stat != HAL_OK)
-			return stat == HAL_TIMEOUT ? TIMEOUT : UART_ERR;
+		HAL_StatusTypeDef stat = HAL_TIMEOUT;
+		
+		#ifdef GL865_IWDG_TIMEOUT
+		while (1)
+		{
+			HAL_IWDG_Refresh(&hiwdg);
+			
+			if (stat == HAL_OK)
+				goto ok;
+			else if (stat != HAL_TIMEOUT)
+				break;
+			
+			const uint32_t t = std::min(STM32T::Time::Remaining_Tick(start, timeout), (GL865_IWDG_TIMEOUT));
+			if (!t)
+				break;
+			
+			stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, t);
+		}
+		#else
+		stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, timeout);
+		if (stat == HAL_OK)
+			goto ok;
+		#endif	// GL865_IWDG_TIMEOUT
+		
+		return stat == HAL_TIMEOUT ? TIMEOUT : UART_ERR;
+		
+	ok:
+		const uint16_t orig_len = len;
 		
 		for (uint16_t i = 1; i < len; i++)
 		{
@@ -61,7 +89,6 @@ class GL865 : public STM32T::GSM<100, 16, 50, 4>
 		}
 		
 		return orig_len;
-		
 	}
 	
 	ErrorCode Setup(const uint32_t timeout_ms = 1000)
