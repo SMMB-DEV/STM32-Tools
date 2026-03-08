@@ -59,12 +59,9 @@ namespace STM32T
 	
 	inline constexpr char H2C(uint8_t x)
 	{
-		constexpr char CHARS[16] =
-		{
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-		};
+		constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 		
-		return CHARS[x & 0xF];
+		return CHARS[x & 0x0F];
 	}
 	
 	inline constexpr char C2H(uint8_t ch)
@@ -246,26 +243,33 @@ namespace STM32T
 	template <typename T, T MIN, T MAX>
 	class ClampedInt
 	{
+		static_assert(is_int_v<T> && MAX > MIN);
+		
 		T m_val;
 		
 	public:
+		[[deprecated("Use VAL_MIN and VAL_MAX instead.")]]
 		static constexpr T val_min = MIN, val_max = MAX;
-		static constexpr uintmax_t RANGE = MAX - MIN;
-		static_assert(is_int_v<T> && MAX > MIN);
 		
+		[[deprecated("Use IS_UNLIMITED instead.")]]
 		static constexpr bool is_unlimited = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
+		
+		static constexpr T VAL_MIN = MIN, VAL_MAX = MAX;
+		static constexpr uintmax_t RANGE = MAX - MIN;
+		static constexpr bool IS_UNLIMITED = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
 		
 		
 		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
 		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
 		
-		operator T() const volatile { return m_val; }
+		T val() const { return m_val; }
 		
-		T val() { return m_val; }
+		operator T() const { return m_val; }
+		operator T() const volatile { return m_val; }
 		
 		ClampedInt& operator=(const T val)
 		{
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val = val;
 			else
 				m_val = std::clamp(val, MIN, MAX);
@@ -289,7 +293,7 @@ namespace STM32T
 		
 		ClampedInt& operator++()	// prefix
 		{
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val++;
 			else
 			{
@@ -304,7 +308,7 @@ namespace STM32T
 		
 		ClampedInt& operator--()	// prefix
 		{
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val--;
 			else
 			{
@@ -321,7 +325,7 @@ namespace STM32T
 		{
 			ClampedInt val = *this;
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val++;
 			else
 			{
@@ -338,7 +342,7 @@ namespace STM32T
 		{
 			ClampedInt val = *this;
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val--;
 			else
 			{
@@ -353,7 +357,7 @@ namespace STM32T
 		
 		volatile ClampedInt& operator++() volatile	// prefix
 		{
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val++;
 			else
 			{
@@ -368,7 +372,7 @@ namespace STM32T
 		
 		volatile ClampedInt& operator--() volatile	// prefix
 		{
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val--;
 			else
 			{
@@ -385,7 +389,7 @@ namespace STM32T
 		{
 			ClampedInt val = *this;
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val++;
 			else
 			{
@@ -402,7 +406,7 @@ namespace STM32T
 		{
 			ClampedInt val = *this;
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val--;
 			else
 			{
@@ -420,7 +424,7 @@ namespace STM32T
 		{
 			static_assert(is_int_v<A>);
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val += add;
 			else
 			{
@@ -461,7 +465,7 @@ namespace STM32T
 		{
 			static_assert(is_int_v<A>);
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val -= sub;
 			else
 			{
@@ -502,7 +506,7 @@ namespace STM32T
 		{
 			static_assert(is_int_v<A>);
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val += add;
 			else
 			{
@@ -543,7 +547,7 @@ namespace STM32T
 		{
 			static_assert(is_int_v<A>);
 			
-			if constexpr (is_unlimited)
+			if constexpr (IS_UNLIMITED)
 				m_val -= sub;
 			else
 			{
@@ -585,13 +589,8 @@ namespace STM32T
 	{
 		static_assert(is_int_v<T>);
 		
-		T m_min, m_max;
-		
-	public:
-		const uintmax_t range;
-		
-	private:
-		T m_val;
+		uintmax_t m_range;
+		T m_min, m_max, m_val;
 		
 	public:
 		bool IsUnlimited()
@@ -601,11 +600,12 @@ namespace STM32T
 		
 		
 		DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
-		DynClampedInt(const T val, const T min, const T max) : m_min(min), m_max(max), range(max - min), m_val(std::clamp(val, min, max)) {}
+		DynClampedInt(const T val, const T min, const T max) : m_range(max - min), m_min(min), m_max(max), m_val(std::clamp(val, min, max)) {}
 		
+		T val() const { return m_val; }
+		
+		operator T() const { return m_val; }
 		operator T() const volatile { return m_val; }
-		
-		T val() { return m_val; }
 		
 		DynClampedInt& operator=(const T val)
 		{
@@ -726,7 +726,7 @@ namespace STM32T
 			{
 				if (add >= 0)
 				{
-					add %= range + 1;
+					add %= m_range + 1;
 					
 					const uintmax_t rem = m_max - m_val;	// always <= RANGE
 					if (add > rem)
@@ -740,7 +740,7 @@ namespace STM32T
 				else
 				{
 					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= range + 1;
+					add_pos %= m_range + 1;
 					
 					const uintmax_t rem = m_val - m_min;
 					if (add_pos > rem)
@@ -767,7 +767,7 @@ namespace STM32T
 			{
 				if (sub >= 0)
 				{
-					sub %= range + 1;
+					sub %= m_range + 1;
 					
 					const uintmax_t rem = m_val - m_min;	// always <= RANGE
 					if (sub > rem)
@@ -781,7 +781,7 @@ namespace STM32T
 				else
 				{
 					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= range + 1;
+					sub_pos %= m_range + 1;
 					
 					const uintmax_t rem = m_max - m_val;
 					if (sub_pos > rem)
@@ -808,7 +808,7 @@ namespace STM32T
 			{
 				if (add >= 0)
 				{
-					add %= range + 1;
+					add %= m_range + 1;
 					
 					const uintmax_t rem = m_max - m_val;	// always <= RANGE
 					if (add > rem)
@@ -822,7 +822,7 @@ namespace STM32T
 				else
 				{
 					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= range + 1;
+					add_pos %= m_range + 1;
 					
 					const uintmax_t rem = m_val - m_min;
 					if (add_pos > rem)
@@ -849,7 +849,7 @@ namespace STM32T
 			{
 				if (sub >= 0)
 				{
-					sub %= range + 1;
+					sub %= m_range + 1;
 					
 					const uintmax_t rem = m_val - m_min;	// always <= RANGE
 					if (sub > rem)
@@ -863,7 +863,7 @@ namespace STM32T
 				else
 				{
 					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= range + 1;
+					sub_pos %= m_range + 1;
 					
 					const uintmax_t rem = m_max - m_val;
 					if (sub_pos > rem)
@@ -882,6 +882,8 @@ namespace STM32T
 		void SetMax(T max)
 		{
 			m_max = max;
+			m_range = m_max - m_min;
+			
 			if (m_val > max)
 				m_val = max;
 		}
@@ -889,6 +891,8 @@ namespace STM32T
 		void SetMin(T min)
 		{
 			m_min = min;
+			m_range = m_max - m_min;
+			
 			if (m_val > min)
 				m_val = min;
 		}
@@ -1295,20 +1299,22 @@ namespace STM32T
 	}
 	
 	template <class F, class R, class... Args>
-	inline void Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, void (* const fail)(), Args&&... args)
+	inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, void (* const fail)(), Args&&... args)
 	{
 		if (_try(std::forward<Args>(args)...) == ok)
-			return;
+			return true;
 		
 		while (retry--)
 		{
 			HAL_Delay(delay_ms);
 			if (_try(std::forward<Args>(args)...) == ok)
-				return;
+				return true;
 		}
 		
 		if (fail)
 			fail();
+		
+		return false;
 	}
 
 	#define RETRY(_retry_count, _delay_ms, _try, _ok, _fail) \
