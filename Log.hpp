@@ -253,15 +253,15 @@ namespace STM32T::Log
 				
 				const char *const start = p++;
 				
-				char spec[16], flags[5 + 1], field_width[4 + 1], precision[4 + 1], modifier[2 + 1];
+				char flags[5 + 1], field_width[3 + 1], precision[3 + 1], modifier[2 + 1], spec[13 + 1];
 				
 				if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
 					return;
 				
-				if (!extract_conv_spec("0123456789*", field_width, sizeof(field_width), p))
+				if (!extract_conv_spec("*0123456789", field_width, sizeof(field_width), p))
 					return;
 				
-				if (!extract_conv_spec(".0123456789*", precision, sizeof(precision), p))
+				if (!extract_conv_spec(".*0123456789", precision, sizeof(precision), p))
 					return;
 				
 				if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
@@ -272,29 +272,17 @@ namespace STM32T::Log
 				fmt = p + 1;
 				
 				int field_width_val;
-				bool field_width_present;
-				if ((field_width_present = strcmp(field_width, "*") == 0))
+				const bool has_field_width = strcmp(field_width, "*") == 0;
+				if (has_field_width)
 					field_width_val = va_arg(args, int);
 				
 				int precision_val;
-				bool precision_present;
-				if ((precision_present = strcmp(precision, ".*") == 0))
+				const bool has_precision = strcmp(precision, ".*") == 0;
+				if (has_precision)
 					precision_val = va_arg(args, int);
 				
 				char var[64];
 				int n = 0;
-				
-				auto format = [&]<typename T>()
-				{
-					if (field_width_present && precision_present)
-						n = snprintf(var, sizeof(var), spec, field_width_val, precision_val, va_arg(args, T));
-					else if (field_width_present)
-						n = snprintf(var, sizeof(var), spec, field_width_val, va_arg(args, T));
-					else if (precision_present)
-						n = snprintf(var, sizeof(var), spec, precision_val, va_arg(args, T));
-					else
-						n = snprintf(var, sizeof(var), spec, va_arg(args, T));
-				};
 				
 				// todo: check ll, etc.
 				switch (*p)
@@ -302,17 +290,17 @@ namespace STM32T::Log
 					case 'd': case 'i':
 					{
 						if (strcmp(modifier, "l") == 0)
-							format.template operator()<long>();
+							n = format<long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "ll") == 0)
-							format.template operator()<long long>();
+							n = format<long long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "j") == 0)
-							format.template operator()<intmax_t>();
+							n = format<intmax_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "z") == 0)
-							format.template operator()<std::make_signed<size_t>>();
+							n = format<std::make_signed<size_t>>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "t") == 0)
-							format.template operator()<ptrdiff_t>();
+							n = format<ptrdiff_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else
-							format.template operator()<int>();
+							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						
 						break;
 					}
@@ -320,17 +308,17 @@ namespace STM32T::Log
 					case 'u': case 'x': case 'X': case 'o':
 					{
 						if (strcmp(modifier, "l") == 0)
-							format.template operator()<unsigned long>();
+							n = format<unsigned long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "ll") == 0)
-							format.template operator()<unsigned long long>();
+							n = format<unsigned long long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "j") == 0)
-							format.template operator()<uintmax_t>();
+							n = format<uintmax_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "z") == 0)
-							format.template operator()<size_t>();
+							n = format<size_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else if (strcmp(modifier, "t") == 0)
-							format.template operator()<std::make_unsigned<ptrdiff_t>>();
+							n = format<std::make_unsigned<ptrdiff_t>>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else
-							format.template operator()<unsigned int>();
+							n = format<unsigned int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						
 						break;
 					}
@@ -338,9 +326,9 @@ namespace STM32T::Log
 					case 'f': case 'F': case 'g': case 'G': case 'e': case 'E': case 'a': case 'A':
 					{
 						if (strcmp(modifier, "L") == 0)
-							format.template operator()<long double>();
+							n = format<long double>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else
-							format.template operator()<double>();
+							n = format<double>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						
 						break;
 					}
@@ -348,9 +336,9 @@ namespace STM32T::Log
 					case 'c':
 					{
 						if (strcmp(modifier, "l") == 0)
-							format.template operator()<wint_t>();
+							n = format<wint_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else
-							format.template operator()<int>();
+							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						
 						break;
 					}
@@ -358,16 +346,16 @@ namespace STM32T::Log
 					case 's':
 					{
 						if (strcmp(modifier, "l") == 0)
-							format.template operator()<const wchar_t *>();
+							n = format<const wchar_t *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						else
-							format.template operator()<const char *>();
+							n = format<const char *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						
 						break;
 					}
 					
 					case 'p':
 					{
-						format.template operator()<void *>();
+						n = format<void *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						break;
 					}
 					
@@ -476,6 +464,20 @@ namespace STM32T::Log
 			*spec = '\0';
 			
 			return *p != '\0';
+		}
+		
+		template <typename T>
+		static int format(char *const var, const size_t var_len, const char *const spec, const bool has_field_width, const bool has_precision,
+			const int field_width, const int precision, va_list& args)
+		{
+			if (has_field_width && has_precision)
+				return snprintf(var, var_len, spec, field_width, precision, va_arg(args, T));
+			else if (has_field_width)
+				return snprintf(var, var_len, spec, field_width, va_arg(args, T));
+			else if (has_precision)
+				return snprintf(var, var_len, spec, precision, va_arg(args, T));
+			else
+				return snprintf(var, var_len, spec, va_arg(args, T));
 		}
 	};
 	
@@ -609,7 +611,7 @@ namespace STM32T::Log
 	template <auto& logger = g_defaultLogger>
 	inline void Startup()
 	{
-		DoIfEnabled([]()
+		if constexpr (logger.isEnabled())
 		{
 			LOG_N<logger>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
 			
@@ -645,7 +647,7 @@ namespace STM32T::Log
 				LOG_N<logger>(" Low Power |");
 			
 			LOG_N<logger>("\n\n");
-		});
+		}
 	}
 }
 
