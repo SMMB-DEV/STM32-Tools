@@ -1122,7 +1122,11 @@ namespace STM32T
 			parent::push_back(t);
 		}
 		
-		std::optional<T> pop_front()
+		/**
+		* @param filter - Should return an optional pair of bools indicating which of the two items should be removed.
+		*					If it returns nothing, the search is canceled and the first item is returned, otherwise the search continues.
+		*/
+		std::optional<T> pop_front(const func<std::optional<std::pair<bool, bool>> (const T&, const T&)>& filter = nullptr)
 		{
 			const index_t back = m_back, front = m_front;	// For fewer volatile accesses
 			
@@ -1140,8 +1144,39 @@ namespace STM32T
 			
 			if (!max_prio)
 			{
-				m_front = back;
+				m_front = back;		// Can't call clear(). m_back might have changed.
 				return std::nullopt;
+			}
+			
+			if (filter && prio_index != back)
+			{
+				index_t i = prio_index;
+				++i;
+				
+				for (; i != back; ++i)
+				{
+					if (m_prio[i] == max_prio)
+					{
+						const auto opt = filter(m_items[prio_index], m_items[i]);
+						if (!opt)
+							break;
+						
+						const auto [rem_first, rem_second] = *opt;
+						
+						if (rem_first && rem_second)
+						{
+							m_prio[prio_index] = m_prio[i] = 0;
+							return pop_front(filter);
+						}
+						else if (rem_first)
+						{
+							m_prio[prio_index] = 0;
+							prio_index = i;
+						}
+						else if (rem_second)
+							m_prio[i] = 0;
+					}
+				}
 			}
 			
 			
