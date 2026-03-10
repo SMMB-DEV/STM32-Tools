@@ -108,8 +108,6 @@ namespace STM32T
 		
 		void tokenize2(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded) const
 		{
-			// Assuming view is null-terminated.
-			
 			bstrv view = *this;
 			const const_pointer start = view.data();
 			
@@ -162,8 +160,6 @@ namespace STM32T
 		
 		void tokenize2(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded) const
 		{
-			// note: Assuming view is null-terminated.
-			
 			bstrv view = *this;
 			const const_pointer start = view.data();
 			
@@ -220,8 +216,6 @@ namespace STM32T
 		
 		void tokenize2(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded) const
 		{
-			// note: Assuming view is null-terminated.
-			
 			bstrv view = *this;
 			const const_pointer start = view.data();
 			

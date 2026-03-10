@@ -273,11 +273,9 @@ namespace STM32T::Log
 				if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
 					return;
 				
-				const char format_spec = *p++;
-				fmt = p;
-				
-				memcpy(spec, start, p - start);
-				spec[p - start] = '\0';
+				memcpy(spec, start, p + 1 - start);
+				spec[p + 1 - start] = '\0';
+				fmt = p + 1;
 				
 				int field_width_val;
 				const bool has_field_width = strcmp(field_width, "*") == 0;
@@ -293,7 +291,7 @@ namespace STM32T::Log
 				int n = 0;
 				
 				// todo: check ll, etc.
-				switch (format_spec)
+				switch (*p)
 				{
 					case 'd': case 'i':
 					{

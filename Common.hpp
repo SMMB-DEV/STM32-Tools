@@ -1029,7 +1029,7 @@ namespace STM32T
 			if (pos >= m_size)
 				return false;
 			
-			container * volatile *current = &p_list;
+			container **current = &p_list;
 			
 			for (size_t i = 0; i < pos; ++i)
 				current = &((*current)->p_next);

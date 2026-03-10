@@ -15,7 +15,7 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 
 
-class GL865 : public STM32T::GSM<100, 16, 50, 4>
+class GL865 : public STM32T::GSM<120, 16, 50, 4>
 {
 	static constexpr uint32_t MAX_DNS_TIME = 20'000;
 	

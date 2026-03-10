@@ -825,12 +825,6 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		
 		static inline This *s_this = nullptr;
 		
-	protected:
-		void addURC(const strv token)
-		{
-			m_urcs.push_back(URC{token});
-		}
-		
 		void startURC()
 		{
 			__HAL_UART_CLEAR_OREFLAG(p_huart);
@@ -841,11 +835,20 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		
 		void stopURC() { HAL_UART_DMAStop(p_huart); }
 		
+	protected:
+		void addURC(const strv token)
+		{
+			m_urcs.push_back(URC{token});
+		}
+		
 	public:
 		void EnableURC(bool enable = true)
 		{
 			if (enable)
 			{
+				if (m_urcEnabled)
+					return;
+				
 				s_this = this;
 				
 				HAL_UART_RegisterRxEventCallback(p_huart, [](UART_HandleTypeDef *huart, uint16_t size)
@@ -875,6 +878,9 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			}
 			else
 			{
+				if (!m_urcEnabled)
+					return;
+				
 				m_urcEnabled = false;
 				s_this = nullptr;
 				// todo: clear m_urcs?
@@ -886,20 +892,30 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		
 		/**
 		* @param handler - If it returns true, the urc will be removed and considered handled.
+		* @retval - The nummber of urcs handled.
 		*/
-		void HandleURCs(const func<bool (strv, uint32_t ts)>& handler)
+		size_t HandleURCs(const func<bool (strv, uint32_t ts)>& handler, const bool stop_when_handled = false)
 		{
 			if (!handler)
-				return;
+				return 0;
 			
+			size_t handled = 0;
 			auto it = m_urcs.begin();
 			while (it != m_urcs.end())
 			{
 				if (handler(*it, it->m_timestamp))
+				{
 					it = m_urcs.erase(it);
+					++handled;
+					
+					if (stop_when_handled)
+						return handled;
+				}
 				else
 					++it;
 			}
+			
+			return handled;
 		}
 		#else
 	protected:
