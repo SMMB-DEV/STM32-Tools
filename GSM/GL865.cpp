@@ -31,11 +31,6 @@ bool GL865::NetworkWait(const uint32_t timeout)
 	return false;
 }
 
-GL865::ErrorCode GL865::FTPOpen(strv address, strv user, strv pass)
-{
-	return SingleToken<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "OK"sv, false, "%.*s,%.*s,%.*s,1", address.length(), address.data(), user.length(), user.data(), pass.length(), pass.data());
-}
-
 GL865::ErrorCode GL865::FTPTimeout(uint32_t timeout)
 {
 	return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPTO"sv, "OK"sv, false, "%u", std::clamp(timeout / 100, 100u, 5000u));

@@ -251,11 +251,6 @@ public:
 		return SMSend(number, msgs.begin(), msgs.size(), timeout);
 	}
 	
-	ErrorCode SMSend(strv number, wstrv msg, const uint32_t timeout = 60'000)
-	{
-		return SMSend(number, &msg, 1, timeout);
-	}
-	
 	ErrorCode Call(strv number, const uint32_t timeout = 30'000)
 	{
 		LOG_D<lg>("Calling %.*s...\n", number.size(), number.data());
@@ -372,9 +367,13 @@ public:
 		}, true, "%hhu", conn_id);
 	}
 	
-	ErrorCode SocketSend(const uint8_t conn_id, strv data)
+	ErrorCode SocketSend(const uint8_t conn_id, const strv *data, size_t data_count)
 	{
-		if (data.size() > 1500 || conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID)
+		size_t total_len = 0;
+		for (size_t i = 0; i < data_count; i++)
+			total_len += data[i].size();
+		
+		if (total_len > 1500 || conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID)
 			return INVALID;
 		
 		ErrorCode code = WaitForReady(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SSEND"sv, "%hhu", conn_id);
@@ -384,17 +383,23 @@ public:
 			return code;
 		}
 		
-		for (char ch : data)
+		for (size_t i = 0; i < data_count; i++)
 		{
-			const char hi = STM32T::H2C(ch >> 4), lo = STM32T::H2C(ch & 0x0F);
-			
-			SendUART({&hi, 1});
-			SendUART({&lo, 1});
+			for (char ch : data[i])
+			{
+				const char chars[2] = {STM32T::H2C(ch >> 4), STM32T::H2C(ch & 0x0F)};
+				SendUART({chars, std::size(chars)});
+			}
 		}
 		
 		m_noSendWait = true;
 		
 		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
+	}
+	
+	ErrorCode SocketSend(const uint8_t conn_id, std::initializer_list<strv> data)
+	{
+		return SocketSend(conn_id, data.begin(), data.size());
 	}
 	
 	int16_t SocketRead(const uint8_t conn_id, char *const data, const uint16_t len, uint32_t timeout_ms = DEFAUL_RECEIVE_TIMEOUT)
@@ -442,7 +447,12 @@ public:
 		});
 	}
 	
-	ErrorCode FTPOpen(strv address, strv user, strv pass);
+	ErrorCode FTPOpen(strv host, uint16_t port, strv user, strv pass)
+	{
+		return SingleToken<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "OK"sv, false, "%.*s:%hu,%.*s,%.*s,1",
+			host.length(), host.data(), port, user.length(), user.data(), pass.length(), pass.data());
+	}
+	
 	ErrorCode FTPTimeout(uint32_t timeout);
 	ErrorCode FTPCWD(strv dir);
 	ErrorCode FTPType(bool ascii);
