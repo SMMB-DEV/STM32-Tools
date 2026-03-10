@@ -899,33 +899,102 @@ namespace STM32T
 	};
 	
 	/**
-	* @brief Useful for queuing work inside an ISR to be handled in the main loop. Has fast insertion and slow access and removal.
+	* @brief Similar to std::forward_list. Useful for queuing work inside an ISR to be handled in the main loop.
 	*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
-	* @note In very rare cases, it might lose some data. Do not use for critical information.
+	* @note In very rare cases, it might not be able to add items to the list. Do not use for critical information.
 	*/
-	template <class T, size_t MAX_SIZE = SIZE_MAX>
-	class linked_list
+	template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
+	class LinkedList
 	{
-		static_assert(MAX_SIZE > 0);
+		static_assert(MAX_SIZE > 0 && MAX_SIZE < SIZE_MAX);
 		
 		class container
 		{
-			friend class linked_list<T, MAX_SIZE>;
+			friend class LinkedList<T, MAX_SIZE>;
 			
-			container * volatile p_next = nullptr;
+			container *p_next = nullptr;
 			T m_val;
 			
 			container(const T& val) : m_val(val) {}
-			container(T&& val) : m_val(val) {}
+			container(T&& val) : m_val(std::move(val)) {}
 		};
 		
-		container * volatile p_list = nullptr;
-		volatile size_t m_size = 0;
-		volatile bool popping = false;
+		container *p_list = nullptr;
+		size_t m_size = 0;
+		volatile size_t removing = SIZE_MAX;
+		
+		container ** find_end()
+		{
+			if (full())
+				return nullptr;
+			
+			if (m_size && removing == m_size - 1)	// fixme
+				return nullptr;
+			
+			container **end = &p_list;
+			
+			while (*end)	// Not relying on m_size because it might not be in sync with p_list.
+				end = &((*end)->p_next);
+			
+			return end;
+		}
 		
 	public:
-		linked_list() {}
-		~linked_list()
+		template <typename U>
+		class _iterator
+		{
+			friend class LinkedList<T, MAX_SIZE>;
+			
+			container* m_con;
+			size_t m_index;
+			
+			_iterator() : m_con(nullptr), m_index(SIZE_MAX) {}
+			_iterator(container *p, size_t index) : m_con(p), m_index(index) {}
+			
+		public:
+			_iterator(const _iterator<std::remove_const<U>>& other) : m_con(other.m_con), m_index(other.m_index) {}
+			
+			~_iterator() {}
+			
+			//using difference_type = std::ptrdiff_t;
+			using value_type = U;
+			using reference = U&;
+			using pointer = U*;
+			//using iterator_category = std::forward_iterator_tag;
+			
+			reference operator*() const
+			{
+				return m_con->m_val;
+			}
+			
+			pointer operator->() const
+			{
+				return &m_con->m_val;
+			}
+			
+			_iterator& operator++()
+			{
+				m_con = m_con->p_next;
+				++m_index;
+				return *this;
+			}
+			
+			_iterator operator++(int)
+			{
+				auto tmp = *this;
+				++*this;
+				return tmp;
+			}
+			
+			bool operator==(const _iterator& other) const { return m_con == other.m_con; }
+			bool operator!=(const _iterator& other) const { return !operator==(other); }
+		};
+		
+		using iterator = _iterator<T>;
+		using const_iterator = _iterator<const T>;
+		
+		LinkedList() {}
+		~LinkedList()
 		{
 			while (pop_front());
 		}
@@ -936,27 +1005,75 @@ namespace STM32T
 		T& front() const { return p_list->m_val; }
 		
 		bool empty() const { return !m_size; }
-		
 		bool full() const { return m_size >= MAX_SIZE; }
+		size_t size() const { return m_size; }
+		
+		iterator begin() noexcept { return iterator(p_list, 0); }
+		const_iterator begin() const noexcept { return const_iterator(p_list, 0); }
+		const_iterator cbegin() const noexcept { return const_iterator(p_list, 0); }
+		
+		iterator end() noexcept { return iterator(); }
+		const_iterator end() const noexcept { return const_iterator(); }
+		const_iterator cend() const noexcept { return const_iterator(); }
 		
 		/**
 		* @brief Meant to be called from the main loop.
 		*/
 		bool pop_front()
 		{
-			if (empty())
+			return erase(0);
+		}
+		
+		bool erase(const size_t pos)
+		{
+			if (pos >= m_size)
 				return false;
 			
-			container *current = p_list;
+			container * volatile *current = &p_list;
 			
-			popping = true;
-			p_list = p_list->p_next;
-			popping = false;
+			for (size_t i = 0; i < pos; ++i)
+				current = &((*current)->p_next);
 			
-			m_size--;
-			delete current;
+			container *elem = *current;
+			
+			removing = pos;
+			*current = (*current)->p_next;
+			removing = SIZE_MAX;
+			
+			--m_size;
+			delete elem;
 			
 			return true;
+		}
+		
+		iterator erase_after(const_iterator iter)
+		{
+			container *elem = iter->p_next;
+			
+			removing = iter.m_index + 1;
+			iter->p_next = elem->p_next;
+			removing = SIZE_MAX;
+			
+			--m_size;
+			delete elem;
+			
+			return ++iter;
+		}
+		
+		iterator erase(const_iterator iter)
+		{
+			const size_t index = iter.m_index;
+			++iter;
+			erase(index);
+			return iter;
+		}
+		
+		iterator erase(iterator iter)	// todo: should be const_iterator
+		{
+			const size_t index = iter.m_index;
+			++iter;
+			erase(index);
+			return iter;
 		}
 		
 		/**
@@ -964,22 +1081,45 @@ namespace STM32T
 		* @note Don't call this from multiple ISRs with different priorities.
 		*/
 		template <class... Args>
-		void emplace_back(Args&&... args)
+		bool emplace_back(Args&&... args)
 		{
-			if (full())
-				return;
-			
-			if (m_size == 1 && popping && p_list != nullptr)	// fixme
-				return;
-			
-			container * volatile *end = &p_list;
-			
-			while (*end)	// Not relying on m_size because it might not be in sync with p_list.
-				end = &((*end)->p_next);
+			container **end = find_end();
+			if (!end)
+				return false;
 			
 			*end = new container(T{args...});
+			++m_size;
+			
+			return true;
+		}
+		
+		bool push_back(const T& t)
+		{
+			container **end = find_end();
+			if (!end)
+				return false;
+			
+			*end = new container(t);
+			++m_size;
+			
+			return true;
+		}
+		
+		bool push_back(T&& t)
+		{
+			container **end = find_end();
+			if (!end)
+				return false;
+			
+			*end = new container(std::move(t));
+			++m_size;
+			
+			return true;
 		}
 	};
+	
+	template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
+	using linked_list [[deprecated("Use LinkedList instead.")]] = LinkedList<T, MAX_SIZE>;
 	
 	template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
 	class StaticQueue
