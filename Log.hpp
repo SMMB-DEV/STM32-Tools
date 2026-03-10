@@ -201,6 +201,11 @@ namespace STM32T::Log
 			return Logger(level, name, outputs, timestamp);
 		}
 		
+		constexpr Logger Clone() const
+		{
+			return Logger(level, name, outputs, timestamp);
+		}
+		
 		constexpr bool isEnabled() const
 		{
 			return level > Level::None;
@@ -253,7 +258,8 @@ namespace STM32T::Log
 				
 				const char *const start = p++;
 				
-				char flags[5 + 1], field_width[3 + 1], precision[3 + 1], modifier[2 + 1], spec[13 + 1];
+				char flags[5 + 1], field_width[2 + 1], precision[3 + 1], modifier[2 + 1],
+					spec[std::size(flags) - 1 + std::size(field_width) - 1 + std::size(precision) - 1 + std::size(modifier) - 1 + 1 + 1];
 				
 				if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
 					return;
@@ -267,9 +273,11 @@ namespace STM32T::Log
 				if (!extract_conv_spec("hlLzjt", modifier, sizeof(modifier), p))
 					return;
 				
-				memcpy(spec, start, p - start + 1);
-				spec[p - start + 1] = '\0';
-				fmt = p + 1;
+				const char format_spec = *p++;
+				fmt = p;
+				
+				memcpy(spec, start, p - start);
+				spec[p - start] = '\0';
 				
 				int field_width_val;
 				const bool has_field_width = strcmp(field_width, "*") == 0;
@@ -281,11 +289,11 @@ namespace STM32T::Log
 				if (has_precision)
 					precision_val = va_arg(args, int);
 				
-				char var[64];
+				char var[100];
 				int n = 0;
 				
 				// todo: check ll, etc.
-				switch (*p)
+				switch (format_spec)
 				{
 					case 'd': case 'i':
 					{
@@ -355,6 +363,9 @@ namespace STM32T::Log
 					
 					case 'p':
 					{
+						if (strcmp(spec, "%p") != 0)	// must match
+							return;
+						
 						n = format<void *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
 						break;
 					}
@@ -383,7 +394,7 @@ namespace STM32T::Log
 					
 					case '%':
 					{
-						if (spec[0] != '\0') // must be empty
+						if (strcmp(spec, "%%") != 0)	// must match
 							return;
 						
 						dispatch_chunk("%", 1);
@@ -401,7 +412,7 @@ namespace STM32T::Log
 				dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
 				written += std::min((size_t)n, sizeof(var) - 1);
 				
-				if (n > sizeof(var) - 1)
+				if (n >= sizeof(var))
 				{
 					dispatch_chunk("..."sv);
 					written += 3;
