@@ -10,9 +10,6 @@
 
 
 
-/* The module's echo option must be disabled before using this library. To do this:
-Send "ATE0&W\r" to the module via the serial port.*/
-
 class SIM800x : public STM32T::GSM
 {
 private:
@@ -36,34 +33,6 @@ private:
 		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 239
 		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	};
-	
-	struct ListItem
-	{
-		ListItem* next = nullptr;
-		char* data;
-		const uint32_t timestamp;
-		const uint16_t size;
-		const bool tokenized;
-		
-		ListItem(const char* data, const uint16_t size, const bool tokenized = false) : timestamp(HAL_GetTick()), size(size + 1), tokenized(tokenized)
-		{
-			memcpy(this->data = new char[this->size], data, size);
-			this->data[size] = '\0';
-		}
-		
-		~ListItem()
-		{
-			delete[] data;
-		}
-		
-		explicit operator strv()
-		{
-			return strv((char*)data, size);
-		}
-	};
-	
-	volatile uint8_t Buffer[512];
-	ListItem* volatile List = nullptr;
 	
 public:
 	struct DateTime
@@ -108,65 +77,9 @@ public:
 
 	SIM800x(UART_HandleTypeDef* UART) : GSM(UART) {}
 	
-	
-	void handleURCs(void (* const handler)(URC urc));
-	
-	HAL_StatusTypeDef receiveURC()
-	{
-		// FOR SOME FUCKING REASON, (SOMETIMES) IT WON'T WORK WITHOUT THIS!!!
-		
-		//__HAL_UART_DISABLE(phuart);
-		//__HAL_UART_ENABLE(phuart);	//clears USART_ISR
-		__HAL_UART_CLEAR_FLAG(p_huart, UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
-		//__HAL_UART_CLEAR_FLAG(phuart, UART_CLEAR_OREF);
-		//__HAL_UART_CLEAR_FLAG(phuart, 0xFFFFFFFF);
-		//HAL_UART_Init(phuart);
-		
-		HAL_StatusTypeDef stat = HAL_UARTEx_ReceiveToIdle_DMA(p_huart, (uint8_t*)Buffer, sizeof(Buffer) - 1);	// null termination in ListItem
-		__HAL_DMA_DISABLE_IT(p_huart->hdmarx, DMA_IT_HT);	//Disable half transfer interrupt; It is enabled in HAL_UARTEx_ReceiveToIdle_DMA()
-		
-		return stat;
-	}
-	
-	HAL_StatusTypeDef cancelURC() __attribute__((always_inline))
-	{
-		return HAL_UART_DMAStop(p_huart);
-	}
-	
 private:
-	void addURC(const strv& token) override
-	{
-		if (List)
-		{
-			ListItem* end = List;
-			while (end->next)
-				end = end->next;
-			
-			end->next = new ListItem(token.data(), token.size(), true);
-		}
-		else
-			List = new ListItem(token.data(), token.size(), true);
-	}
 	
 public:
-	void newURC(const uint16_t Size, const bool receive = true)
-	{
-		if (List)
-		{
-			ListItem* end = List;
-			while (end->next)
-				end = end->next;
-			
-			end->next = new ListItem((char*)Buffer, Size);
-		}
-		else
-			List = new ListItem((char*)Buffer, Size);
-		
-		if (receive)
-			receiveURC();
-	}
-	
-	
 	ErrorCode Setup();
 	
 	ErrorCode GetSignalQuality(int8_t& rssi, uint8_t& ber, const uint32_t timeout = 15);

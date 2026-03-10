@@ -18,30 +18,7 @@
 
 
 
-/*void SIM800x::Power(bool p)
-{
-	if ((S_Port && Status() == p) || !P_Port)
-		return;
-	
-	HAL_GPIO_WritePin(P_Port, P_Pin, GPIO_PIN_SET);
-	HAL_Delay(2000);
-	HAL_GPIO_WritePin(P_Port, P_Pin, GPIO_PIN_RESET);
-}
-
-bool SIM800x::Status(void)
-{
-	if (S_Port==0)
-		return 0;
-	
-	return HAL_GPIO_ReadPin(S_Port, S_Pin);
-}
-
-uint8_t SIM800x::Net(void)
-{
-	return 0;
-}
-
-uint8_t STATUS(const char *a)
+/*uint8_t STATUS(const char *a)
 {
 	if (strncmp(a, "CONNECT OK", 10) == 0)
 		return 36;

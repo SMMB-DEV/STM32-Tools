@@ -4,16 +4,16 @@
 
 #include "../Common.hpp"
 #include "../strv.hpp"
+#include "../Log.hpp"
 
 #include <memory>	// unique_ptr
 #include <optional>
 
 
 
+#ifdef HAL_UART_MODULE_ENABLED
 namespace STM32T
 {
-#ifdef HAL_UART_MODULE_ENABLED
-
 #ifndef HAL_UART_TIMEOUT_VALUE
 #define HAL_UART_TIMEOUT_VALUE		(HAL_MAX_DELAY)
 #endif
@@ -40,7 +40,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t SEND_GUARD = 0, uint32_t SEND_DELAY = 0, size_t DEF_RESP_LEN = 64, size_t DEF_ARG_LEN = 64>
 	class GSM
 	{
-		uint32_t m_lastSend = 0;
+		using This = GSM<DEF_RX_TO, DEF_IDLE_TO, SEND_GUARD, SEND_DELAY, DEF_RESP_LEN, DEF_ARG_LEN>;
 		
 	public:
 		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15;
@@ -73,39 +73,30 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			CMS_CODE_100(1), CMS_CODE_100(2), CMS_CODE_100(3), CMS_CODE_100(4), CMS_CODE_100(5)	//, CMS_CODE_100(6), CMS_CODE_100(7), CMS_CODE_100(8), CMS_CODE_100(9)
 		};
 		
-		class URC : public strv
-		{
-		public:
-			uint32_t m_timestamp;
-			
-			URC() : strv(), m_timestamp(0) {}
-			URC(URC&& other) : strv(std::move((strv)other)), m_timestamp(other.m_timestamp) {}
-			
-			URC& operator=(URC&& other) &
-			{
-				(strv)*this = std::move((strv)other);
-				m_timestamp = other.m_timestamp;
-				
-				return *this;
-			}
-			
-			URC(const char* const data, const size_t size, const uint32_t timestamp) : strv(data, size), m_timestamp(timestamp) {}
-			URC(const strv& other, const uint32_t timestamp) : strv(other), m_timestamp(timestamp) {}
-		};
-		
 	protected:
+		static constexpr STM32T::Log::Logger lg = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
+		
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
 		static constexpr size_t DEFAULT_RESPONSE_LEN = DEF_RESP_LEN, DEFAULT_ARG_LEN = DEF_ARG_LEN;
 		
 		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv;
 		
 		
+		enum class CommandType : uint8_t
+		{
+			Test,		// AT+CMD=?\r
+			Read,		// AT+CMD?\r
+			Execute,	// AT+CMDARGS\r
+			Write,		// AT+CMD=ARGS\r
+			Bare		// ARGS
+		};
+		
+		
+		uint32_t m_lastSend = 0;
 		UART_HandleTypeDef* const p_huart;
-		bool m_noSendWait = false, m_noSendDelay = false;
+		bool m_urcEnabled = false, m_noSendWait = false, m_noSendDelay = false;
 		
 		
-		virtual void addURC(const strv token) = 0;
-	
 		void addURCs(const vec<strv>& tokens)
 		{
 			for (auto& token: tokens)
@@ -118,15 +109,6 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			buf.tokenize2("\r\n"sv, tokens, true);
 			addURCs(tokens);
 		}
-		
-		enum class CommandType : uint8_t
-		{
-			Test,		// AT+CMD=?\r
-			Read,		// AT+CMD?\r
-			Execute,	// AT+CMDARGS\r
-			Write,		// AT+CMD=ARGS\r
-			Bare		// ARGS
-		};
 		
 		void SendUART(strv data)
 		{
@@ -183,7 +165,14 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			if (buffer && len)
 			{
+				if (m_urcEnabled)
+					stopURC();
+				
 				int16_t len2 = ReceiveUART(buffer, len - 1, timeout, DEFAULT_IDLE_TIMEOUT);
+				
+				if (m_urcEnabled)
+					startURC();
+				
 				if (len2 < OK)
 					return ErrorCode(len2);
 				
@@ -548,10 +537,10 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			va_start(print_args, fmt);
 			
 			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
+			
 			if (argsLen < 0)
 				return INVALID_PARAM;
-			
-			va_end(print_args);
 			
 			if (argsLen >= sizeof(args))
 				return BIG_PARAM;
@@ -795,6 +784,132 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			return OK;
 		}
+		
+		#if USE_HAL_UART_REGISTER_CALLBACKS == 1
+	private:
+		class URC
+		{
+			friend class GSM<DEF_RX_TO, DEF_IDLE_TO, SEND_GUARD, SEND_DELAY, DEF_RESP_LEN, DEF_ARG_LEN>;
+			friend class LinkedList<URC, 64>;
+			
+			char *m_buf;
+			size_t m_size;
+			uint32_t m_timestamp;
+			
+			URC(const URC& other) = delete;
+			URC(URC&& other) : m_buf(other.m_buf), m_size(other.m_size), m_timestamp(other.m_timestamp)
+			{
+				other.m_buf = nullptr;
+				other.m_size = 0;
+			}
+			
+			~URC()
+			{
+				delete[] m_buf;
+				m_buf = nullptr;
+				m_size = 0;
+			}
+			
+			URC(const strv& urc) : URC(urc, HAL_GetTick()) {}
+			URC(const strv& urc, const uint32_t timestamp) : m_buf(new char[urc.size() + 1]), m_size(urc.size()), m_timestamp(timestamp)
+			{
+				memcpy(m_buf, urc.data(), m_size);
+				m_buf[m_size] = 0;
+			}
+			
+			operator strv() const { return {m_buf, m_size}; }
+		};
+		
+		uint8_t m_buf[256];
+		LinkedList<URC, 64> m_urcs;
+		
+		static inline This *s_this = nullptr;
+		
+	protected:
+		void addURC(const strv token)
+		{
+			m_urcs.push_back(URC{token});
+		}
+		
+		void startURC()
+		{
+			__HAL_UART_CLEAR_OREFLAG(p_huart);
+			
+			HAL_UARTEx_ReceiveToIdle_DMA(p_huart, m_buf, sizeof(m_buf));
+			__HAL_DMA_DISABLE_IT(p_huart->hdmarx, DMA_IT_HT);	//Disable half transfer interrupt if it is enabled in HAL_UARTEx_ReceiveToIdle_DMA()
+		}
+		
+		void stopURC() { HAL_UART_DMAStop(p_huart); }
+		
+	public:
+		void EnableURC(bool enable = true)
+		{
+			if (enable)
+			{
+				s_this = this;
+				
+				HAL_UART_RegisterRxEventCallback(p_huart, [](UART_HandleTypeDef *huart, uint16_t size)
+				{
+					if (!s_this)	// todo: find a better way
+						return;
+					
+					const Time::cycle_t start = Time::GetCycle();
+					
+					strv data = {reinterpret_cast<const char *>(huart->pRxBuffPtr), size};
+					data.tokenize2("\r\n"sv, [](const strv token) { s_this->addURC(token); }, false);
+					
+					const Time::cycle_t end = Time::GetCycle();
+					const auto time = Time::CyclesTo_us(end - start);
+					
+					static const Time::us_time_t MaxTime = 1'000'000u * 10u / huart->Init.BaudRate;		// Time of 1 byte
+					
+					if (time >= MaxTime)	// todo: Can't use lg directly (LOG_W<lg>)
+						lg.Clone().w("Rx event proccessing time (%u us) has exceeded maximum (%u us).\n", time, MaxTime);
+					
+					s_this->startURC();
+					
+				});
+				
+				startURC();
+				m_urcEnabled = true;
+			}
+			else
+			{
+				m_urcEnabled = false;
+				s_this = nullptr;
+				// todo: clear m_urcs?
+				
+				stopURC();
+				HAL_UART_UnRegisterRxEventCallback(p_huart);
+			}
+		}
+		
+		/**
+		* @param handler - If it returns true, the urc will be removed and considered handled.
+		*/
+		void HandleURCs(const func<bool (strv, uint32_t ts)>& handler)
+		{
+			if (!handler)
+				return;
+			
+			auto it = m_urcs.begin();
+			while (it != m_urcs.end())
+			{
+				if (handler(*it, it->m_timestamp))
+					it = m_urcs.erase(it);
+				else
+					++it;
+			}
+		}
+		#else
+	protected:
+		void addURC(const strv token) {}
+		void startURC() {}
+		void stopURC() {}
+		
+	public:
+		void EnableURC(bool enable = true) {}
+		#endif	// USE_HAL_UART_REGISTER_CALLBACKS == 1
 	};
-#endif	// HAL_UART_MODULE_ENABLED
 }
+#endif	// HAL_UART_MODULE_ENABLED

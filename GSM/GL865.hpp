@@ -2,7 +2,6 @@
 
 #include "./GSM.hpp"
 #include "../IO.hpp"
-#include "../Log.hpp"
 
 
 
@@ -18,8 +17,6 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 class GL865 : public STM32T::GSM<100, 16, 50, 4>
 {
-	static constexpr STM32T::Log::Logger lg = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
-	
 	static constexpr uint32_t MAX_DNS_TIME = 20'000;
 	
 	STM32T::IO m_pwr;
@@ -41,8 +38,6 @@ class GL865 : public STM32T::GSM<100, 16, 50, 4>
 		
 		return true;
 	}
-	
-	void addURC(const strv token) override {}
 	
 	int16_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) override
 	{
@@ -461,18 +456,18 @@ public:
 	
 	ErrorCode SIMCheck(uint8_t& status);
 	
-	void Init(const bool initial = false)
+	void Init(const bool enable_urc, const bool initial = false)
 	{
 		STM32T::Time::WaitAfter_Tick(m_lastPowerOff, 1500);
 		m_pwr.Set();
 		
 		HAL_UART_Init(p_huart);		// fixme: necessary?
+		EnableURC(enable_urc);
 		
 		if (initial)
 		{
 			HAL_Delay(5000 + 1000);
 			
-			using namespace std::placeholders;
 			STM32T::Retry(3, 1000, std::bind(&GL865::Setup, this, 1000), OK, Error_Handler);
 		}
 		
@@ -501,6 +496,8 @@ public:
 	
 	void PowerOff(const bool fast = false)
 	{
+		EnableURC(false);
+		
 		if (!fast && c_pwrMon.Read())
 		{
 			uint16_t x;
