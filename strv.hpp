@@ -341,7 +341,13 @@ namespace STM32T
 	using u32strv = bstrv<std::u32string_view::value_type>;
 	using wstrv = bstrv<std::wstring_view::value_type>;
 	
+	constexpr strv		operator ""_sv(const char* str, std::size_t len) noexcept		{ return strv(str, len); }
+	constexpr u16strv	operator ""_sv(const char16_t* str, std::size_t len) noexcept	{ return u16strv(str, len); }
+	constexpr u32strv	operator ""_sv(const char32_t* str, std::size_t len) noexcept	{ return u32strv(str, len); }
+	constexpr wstrv		operator ""_sv(const wchar_t* str, std::size_t len) noexcept	{ return wstrv(str, len); }
+	
 	#if __cplusplus >= 202002L
 	using u8strv = bstrv<std::u8string_view::value_type>;
+	constexpr u8strv	operator ""_sv(const char8_t* str, std::size_t len) noexcept 	{ return u8strv(str, len); }
 	#endif
 }
