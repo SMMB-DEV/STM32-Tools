@@ -1,9 +1,8 @@
 #pragma once
 
-//#define GSM_URC_SUPPORT
-
 #include "../Common.hpp"
 #include "../strv.hpp"
+#include "../span.hpp"
 #include "../Log.hpp"
 
 #include <memory>	// unique_ptr
@@ -11,30 +10,24 @@
 
 
 
+#ifdef STM32T_IWDG_TIMEOUT
+extern "C" IWDG_HandleTypeDef hiwdg;
+#endif	// STM32T_IWDG_TIMEOUT
+
+
+
 #ifdef HAL_UART_MODULE_ENABLED
 namespace STM32T
 {
-#ifndef HAL_UART_TIMEOUT_VALUE
-#define HAL_UART_TIMEOUT_VALUE		(HAL_MAX_DELAY)
-#endif
+#define CM_CODE(name, code)		name = -(code)
 
+#define CM_CODE_10(name, code)		CM_CODE(name##0, (code) * 10 + 0), CM_CODE(name##1, (code) * 10 + 1), \
+CM_CODE(name##2, (code) * 10 + 2), CM_CODE(name##3, (code) * 10 + 3), CM_CODE(name##4, (code) * 10 + 4), CM_CODE(name##5, (code) * 10 + 5), \
+CM_CODE(name##6, (code) * 10 + 6), CM_CODE(name##7, (code) * 10 + 7), CM_CODE(name##8, (code) * 10 + 8), CM_CODE(name##9, (code) * 10 + 9)
 
-#define CME_CODE(code)		CME_##code = -(1000 + code)
-
-#define CME_CODE_10(code)	CME_CODE(code##0), CME_CODE(code##1), CME_CODE(code##2), CME_CODE(code##3), CME_CODE(code##4), \
-CME_CODE(code##5), CME_CODE(code##6), CME_CODE(code##7), CME_CODE(code##8), CME_CODE(code##9)
-
-#define CME_CODE_100(code)	CME_CODE_10(code##0), CME_CODE_10(code##1), CME_CODE_10(code##2), CME_CODE_10(code##3), CME_CODE_10(code##4), \
-CME_CODE_10(code##5), CME_CODE_10(code##6), CME_CODE_10(code##7), CME_CODE_10(code##8), CME_CODE_10(code##9)
-
-	
-#define CMS_CODE(code)		CMS_##code = -(2000 + code)
-
-#define CMS_CODE_10(code)	CMS_CODE(code##0), CMS_CODE(code##1), CMS_CODE(code##2), CMS_CODE(code##3), CMS_CODE(code##4), \
-CMS_CODE(code##5), CMS_CODE(code##6), CMS_CODE(code##7), CMS_CODE(code##8), CMS_CODE(code##9)
-
-#define CMS_CODE_100(code)	CMS_CODE_10(code##0), CMS_CODE_10(code##1), CMS_CODE_10(code##2), CMS_CODE_10(code##3), CMS_CODE_10(code##4), \
-CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(code##8), CMS_CODE_10(code##9)
+#define CM_CODE_100(name, code)		CM_CODE_10(name##0, (code) * 10 + 0), CM_CODE_10(name##1, (code) * 10 + 1), \
+CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_CODE_10(name##4, (code) * 10 + 4), CM_CODE_10(name##5, (code) * 10 + 5), \
+CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
 
 
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t SEND_GUARD = 0, uint32_t SEND_DELAY = 0, size_t DEF_RESP_LEN = 64, size_t DEF_ARG_LEN = 64>
@@ -44,49 +37,50 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		
 	public:
 		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15;
+		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
 		
-		enum ErrorCode : int16_t
+		#ifdef HAL_UART_TIMEOUT_VALUE
+		static constexpr uint32_t DEFAUL_TRANSMIT_TIMEOUT = HAL_UART_TIMEOUT_VALUE;
+		#else
+		static constexpr uint32_t DEFAUL_TRANSMIT_TIMEOUT = (HAL_MAX_DELAY);
+		#endif
+		
+		enum ErrorCode : int32_t
 		{
 			OK				= +0,
-			INVALID_PARAM	= -1,
 			INVALID			= -1,
+			INVALID_PARAM	= INVALID,
 			UART_ERR		= -2,
 			TIMEOUT			= -3,
 			WRONG_FORMAT	= -4,	// In response
 			ERR				= -5,	// Failure on the module side
 			FAIL			= -6,	// Failure on the MCU side
-			BUF_FULL		= -7,	// todo: remove
 			BIG_PARAM		= -7,
-			ABORT			= -8,	// todo: remove?
-			UNKNOWN			= -9,
+			BUF_FULL		= -8,
+			ABORT			= -9,	// todo: remove?
+			UNKNOWN			= -10,
 			
+			// GL865
+			CM_CODE_100(CME_0, 10), CM_CODE_100(CME_1, 11),
+			CM_CODE_100(CME_5, 15), CM_CODE_100(CME_6, 16), CM_CODE_100(CME_7, 17), CM_CODE_100(CME_8, 18), CM_CODE_100(CME_9, 19),
 			
-			CME_CODE(0),
-			CME_CODE(1), CME_CODE(2), CME_CODE(3), CME_CODE(4), CME_CODE(5), CME_CODE(6), CME_CODE(7), CME_CODE(8), CME_CODE(9),
-			CME_CODE_10(1), CME_CODE_10(2), CME_CODE_10(3), CME_CODE_10(4), CME_CODE_10(5), CME_CODE_10(6), CME_CODE_10(7), CME_CODE_10(8), CME_CODE_10(9),
-			CME_CODE_100(1), CME_CODE_100(2), CME_CODE_100(3), CME_CODE_100(4), CME_CODE_100(5), CME_CODE_100(6), CME_CODE_100(7), CME_CODE_100(8), CME_CODE_100(9),
-			
-			
-			CMS_CODE(0),
-			CMS_CODE(1), CMS_CODE(2), CMS_CODE(3), CMS_CODE(4), CMS_CODE(5), CMS_CODE(6), CMS_CODE(7), CMS_CODE(8), CMS_CODE(9),
-			CMS_CODE_10(1), CMS_CODE_10(2), CMS_CODE_10(3), CMS_CODE_10(4), CMS_CODE_10(5), CMS_CODE_10(6), CMS_CODE_10(7), CMS_CODE_10(8), CMS_CODE_10(9),
-			CMS_CODE_100(1), CMS_CODE_100(2), CMS_CODE_100(3), CMS_CODE_100(4), CMS_CODE_100(5)	//, CMS_CODE_100(6), CMS_CODE_100(7), CMS_CODE_100(8), CMS_CODE_100(9)
+			CM_CODE_100(CMS_0, 20), CM_CODE_100(CMS_1, 21), CM_CODE_100(CMS_2, 22), CM_CODE_100(CMS_3, 23),
+			CM_CODE(CMS_500, 2500), CM_CODE(CMS_512, 2512),
 		};
 		
 	protected:
-		static constexpr STM32T::Log::Logger lg = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
+		static constexpr STM32T::Log::Logger LG = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
 		
-		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
 		static constexpr size_t DEFAULT_RESPONSE_LEN = DEF_RESP_LEN, DEFAULT_ARG_LEN = DEF_ARG_LEN;
 		
-		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv;
+		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv, CMD_MODE = "+++"sv;
 		
 		
 		enum class CommandType : uint8_t
 		{
 			Test,		// AT+CMD=?\r
-			Read,		// AT+CMD?\r
-			Execute,	// AT+CMDARGS\r
+			Read,		// AT#CMD?\r
+			Execute,	// AT@CMDARGS\r
 			Write,		// AT+CMD=ARGS\r
 			Bare		// ARGS
 		};
@@ -112,12 +106,12 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		
 		void SendUART(strv data)
 		{
-			HAL_UART_Transmit(p_huart, (uint8_t*)data.data(), data.length(), HAL_UART_TIMEOUT_VALUE);
+			HAL_UART_Transmit(p_huart, (uint8_t*)data.data(), data.length(), DEFAUL_TRANSMIT_TIMEOUT);
 		}
 		
-		virtual int16_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
+		virtual int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
 		
-		ErrorCode Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, uint16_t& len)
+		int32_t Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, const uint16_t len)
 		{
 			const bool data_sent = type != CommandType::Bare || !args.empty();
 			
@@ -168,7 +162,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 				if (m_urcEnabled)
 					stopURC();
 				
-				int16_t len2 = ReceiveUART(buffer, len - 1, timeout, DEFAULT_IDLE_TIMEOUT);
+				const int32_t len2 = ReceiveUART(buffer, len - 1, timeout, DEFAULT_IDLE_TIMEOUT);
 				
 				if (m_urcEnabled)
 					startURC();
@@ -176,10 +170,12 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 				if (len2 < OK)
 					return ErrorCode(len2);
 				
-				buffer[len = len2] = 0;		// Make it safe for C str functions
+				buffer[len2] = 0;		// Make it safe for C str functions
+				
+				return len2;
 			}
 			
-			return OK;
+			return 0;
 		}
 		
 		ErrorCode Standard(vec<strv>& tokens)
@@ -239,7 +235,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		/**
 		* @note Calls va_end()
 		*/
-		std::pair<int16_t, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
+		std::pair<int, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
 		{
 			if (!fmt)
 				return {INVALID, nullptr};
@@ -265,35 +261,130 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 				return INVALID_PARAM;
 			
 			char buffer[LEN];
-			uint16_t len = sizeof(buffer);
-			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
-			if (code != ErrorCode::OK)
-				return code;
+			int32_t len = Command(timeout, type, cmd, args, buffer, sizeof(buffer));
+			if (len < OK)
+				return ErrorCode(len);
 			
 			return handler(strv(buffer, len));
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const char* const fmt, ...)
+		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const char *const fmt, ...)
 		{
 			if (!fmt)
-				return ErrorCode::INVALID_PARAM;
+				return INVALID;
 			
 			char args[ARG_LEN];
 			
 			va_list print_args;
 			va_start(print_args, fmt);
-			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			if (argsLen < 0)
-				return ErrorCode::UNKNOWN;
-			
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			va_end(print_args);
+			
+			if (argsLen < 0)
+				return UNKNOWN;
 			
 			if (argsLen >= sizeof(args))	// did not fit inside {args}
 				return BIG_PARAM;
 			
 			return NoToken<LEN>(timeout, type, cmd, handler, strv(args, argsLen));
+		}
+		
+		template <size_t CHUNK_LEN = 600, size_t LEN = DEFAULT_RESPONSE_LEN>
+		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
+			const func<ErrorCode (strv, size_t)>& chunk_handler = nullptr, const strv args = strv())
+		{
+			std::unique_ptr<char[]> buf[2] = {std::make_unique<char[]>(CHUNK_LEN), std::make_unique<char[]>(CHUNK_LEN)};
+			if (!buf[0] || !buf[1])
+				return FAIL;
+			
+			ErrorCode code = SingleToken<LEN>(timeout, type, cmd, args, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}});
+			
+			if (code != OK)
+				return code;
+			
+			const bool urcEnabled = m_urcEnabled;
+			
+			ScopeActionF exit([this, urcEnabled]()
+			{
+				HAL_UART_AbortReceive_IT(p_huart);
+				
+				Command(0, CommandType::Bare, ""sv, CMD_MODE, nullptr, 0);
+				
+				if (urcEnabled)
+					EnableURC(true);
+			});
+			
+			if (urcEnabled)
+				EnableURC(false);
+			
+			const uint32_t start = HAL_GetTick();
+			uint32_t rem = dl_to;
+			size_t len = 0;
+			ClampedInt<uint8_t, 0, std::size(buf) - 1> index = 0;
+			
+			HAL_UART_StateTypeDef state = HAL_UART_STATE_READY;
+			HAL_StatusTypeDef stat = HAL_UARTEx_ReceiveToIdle_IT(p_huart, reinterpret_cast<uint8_t *>(buf[index].get()), CHUNK_LEN);
+			
+			while (stat == HAL_OK && code == OK && state == HAL_UART_STATE_READY && rem)
+			{
+				do
+				{
+					#ifdef STM32T_IWDG_TIMEOUT
+					HAL_IWDG_Refresh(&hiwdg);
+					#endif	// STM32T_IWDG_TIMEOUT
+					
+					state = HAL_UART_GetState(p_huart);
+					rem = Time::Remaining_Tick(start, dl_to);
+				}
+				while (state == HAL_UART_STATE_BUSY_RX && rem);
+				
+				strv chunk = {buf[index].get(), size_t(p_huart->RxXferSize - p_huart->RxXferCount)};
+				if (chunk == "\r\nNO CARRIER\r\n"sv)
+					return len;		// end
+				
+				if (state == HAL_UART_STATE_READY && rem)
+					stat = HAL_UARTEx_ReceiveToIdle_IT(p_huart, reinterpret_cast<uint8_t *>(buf[++index].get()), CHUNK_LEN);
+				
+				if (chunk_handler)
+					code = chunk_handler(chunk, len);
+				
+				len += chunk.size();
+			}
+			
+			if ((state != HAL_UART_STATE_READY || stat != HAL_OK) && !len)
+				return UART_ERR;
+			
+			if (code != OK && !len)
+				return code;
+			
+			if (!rem && !len)
+				return TIMEOUT;
+			
+			return len;
+		}
+		
+		template <size_t CHUNK_LEN = 600, size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
+			const func<ErrorCode (strv, size_t)>& chunk_handler, const char *const fmt, ...)
+		{
+			if (!fmt)
+				return INVALID;
+			
+			char args[ARG_LEN];
+			
+			va_list print_args;
+			va_start(print_args, fmt);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
+			
+			if (argsLen < 0)
+				return UNKNOWN;
+			
+			if (argsLen >= sizeof(args))	// did not fit inside {args}
+				return BIG_PARAM;
+			
+			return ReceiveOnline<CHUNK_LEN, LEN>(timeout, dl_to, type, cmd, chunk_handler, strv(args, argsLen));
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -304,10 +395,9 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 				return INVALID_PARAM;
 			
 			char buffer[LEN];
-			uint16_t len = sizeof(buffer);
-			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
-			if (code != OK)
-				return code;
+			int32_t len = Command(timeout, type, cmd, args, buffer, sizeof(buffer));
+			if (len < OK)
+				return ErrorCode(len);
 			
 			vec<strv> tokens;
 			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
@@ -323,10 +413,9 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 				return INVALID_PARAM;
 			
 			char buffer[LEN];
-			uint16_t len = sizeof(buffer);
-			ErrorCode code = Command(timeout, type, cmd, args, buffer, len);
-			if (code != OK)
-				return code;
+			int32_t len = Command(timeout, type, cmd, args, buffer, sizeof(buffer));
+			if (len < OK)
+				return ErrorCode(len);
 			
 			vec<strv> tokens;
 			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
@@ -340,19 +429,27 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(), const strv token = "OK"sv, const bool allowSingleEnded = false)
+		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(),
+			const span<const std::pair<strv, ErrorCode>> responses = {{"OK"sv, OK}}, const bool allowSingleEnded = false)
 		{
 			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
 			{
-				if (tokens.size() != 1 || tokens[0] != token)
-					return Error(tokens);
+				if (tokens.size() == 1)
+				{
+					for (auto resp : responses)
+					{
+						if (tokens[0] == resp.first)
+							return resp.second;
+					}
+				}
 				
-				return OK;
+				return Error(tokens);
 			}, allowSingleEnded);
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv token, const bool allowSingleEnded, const char* const fmt, ...)
+		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const span<const std::pair<strv, ErrorCode>> responses,
+			const bool allowSingleEnded, const char* const fmt, ...)
 		{
 			if (!fmt)
 				return INVALID;
@@ -361,22 +458,43 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			va_list print_args;
 			va_start(print_args, fmt);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
 			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			if (argsLen < 0)
 				return ErrorCode::UNKNOWN;
-			
-			va_end(print_args);
 			
 			if (argsLen >= sizeof(args))
 				return BIG_PARAM;
 			
-			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen), token, allowSingleEnded);
+			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen), responses, allowSingleEnded);
+		}
+		
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode ReceiveOK(const uint32_t timeout, const CommandType type, const strv cmd, const char* const fmt, ...)
+		{
+			if (!fmt)
+				return INVALID;
+			
+			char args[ARG_LEN];
+			
+			va_list print_args;
+			va_start(print_args, fmt);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
+			
+			if (argsLen < 0)
+				return ErrorCode::UNKNOWN;
+			
+			if (argsLen >= sizeof(args))
+				return BIG_PARAM;
+			
+			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen));
 		}
 		
 		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv())
 		{
-			return SingleToken(timeout, type, cmd, args, "> "sv, true);
+			return SingleToken(timeout, type, cmd, args, {{"> "sv, OK}}, true);
 		}
 		
 		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const char *fmt, ...)
@@ -451,12 +569,11 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			va_list print_args;
 			va_start(print_args, fmt);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
 			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			if (argsLen < 0)
 				return INVALID_PARAM;
-			
-			va_end(print_args);
 			
 			if (argsLen >= sizeof(args))
 				return BIG_PARAM;
@@ -475,12 +592,11 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			va_list print_args;
 			va_start(print_args, fmt);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			va_end(print_args);
 			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			if (argsLen < 0)
 				return INVALID_PARAM;
-			
-			va_end(print_args);
 			
 			if (argsLen >= sizeof(args))
 				return BIG_PARAM;
@@ -535,8 +651,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			va_list print_args;
 			va_start(print_args, fmt);
-			
-			int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
+			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
 			va_end(print_args);
 			
 			if (argsLen < 0)
@@ -571,7 +686,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		int16_t StrToken2(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
+		int32_t StrToken2(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
 			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str) -> ErrorCode
 			{
@@ -687,9 +802,11 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			
 			const char* Format() const
 			{
-				static char fmt[2 + 7 * 3] = { 0 };
+				static char fmt[32] = { 0 };
 				
-				sprintf(fmt, "20%02hhu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+hhd", yy, MM, dd, hh, mm, ss, zz);
+				const int mins = zz * 15, hour = mins / 60, min = mins % 60;
+				
+				sprintf(fmt, "%hhu%02hhu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+03hhd:%02hhu", yy < 70 ? 20u : 19u, yy, MM, dd, hh, mm, ss, hour, std::abs(min));
 				return fmt;
 			}
 		};
@@ -701,18 +818,17 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			return SingleToken(timeout, CommandType::Execute, {});
 		}
 		
-		void Custom(strv command)
+		ErrorCode Custom(strv command, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
-			uint16_t temp;
-			Command(0, CommandType::Execute, command, strv(), nullptr, temp);
+			return SingleToken(timeout, CommandType::Execute, command);
 		}
 		
-		int16_t GetBrand(char *const buf, const size_t max_len)
+		int32_t GetBrand(char *const buf, const size_t max_len)
 		{
 			return StrToken2(buf, max_len, CommandType::Execute, "+CGMI"sv);
 		}
 		
-		int16_t GetModel(char *const buf, const size_t max_len)
+		int32_t GetModel(char *const buf, const size_t max_len)
 		{
 			return StrToken2(buf, max_len, CommandType::Execute, "+CGMM"sv);
 		}
@@ -720,7 +836,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		/**
 		* @param rev - Will be null-terminated.
 		*/
-		int16_t GetRevision(char *const rev, const size_t max_len)
+		int32_t GetRevision(char *const rev, const size_t max_len)
 		{
 			return StrToken2(rev, max_len, CommandType::Execute, "+CGMR"sv);
 		}
@@ -732,7 +848,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		{
 			static_assert(IMEI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
 			
-			int16_t len = StrToken2(imei, IMEI_LEN + 1, CommandType::Execute, "+CGSN"sv);
+			int32_t len = StrToken2(imei, IMEI_LEN + 1, CommandType::Execute, "+CGSN"sv);
 			if (len != IMEI_LEN)
 				return WRONG_FORMAT;
 			
@@ -766,7 +882,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 		{
 			static_assert(IMSI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
 			
-			const int16_t len = StrToken2(imsi, IMSI_LEN + 1, CommandType::Execute, "+CIMI"sv);
+			const int32_t len = StrToken2(imsi, IMSI_LEN + 1, CommandType::Execute, "+CIMI"sv);
 			return len == IMSI_LEN ? OK : WRONG_FORMAT;
 		}
 		
@@ -785,7 +901,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			return OK;
 		}
 		
-		#if USE_HAL_UART_REGISTER_CALLBACKS == 1
+		#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 	private:
 		class URC
 		{
@@ -820,7 +936,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			operator strv() const { return {m_buf, m_size}; }
 		};
 		
-		uint8_t m_buf[256];
+		uint8_t m_buf[512];
 		LinkedList<URC, 64> m_urcs;
 		
 		static inline This *s_this = nullptr;
@@ -833,7 +949,7 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 			__HAL_DMA_DISABLE_IT(p_huart->hdmarx, DMA_IT_HT);	//Disable half transfer interrupt if it is enabled in HAL_UARTEx_ReceiveToIdle_DMA()
 		}
 		
-		void stopURC() { HAL_UART_DMAStop(p_huart); }
+		void stopURC() { HAL_UART_DMAStop(p_huart); }	// todo: handle half received URC
 		
 	protected:
 		void addURC(const strv token)
@@ -866,8 +982,8 @@ CMS_CODE_10(code##5), CMS_CODE_10(code##6), CMS_CODE_10(code##7), CMS_CODE_10(co
 					
 					static const Time::us_time_t MaxTime = 1'000'000u * 10u / huart->Init.BaudRate;		// Time of 1 byte
 					
-					if (time >= MaxTime)	// todo: Can't use lg directly (LOG_W<lg>)
-						lg.Clone().w("Rx event proccessing time (%u us) has exceeded maximum (%u us).\n", time, MaxTime);
+					if (time >= MaxTime)	// todo: Can't use LG directly (LOG_W<LG>)
+						LG.w("Rx event proccessing time (%u us) has exceeded maximum (%u us).", time, MaxTime);
 					
 					s_this->startURC();
 					

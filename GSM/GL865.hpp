@@ -2,6 +2,7 @@
 
 #include "./GSM.hpp"
 #include "../IO.hpp"
+#include "../span.hpp"
 
 
 
@@ -9,19 +10,19 @@ using STM32T::strv;
 using STM32T::wstrv;
 using std::operator"" sv;
 
-#ifdef GL865_IWDG_TIMEOUT
+#ifdef STM32T_IWDG_TIMEOUT
 extern "C" IWDG_HandleTypeDef hiwdg;
-#endif	// GL865_IWDG_TIMEOUT
+#endif	// STM32T_IWDG_TIMEOUT
 
 
 
-class GL865 : public STM32T::GSM<120, 16, 50, 4>
+class GL865 : public STM32T::GSM<120, 22, 50, 3>
 {
-	static constexpr uint32_t MAX_DNS_TIME = 20'000;
+	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 500'000;
 	
 	STM32T::IO m_pwr;
 	const STM32T::IO c_pwrMon;
-	uint32_t m_lastPowerOff = 0;
+	uint32_t m_lastPowerOff = 0, m_ftpTimeout = DEFAULT_FTP_TIMEOUT;
 	
 	static bool IsIPAddress(strv host)
 	{
@@ -39,14 +40,14 @@ class GL865 : public STM32T::GSM<120, 16, 50, 4>
 		return true;
 	}
 	
-	int16_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) override
+	int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) override
 	{
 		const uint32_t start = HAL_GetTick();
 		
 		__HAL_UART_CLEAR_OREFLAG(p_huart);
 		HAL_StatusTypeDef stat = HAL_TIMEOUT;
 		
-		#ifdef GL865_IWDG_TIMEOUT
+		#ifdef STM32T_IWDG_TIMEOUT
 		while (1)
 		{
 			HAL_IWDG_Refresh(&hiwdg);
@@ -56,7 +57,7 @@ class GL865 : public STM32T::GSM<120, 16, 50, 4>
 			else if (stat != HAL_TIMEOUT)
 				break;
 			
-			const uint32_t t = std::min(STM32T::Time::Remaining_Tick(start, timeout), (GL865_IWDG_TIMEOUT));
+			const uint32_t t = std::min(STM32T::Time::Remaining_Tick(start, timeout), (STM32T_IWDG_TIMEOUT));
 			if (!t)
 				break;
 			
@@ -66,7 +67,7 @@ class GL865 : public STM32T::GSM<120, 16, 50, 4>
 		stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, timeout);
 		if (stat == HAL_OK)
 			goto ok;
-		#endif	// GL865_IWDG_TIMEOUT
+		#endif	// STM32T_IWDG_TIMEOUT
 		
 		return stat == HAL_TIMEOUT ? TIMEOUT : UART_ERR;
 		
@@ -88,8 +89,6 @@ class GL865 : public STM32T::GSM<120, 16, 50, 4>
 	
 	ErrorCode Setup(const uint32_t timeout_ms = 1000)
 	{
-		m_noSendWait = true;
-		
 		static constexpr strv CMD = "E0;&K0;&P;+IPR=115200;#SLED=2;"
 			"+CGDCONT=1,\"IP\",\"mcinet\";"			// ",\"0.0.0.0\";"
 			"+CGDCONT=2,\"IP\",\"mtnirancell\";"	// ",\"0.0.0.0\";"
@@ -109,7 +108,7 @@ class GL865 : public STM32T::GSM<120, 16, 50, 4>
 			return INVALID;
 		
 		// Old: x,x,1500,600,50,0
-		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SCFG"sv, "OK"sv, false, "%hhu,%hhu,128,600,%hu,1", conn_id, cid, STM32T::ceil(conn_to, 100u));
+		return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SCFG"sv, "%hhu,%hhu,128,600,%hu,1", conn_id, cid, STM32T::ceil(conn_to, 100u));
 	}
 	
 public:
@@ -120,8 +119,17 @@ public:
 	*/
 	GL865(UART_HandleTypeDef* huart, STM32T::IO pwr, STM32T::IO pwr_mon) : GSM(huart), m_pwr(pwr), c_pwrMon(pwr_mon) {}
 	
-	ErrorCode NetworkCheck(uint8_t& stat);
-	bool NetworkWait(const uint32_t timeout);
+	int32_t NetworkCheck()
+	{
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "+CGREG", strv(), [&](strv token) -> ErrorCode
+		{
+			uint8_t n, stat;
+			if (sscanf(token.data(), "%hhu,%hhu", &n, &stat) == 2)
+				return ErrorCode(stat);
+			
+			return ERR;
+		});
+	}
 	
 	ErrorCode ClockRead(DateTime& dt)
 	{
@@ -157,7 +165,7 @@ public:
 	* @param buf - Will be null-terminated.
 	* @param max_len - Must be at most 256
 	*/
-	int16_t USSD(strv ussd, wchar_t *buf, uint16_t max_len, const uint32_t resp_timeout)
+	int32_t USSD(strv ussd, wchar_t *buf, uint16_t max_len, const uint32_t resp_timeout)
 	{
 		static_assert(sizeof(wchar_t) == 2);
 		
@@ -192,11 +200,11 @@ public:
 		}, "1,\"%.*s\"", ussd.size(), ussd.data());
 	}
 	
-	ErrorCode SMSend(strv number, const wstrv *msgs, const size_t msg_count, const uint32_t timeout = 60'000)
+	ErrorCode SMSend(strv number, STM32T::span<const wstrv> msgs, const uint32_t timeout = 60'000)
 	{
 		static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
 		
-		LOG_D<lg>("Sending SM to %.*s...\n", number.size(), number.data());
+		LOG_D<LG>("Sending SM to %.*s...", number.size(), number.data());
 		
 		auto number2 = std::make_unique<char[]>(number.size() * 4);
 		for (size_t i = 0; i < number.size(); i++)
@@ -218,9 +226,9 @@ public:
 			return code;
 		}
 		
-		for (size_t i = 0; i < msg_count; i++)
+		for (auto msg : msgs)
 		{
-			for (auto& ch : msgs[i])
+			for (auto ch : msg)
 			{
 				using namespace STM32T;
 				
@@ -239,22 +247,17 @@ public:
 		});
 		
 		if (res == OK)
-			LOG_D<lg>("SM sent successfully (%hhu).\n", n);
+			LOG_D<LG>("SM sent successfully (%hhu).", n);
 		else
-			LOG_W<lg>("SM could not be sent (%hhu)!\n", res);
+			LOG_W<LG>("SM could not be sent (%hhu)!", res);
 		
 		return res;
 	}
 	
-	ErrorCode SMSend(strv number, std::initializer_list<wstrv> msgs, const uint32_t timeout = 60'000)
-	{
-		return SMSend(number, msgs.begin(), msgs.size(), timeout);
-	}
-	
 	ErrorCode Call(strv number, const uint32_t timeout = 30'000)
 	{
-		LOG_D<lg>("Calling %.*s...\n", number.size(), number.data());
-		return SingleToken(timeout, CommandType::Execute, "D"sv, "OK"sv, false, "%.*s;", number.size(), number.data());
+		LOG_D<LG>("Calling %.*s...", number.size(), number.data());
+		return SingleToken(timeout, CommandType::Execute, "D"sv, {{"OK"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "%.*s;", number.size(), number.data());
 	}
 	
 	ErrorCode HangUp(const uint32_t timeout = 30'000)
@@ -305,7 +308,7 @@ public:
 		return ResponseToken<27 + 6>(timeout_ms, CommandType::Write, "#SGACT"sv, [](strv token) { return OK; }, true, "%hhu,%hhu", cid, enable);
 	}
 	
-	int16_t ContextStatus(const uint8_t cid)
+	int32_t ContextStatus(const uint8_t cid)
 	{
 		if (cid < 1 || cid > MAX_CID)
 			return INVALID;
@@ -329,8 +332,8 @@ public:
 	
 	ErrorCode SocketDial(const uint8_t conn_id, const uint8_t cid, strv host, uint16_t port, uint16_t udp_port = 0, const uint16_t timeout_ms = 10000)
 	{
-		if (host.size() > 256 - 22)
-			return INVALID;
+		if (host.size() > 256 - 14)
+			return BIG_PARAM;
 		
 		ErrorCode code = ConfigSocket(conn_id, cid, timeout_ms);
 		if (code != OK)
@@ -338,9 +341,20 @@ public:
 		
 		m_noSendWait = true;
 		
-		// todo: separate OpenSocket() for IP address
-		return SingleToken<256>((IsIPAddress(host) ? 0 : MAX_DNS_TIME) + timeout_ms,
-			CommandType::Write, "#SD"sv, "OK"sv, false, "%hhu,%hhu,%hu,\"%.*s\",0,%hu,1", conn_id, bool(udp_port), port, host.length(), host.data(), udp_port);
+		return ReceiveOK<256>((IsIPAddress(host) ? 0 : MAX_DNS_TIME) + timeout_ms, CommandType::Write, "#SD"sv, "%hhu,%hhu,%hu,\"%.*s\",0,%hu,1",
+			conn_id, bool(udp_port), port, host.length(), host.data(), udp_port);
+	}
+	
+	ErrorCode SocketDial(const uint8_t conn_id, const uint8_t cid, const uint8_t (&host)[4], uint16_t port, uint16_t udp_port = 0, const uint16_t timeout_ms = 10000)
+	{
+		ErrorCode code = ConfigSocket(conn_id, cid, timeout_ms);
+		if (code != OK)
+			return code;
+		
+		m_noSendWait = true;
+		
+		return ReceiveOK(timeout_ms, CommandType::Write, "#SD"sv, "%hhu,%hhu,%hu,\"%hhu.%hhu.%hhu.%hhu\",0,%hu,1",
+			conn_id, bool(udp_port), port, host[0], host[1], host[2], host[3], udp_port);
 	}
 	
 	ErrorCode SocketClose(const uint8_t conn_id)
@@ -348,10 +362,10 @@ public:
 		if (conn_id < 1 || conn_id > 6)
 			return INVALID;
 		
-		return SingleToken(3000, CommandType::Write, "#SH"sv, "OK"sv, false, "%hhu", conn_id);
+		return ReceiveOK(3000, CommandType::Write, "#SH"sv, "%hhu", conn_id);
 	}
 	
-	int16_t SocketStatus(const uint8_t conn_id)
+	int32_t SocketStatus(const uint8_t conn_id)
 	{
 		if (conn_id < 1 || conn_id > 6)
 			return INVALID;
@@ -367,11 +381,11 @@ public:
 		}, true, "%hhu", conn_id);
 	}
 	
-	ErrorCode SocketSend(const uint8_t conn_id, const strv *data, size_t data_count)
+	ErrorCode SocketSend(const uint8_t conn_id, STM32T::span<const strv> data)
 	{
 		size_t total_len = 0;
-		for (size_t i = 0; i < data_count; i++)
-			total_len += data[i].size();
+		for (auto chunk : data)
+			total_len += chunk.size();
 		
 		if (total_len > 1500 || conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID)
 			return INVALID;
@@ -383,9 +397,9 @@ public:
 			return code;
 		}
 		
-		for (size_t i = 0; i < data_count; i++)
+		for (auto chunk : data)
 		{
-			for (char ch : data[i])
+			for (char ch : chunk)
 			{
 				const char chars[2] = {STM32T::H2C(ch >> 4), STM32T::H2C(ch & 0x0F)};
 				SendUART({chars, std::size(chars)});
@@ -397,12 +411,7 @@ public:
 		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
 	}
 	
-	ErrorCode SocketSend(const uint8_t conn_id, std::initializer_list<strv> data)
-	{
-		return SocketSend(conn_id, data.begin(), data.size());
-	}
-	
-	int16_t SocketRead(const uint8_t conn_id, char *const data, const uint16_t len, uint32_t timeout_ms = DEFAUL_RECEIVE_TIMEOUT)
+	int32_t SocketRead(const uint8_t conn_id, char *const data, const uint16_t len, uint32_t timeout_ms = DEFAUL_RECEIVE_TIMEOUT)
 	{
 		if (timeout_ms < DEFAUL_RECEIVE_TIMEOUT)
 			return INVALID;
@@ -447,22 +456,91 @@ public:
 		});
 	}
 	
-	ErrorCode FTPOpen(strv host, uint16_t port, strv user, strv pass)
+	ErrorCode FTPTimeout(uint32_t ftp_to)
 	{
-		return SingleToken<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "OK"sv, false, "%.*s:%hu,%.*s,%.*s,1",
-			host.length(), host.data(), port, user.length(), user.data(), pass.length(), pass.data());
+		if (ftp_to < 10'000 || ftp_to > 500'000)
+			return INVALID;
+		
+		ftp_to = STM32T::next_multiple(ftp_to, 100u);
+		
+		ErrorCode code = ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPTO"sv, "%hu", ftp_to / 100u);
+		
+		if (code == OK)
+			m_ftpTimeout = ftp_to;
+		
+		return code;
 	}
 	
-	ErrorCode FTPTimeout(uint32_t timeout);
-	ErrorCode FTPCWD(strv dir);
-	ErrorCode FTPType(bool ascii);
+	/**
+	* @note Requires PDP context #1 or GSM context.
+	*/
+	ErrorCode FTPOpen(strv host, uint16_t port, strv user, strv pass, const bool passive = true)
+	{
+		if (host.size() + user.size() + pass.size() > 256 - 6)
+			return BIG_PARAM;
+		
+		return ReceiveOK<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "%.*s:%hu,%.*s,%.*s,%hhu",
+			host.length(), host.data(), port, user.length(), user.data(), pass.length(), pass.data(), passive);
+	}
+	
+	ErrorCode FTPClose()
+	{
+		return SingleToken(m_ftpTimeout, CommandType::Execute, "#FTPCLOSE"sv);
+	}
+	
+	int32_t FTPGetO(strv file, const std::function<void (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
+	{
+		return ReceiveOnline(m_ftpTimeout, dl_to, CommandType::Write, "#FTPGET"sv, [&](strv chunk, size_t handled) -> ErrorCode
+		{
+			if (chunk_handler)
+				chunk_handler(chunk, handled);
+			
+			return OK;
+		}, "\"%.*s\"", file.size(), file.data());
+		
+		
+		
+		ErrorCode code = SingleToken(m_ftpTimeout, CommandType::Write, "#FTPGET"sv, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "\"%.*s\"",
+			file.size(), file.data());
+		
+		return code;
+	}
+	
+	ErrorCode FTPType(bool ascii)
+	{
+		return ReceiveOK(m_ftpTimeout, CommandType::Write, "#FTPTYPE"sv, "%hhu", ascii);
+	}
+	
+	ErrorCode FTPCWD(strv dir)
+	{
+		return SingleToken(m_ftpTimeout, CommandType::Write, "#FTPCWD"sv, dir);
+	}
+	
+	int32_t FTPListO(char *buf, size_t len, strv name = strv(), const uint32_t list_to = 15'000)
+	{
+		return ReceiveOnline(m_ftpTimeout, list_to, name.size() ? CommandType::Write : CommandType::Execute, "#FTPLIST"sv,
+			[&buf, &len](strv chunk, size_t handled) -> ErrorCode
+			{
+				if (!len)
+					return BUF_FULL;
+				
+				const size_t copy_size = std::min(len, chunk.size());
+				memcpy(buf, chunk.data(), copy_size);
+				buf += copy_size;
+				len -= copy_size;
+				
+				if (copy_size < chunk.size())
+					return BUF_FULL;
+				
+				return OK;
+			}, name);
+	}
+	
 	ErrorCode FTPFileSize(strv file, size_t& size);
-	ErrorCode FTPList(strv file);
 	ErrorCode FTPPut(strv file);
 	ErrorCode FTPAppend(strv data, bool final = false);
 	ErrorCode FTPGet(strv file);
 	ErrorCode FTPRecv(char* buf, uint16_t& len);
-	ErrorCode FTPClose();
 	
 	ErrorCode SIMCheck(uint8_t& status);
 	
@@ -510,12 +588,12 @@ public:
 		
 		if (!fast && c_pwrMon.Read())
 		{
-			uint16_t x;
-			Command(0, CommandType::Execute, "#SYSHALT"sv, {}, nullptr, x);
+			Command(0, CommandType::Execute, "#SYSHALT"sv, {}, nullptr, 0);
 			c_pwrMon.Wait(0, 15000);
 		}
 		
 		m_pwr.Reset();
 		m_lastPowerOff = HAL_GetTick();
+		m_ftpTimeout = DEFAULT_FTP_TIMEOUT;
 	}
 };

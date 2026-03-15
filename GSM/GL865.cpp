@@ -1,51 +1,5 @@
 #include "./GL865.hpp"
 
-using STM32T::vec;
-using STM32T::operator"" _Ki;
-
-
-
-GL865::ErrorCode GL865::NetworkCheck(uint8_t& stat)
-{
-	return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "+CGREG", strv(), [&](strv token) -> ErrorCode
-	{
-		uint8_t n;
-		if (sscanf(token.data(), "%hhu,%hhu", &n, &stat) == 2)
-			return OK;
-		
-		return ERR;
-	});
-}
-
-bool GL865::NetworkWait(const uint32_t timeout)
-{
-	for (const uint32_t start = HAL_GetTick(); HAL_GetTick() - start < timeout;)
-	{
-		uint8_t stat;
-		if (NetworkCheck(stat) == ErrorCode::OK && stat == 1 || stat == 5)
-			return true;
-		
-		HAL_Delay(1000);
-	}
-	
-	return false;
-}
-
-GL865::ErrorCode GL865::FTPTimeout(uint32_t timeout)
-{
-	return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPTO"sv, "OK"sv, false, "%u", std::clamp(timeout / 100, 100u, 5000u));
-}
-
-GL865::ErrorCode GL865::FTPCWD(strv dir)
-{
-	return SingleToken(15'000, CommandType::Write, "#FTPCWD"sv, dir);
-}
-
-GL865::ErrorCode GL865::FTPType(bool ascii)
-{
-	return SingleToken(15'000, CommandType::Write, "#FTPTYPE"sv, "OK"sv, false, "%u", ascii);
-}
-
 GL865::ErrorCode GL865::FTPFileSize(strv file, size_t& size)
 {
 	return ResponseToken(15'000, CommandType::Write, "#FTPFSIZE"sv, file, [&](strv token) -> ErrorCode
@@ -54,19 +8,14 @@ GL865::ErrorCode GL865::FTPFileSize(strv file, size_t& size)
 	});
 }
 
-GL865::ErrorCode GL865::FTPList(strv name)
-{
-	return SingleToken(15'000, CommandType::Write, "#FTPLIST"sv, name);
-}
-
 GL865::ErrorCode GL865::FTPPut(strv file)
 {
-	return SingleToken(15'000, CommandType::Write, "#FTPPUT"sv, "OK"sv, false, "\"%.*s\",1", file.length(), file.data());
+	return ReceiveOK(15'000, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", file.length(), file.data());
 }
 
 GL865::ErrorCode GL865::FTPAppend(strv data, bool final)
 {
-	ErrorCode code = SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPAPPEXT"sv, "> "sv, true, "%hu,%hhu", std::min(data.size(), 1500u), final);
+	ErrorCode code = WaitForReady(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPAPPEXT"sv, "%hu,%hhu", std::min(data.size(), 1500u), final);
 	
 	if (code != OK)
 	{
@@ -116,11 +65,6 @@ GL865::ErrorCode GL865::FTPRecv(char* buf, uint16_t& len)
 		
 		return ErrorCode::OK;
 	}, "%hu", std::min<uint16_t>(len , 3000));
-}
-
-GL865::ErrorCode GL865::FTPClose()
-{
-	return SingleToken(15'000, CommandType::Execute, "#FTPCLOSE"sv);
 }
 
 GL865::ErrorCode GL865::SIMCheck(uint8_t& status)
