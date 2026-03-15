@@ -6,10 +6,6 @@
 #include <charconv>
 
 
-#ifdef MAX
-#undef MAX
-#endif
-
 
 namespace STM32T
 {
@@ -47,7 +43,7 @@ namespace STM32T
 			Normal = 255
 		};
 		
-		static constexpr Version MAX()
+		static constexpr Version Max()
 		{
 			return Version(UINT32_MAX);
 		}
