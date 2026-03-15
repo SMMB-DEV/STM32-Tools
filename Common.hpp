@@ -154,8 +154,7 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	[[deprecated("Use next_multiple() instead.")]]
-	inline constexpr T round_up(T n, T multiple)
+	inline constexpr T next_multiple(T n, T multiple)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -163,12 +162,8 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr T next_multiple(T n, T multiple)
-	{
-		static_assert(is_int_v<T>);
-		
-		return ceil(n, multiple) * multiple;
-	}
+	[[deprecated("Use next_multiple() instead.")]]
+	inline constexpr T round_up(T n, T multiple) { return next_multiple<T>(n, multiple); }
 	
 	template<class T>
 	union shared_arr
@@ -952,25 +947,18 @@ namespace STM32T
 			_iterator(container *p, size_t index) : m_con(p), m_index(index) {}
 			
 		public:
-			_iterator(const _iterator<std::remove_const<U>>& other) : m_con(other.m_con), m_index(other.m_index) {}
+			_iterator(const _iterator<std::remove_const_t<U>>& other) : m_con(other.m_con), m_index(other.m_index) {}
 			
 			~_iterator() {}
 			
-			//using difference_type = std::ptrdiff_t;
+			using difference_type = std::ptrdiff_t;
 			using value_type = U;
 			using reference = U&;
 			using pointer = U*;
-			//using iterator_category = std::forward_iterator_tag;
+			using iterator_category = std::forward_iterator_tag;
 			
-			reference operator*() const
-			{
-				return m_con->m_val;
-			}
-			
-			pointer operator->() const
-			{
-				return &m_con->m_val;
-			}
+			reference operator*() const { return m_con->m_val; }
+			pointer operator->() const { return &m_con->m_val; }
 			
 			_iterator& operator++()
 			{
@@ -1057,7 +1045,8 @@ namespace STM32T
 			--m_size;
 			delete elem;
 			
-			return ++iter;
+			++iter;
+			return iterator(iter.m_con, iter.m_index);
 		}
 		
 		iterator erase(const_iterator iter)
@@ -1065,15 +1054,8 @@ namespace STM32T
 			const size_t index = iter.m_index;
 			++iter;
 			erase(index);
-			return iter;
-		}
-		
-		iterator erase(iterator iter)	// todo: should be const_iterator
-		{
-			const size_t index = iter.m_index;
-			++iter;
-			erase(index);
-			return iter;
+			--iter.m_index;
+			return iterator(iter.m_con, iter.m_index);
 		}
 		
 		/**
