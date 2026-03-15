@@ -277,36 +277,27 @@ namespace STM32T::Log
 				spec[p + 1 - start] = '\0';
 				fmt = p + 1;
 				
-				int field_width_val;
-				const bool has_field_width = strcmp(field_width, "*") == 0;
-				if (has_field_width)
-					field_width_val = va_arg(args, int);
-				
-				int precision_val;
-				const bool has_precision = strcmp(precision, ".*") == 0;
-				if (has_precision)
-					precision_val = va_arg(args, int);
+				const bool has_field_width = strcmp(field_width, "*") == 0, has_precision = strcmp(precision, ".*") == 0;
 				
 				char var[100];
 				int n = 0;
 				
-				// todo: check ll, etc.
 				switch (*p)
 				{
 					case 'd': case 'i':
 					{
 						if (strcmp(modifier, "l") == 0)
-							n = format<long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<long>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "ll") == 0)
-							n = format<long long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<long long>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "j") == 0)
-							n = format<intmax_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<intmax_t>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "z") == 0)
-							n = format<std::make_signed<size_t>>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<std::make_signed<size_t>>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "t") == 0)
-							n = format<ptrdiff_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<ptrdiff_t>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else
-							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						
 						break;
 					}
@@ -314,17 +305,17 @@ namespace STM32T::Log
 					case 'u': case 'x': case 'X': case 'o':
 					{
 						if (strcmp(modifier, "l") == 0)
-							n = format<unsigned long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<unsigned long>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "ll") == 0)
-							n = format<unsigned long long>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<unsigned long long>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "j") == 0)
-							n = format<uintmax_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<uintmax_t>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "z") == 0)
-							n = format<size_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<size_t>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else if (strcmp(modifier, "t") == 0)
-							n = format<std::make_unsigned<ptrdiff_t>>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<std::make_unsigned<ptrdiff_t>>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else
-							n = format<unsigned int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<unsigned int>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						
 						break;
 					}
@@ -332,9 +323,9 @@ namespace STM32T::Log
 					case 'f': case 'F': case 'g': case 'G': case 'e': case 'E': case 'a': case 'A':
 					{
 						if (strcmp(modifier, "L") == 0)
-							n = format<long double>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<long double>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else
-							n = format<double>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<double>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						
 						break;
 					}
@@ -342,9 +333,9 @@ namespace STM32T::Log
 					case 'c':
 					{
 						if (strcmp(modifier, "l") == 0)
-							n = format<wint_t>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<wint_t>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else
-							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<int>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						
 						break;
 					}
@@ -352,24 +343,48 @@ namespace STM32T::Log
 					case 's':
 					{
 						if (strcmp(modifier, "l") == 0)
-							n = format<const wchar_t *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+							n = format<const wchar_t *>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						else
-							n = format<const char *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+						{
+							if (strcmp(spec, "%s") == 0 || strcmp(spec, "%.*s") == 0)
+							{
+								int precision = INT_MAX;
+								if (has_precision)
+									precision = va_arg(args, int);
+								
+								if (precision < 0)
+									precision = INT_MAX;
+								
+								const char *buf = va_arg(args, const char *);
+								const size_t len = std::min(std::strlen(buf), size_t(precision));	// todo: does strlen matter when precision is specified?
+								
+								if (len > 0)
+								{
+									dispatch_chunk({buf, len});
+									written += len;
+								}
+							}
+							else
+								n = format<const char *>(var, sizeof(var), spec, has_field_width, has_precision, args);
+						}
 						
 						break;
 					}
 					
 					case 'p':
 					{
-						if (strcmp(spec, "%p") != 0)	// must match
+						if (strcmp(modifier, "") != 0)
 							return;
 						
-						n = format<void *>(var, sizeof(var), spec, has_field_width, has_precision, field_width_val, precision_val, args);
+						n = format<void *>(var, sizeof(var), spec, has_field_width, has_precision, args);
 						break;
 					}
 					
 					case 'n':
 					{
+						if (strcmp(flags, "") != 0 || strcmp(field_width, "") != 0 || strcmp(precision, "") != 0)
+							return;
+						
 						if (strcmp(modifier, "hh") == 0)
 							*va_arg(args, signed char *) = written;
 						else if (strcmp(modifier, "h") == 0)
@@ -406,18 +421,24 @@ namespace STM32T::Log
 				
 				if (n < 0)
 					return;
-				
-				dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
-				written += std::min((size_t)n, sizeof(var) - 1);
-				
-				if (n >= sizeof(var))
+				else if (n > 0)
 				{
-					dispatch_chunk("..."sv);
-					written += 3;
+					dispatch_chunk({var, std::min((size_t)n, sizeof(var) - 1)});
+					written += std::min((size_t)n, sizeof(var) - 1);
+					
+					if (n >= sizeof(var))
+					{
+						dispatch_chunk("..."sv);
+						written += 3;
+					}
 				}
 			}
 			
-			dispatch_chunk({fmt, (size_t)(p - fmt)}, true);
+			const bool none = level == Level::None;
+			dispatch_chunk({fmt, (size_t)(p - fmt)}, none);
+			
+			if (!none)
+				dispatch_chunk("\n"sv, true);
 		}
 		
 		template <class... Args>
@@ -476,9 +497,16 @@ namespace STM32T::Log
 		}
 		
 		template <typename T>
-		static int format(char *const var, const size_t var_len, const char *const spec, const bool has_field_width, const bool has_precision,
-			const int field_width, const int precision, va_list& args)
+		static int format(char *const var, const size_t var_len, const char *const spec, const bool has_field_width, const bool has_precision, va_list& args)
 		{
+			int field_width;
+			if (has_field_width)
+				field_width = va_arg(args, int);
+			
+			int precision;
+			if (has_precision)
+				precision = va_arg(args, int);
+			
 			if (has_field_width && has_precision)
 				return snprintf(var, var_len, spec, field_width, precision, va_arg(args, T));
 			else if (has_field_width)
@@ -527,24 +555,11 @@ namespace STM32T::Log
 	
 	
 	
-	template <auto& logger, const Level level, class... Args>
-	void LOG_N(const char *fmt, Args... args)
-	{
-		if constexpr (logger.isEnabled() && logger.isEnabled(level))
-			logger.log(Level::None, fmt, args...);
-	}
-	
-	template <const Level level, class... Args>
+	template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
 	[[gnu::always_inline]]
 	inline void LOG_N(const char *fmt, Args... args)
 	{
-		LOG_N<g_defaultLogger, level>(fmt, args...);
-	}
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_N(const char *fmt, Args... args)
-	{
-		if constexpr (logger.isEnabled())
+		if constexpr (logger.isEnabled() && logger.isEnabled(level))
 			logger.log(Level::None, fmt, args...);
 	}
 	
@@ -565,25 +580,25 @@ namespace STM32T::Log
 	template <auto& logger = g_defaultLogger, class... Args>
 	void LOG_D(const char *fmt, Args... args) { _LOG<logger, Level::Debug>(fmt, args...); }
 	
-	template <auto& logger = g_defaultLogger>
+	template <const Level level = Level::None, auto& logger = g_defaultLogger>
 	inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
 	{
-		if constexpr (logger.isEnabled())
+		if constexpr (logger.isEnabled() && logger.isEnabled(level))
 		{
 			while (len)
 			{
 				for (size_t i = 0; len && i < line_count; i++, len--)
-					LOG_N<logger>(" %02X", *arr++);
+					LOG_N<level, logger>(" %02X", *arr++);
 				
-				LOG_N<logger>("\n");
+				LOG_N<level, logger>("\n");
 			}
 		}
 	}
 	
-	template <auto& logger = g_defaultLogger>
+	template <const Level level = Level::None, auto& logger = g_defaultLogger>
 	inline void LOGSEP()
 	{
-		LOG_N<logger>("--------------------------------------------------------------------------------\n");
+		LOG_N<level, logger>("--------------------------------------------------------------------------------\n");
 	}
 	
 	inline void DoIfEnabled(void (*f)())
@@ -617,16 +632,16 @@ namespace STM32T::Log
 			return R();
 	}
 	
-	template <auto& logger = g_defaultLogger>
+	template <const Level level = Level::None, auto& logger = g_defaultLogger>
 	inline void Startup()
 	{
-		if constexpr (logger.isEnabled())
+		if constexpr (logger.isEnabled() && logger.isEnabled(level))
 		{
-			LOG_N<logger>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
+			LOG_N<level, logger>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
 			
 			const uint32_t version = HAL_GetHalVersion();	// major.minor.patch-rc
 			
-			LOG_N<logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%X, DevID: 0x%X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n",
+			LOG_N<level, logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%04X, DevID: 0x%03X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n",
 				version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
 				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
 				HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
@@ -635,27 +650,27 @@ namespace STM32T::Log
 			const uint32_t reset_flags = RCC->CSR;
 			__HAL_RCC_CLEAR_RESET_FLAGS();
 			
-			LOG_N<logger>("Cause of reset: |");
+			LOG_N<level, logger>("Cause of reset: |");
 			
 			if (reset_flags & RCC_CSR_PINRSTF)
-				LOG_N<logger>(" Reset Pin |");
+				LOG_N<level, logger>(" Reset Pin |");
 			
 			if (reset_flags & RCC_CSR_PORRSTF)
-				LOG_N<logger>(" POR/PDR |");
+				LOG_N<level, logger>(" POR/PDR |");
 			
 			if (reset_flags & RCC_CSR_SFTRSTF)
-				LOG_N<logger>(" Software |");
+				LOG_N<level, logger>(" Software |");
 			
 			if (reset_flags & RCC_CSR_IWDGRSTF)
-				LOG_N<logger>(" IWDG |");
+				LOG_N<level, logger>(" IWDG |");
 			
 			if (reset_flags & RCC_CSR_WWDGRSTF)
-				LOG_N<logger>(" WWDG |");
+				LOG_N<level, logger>(" WWDG |");
 			
 			if (reset_flags & RCC_CSR_LPWRRSTF)
-				LOG_N<logger>(" Low Power |");
+				LOG_N<level, logger>(" Low Power |");
 			
-			LOG_N<logger>("\n\n");
+			LOG_N<level, logger>("\n\n");
 		}
 	}
 }
