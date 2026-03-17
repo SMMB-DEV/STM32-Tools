@@ -187,11 +187,11 @@ public:
 			uint16_t j = 0;
 			for (size_t i = 0; i < data.size() && j < max_len - 1; i += 4, j++)
 			{
-				const uint8_t _3 = STM32T::C2H(data[i]), _2 = STM32T::C2H(data[i + 1]), _1 = STM32T::C2H(data[i + 2]), _0 = STM32T::C2H(data[i + 3]);
-				if (_3 == 0xFF || _2 == 0xFF || _1 == 0xFF || _0 == 0xFF)
+				const auto opt = STM32T::C2H<wchar_t>(data.data() + i);
+				if (!opt)
 					return WRONG_FORMAT;
 				
-				buf[j] = (_3 << 12) | (_2 << 8) | (_1 << 4) | _0;
+				buf[j] = *opt;
 			}
 			
 			buf[j] = 0;
@@ -208,15 +208,7 @@ public:
 		
 		auto number2 = std::make_unique<char[]>(number.size() * 4);
 		for (size_t i = 0; i < number.size(); i++)
-		{
-			char *buf = number2.get() + i * 4;
-			
-			using namespace STM32T;
-			buf[0] = H2C(number[i] >> 12);
-			buf[1] = H2C(number[i] >> 8);
-			buf[2] = H2C(number[i] >> 4);
-			buf[3] = H2C(number[i]);
-		}
+			STM32T::H2C<uint16_t>(number[i], number2.get() + i * 4);
 		
 		const uint32_t start = HAL_GetTick();
 		ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4});
@@ -230,10 +222,10 @@ public:
 		{
 			for (auto ch : msg)
 			{
-				using namespace STM32T;
-				
-				char ucs2[sizeof(ch) * 2] = {H2C(ch >> 12), H2C(ch >> 8), H2C(ch >> 4), H2C(ch)};
-				SendUART(strv(ucs2, std::size(ucs2)));
+				SendUART(STM32T::H2C(ch >> 12));
+				SendUART(STM32T::H2C(ch >> 8));
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
 			}
 		}
 		
@@ -401,8 +393,8 @@ public:
 		{
 			for (char ch : chunk)
 			{
-				const char chars[2] = {STM32T::H2C(ch >> 4), STM32T::H2C(ch & 0x0F)};
-				SendUART({chars, std::size(chars)});
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
 			}
 		}
 		
@@ -444,12 +436,12 @@ public:
 			
 			for (uint16_t i = 0, j = 0; i < tokens[1].size(); i++, j += 2)
 			{
-				const uint8_t hi = STM32T::C2H(tokens[1][j]), lo = STM32T::C2H(tokens[1][j + 1]);
-				if (hi == 0xFF || lo == 0xFF)
+				const auto opt = STM32T::C2H<uint8_t>(tokens[1].data() + j);
+				if (!opt)
 					return WRONG_FORMAT;
 				
 				if (data)
-					data[i] = (hi << 4) | lo;
+					data[i] = *opt;
 			}
 			
 			return ErrorCode(recv_len);

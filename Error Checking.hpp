@@ -10,7 +10,7 @@ namespace STM32T
 	/**
 	* @param TYPE - The integer type used for calculating CRC. Determines the size of the CRC.
 	* @param table - Must have 256 values.
-	* @note Base on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
+	* @note Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
 	*/
 	template <typename TYPE>
 	inline TYPE CRCx(const uint8_t * const data, const size_t len, const TYPE *table, TYPE crc_init = 0)

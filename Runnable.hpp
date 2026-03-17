@@ -16,7 +16,6 @@ class Runnable
 	Runnable(void (*callable)(), uint32_t interval, uint32_t last_time, bool repeat)
 		: p_callable(callable), c_interval(interval), m_lastTime(last_time), c_repeat(repeat) {}
 	
-	
 	static inline std::vector<Runnable> s_list;
 	static inline size_t s_lastIndex = 0;
 	

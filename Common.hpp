@@ -1,7 +1,5 @@
 #pragma once
 
-#include "main.h"
-
 #include "./Timing.hpp"
 
 #include <vector>
@@ -20,7 +18,7 @@ namespace STM32T
 	
 	template <class T>
 	constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
-
+	
 	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
 	{
 		return x * 1024;
@@ -64,7 +62,16 @@ namespace STM32T
 		return CHARS[x & 0x0F];
 	}
 	
-	inline constexpr char C2H(uint8_t ch)
+	template <typename T>
+	inline constexpr void H2C(T val, char *buf)
+	{
+		static_assert(is_int_v<T>);
+		
+		for (size_t i = 0, b = sizeof(T) * 8 - 4; i < sizeof(T) * 2; ++i, b -= 4)
+			buf[i] = H2C(val >> b);
+	}
+	
+	inline constexpr uint8_t C2H(char ch)
 	{
 		constexpr uint8_t HEX[256] =
 		{
@@ -88,6 +95,25 @@ namespace STM32T
 		};
 		
 		return HEX[ch];
+	}
+	
+	template <typename T>
+	inline constexpr std::optional<T> C2H(const char *str)
+	{
+		static_assert(is_int_v<T>);
+		
+		T ret = T(0);
+		for (size_t i = 0; i < sizeof(T) * 2; ++i)
+		{
+			const uint8_t h = C2H(*str++);
+			if (h == 0xFF)
+				return std::nullopt;
+			
+			ret <<= 4;
+			ret |= h;
+		}
+		
+		return ret;
 	}
 	
 	inline constexpr uint32_t pow10(uint8_t pow)
@@ -1108,6 +1134,8 @@ namespace STM32T
 	{
 	protected:
 		static_assert(std::is_unsigned_v<INDEX_T>);
+		static_assert(MAX_SIZE - 1 <= std::numeric_limits<INDEX_T>::max());
+		
 		using index_t = ClampedInt<INDEX_T, 0, MAX_SIZE - 1>;
 		
 		T m_items[MAX_SIZE];

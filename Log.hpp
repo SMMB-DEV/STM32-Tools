@@ -150,13 +150,13 @@ namespace STM32T::Log
 	{
 		switch (level)
 		{
-			case Level::None:		return "None"sv;
+			case Level::None:		return "None "sv;
 			case Level::Fatal:		return "Fatal"sv;
 			case Level::Error:		return "Error"sv;
-			case Level::Warning:	return "Warning"sv;
-			case Level::Info:		return "Info"sv;
+			case Level::Warning:	return "Warn "sv;
+			case Level::Info:		return "Info "sv;
 			case Level::Debug:		return "Debug"sv;
-			default:				return "Unknown"sv;
+			default:				return " XXX "sv;
 		}
 	}
 	

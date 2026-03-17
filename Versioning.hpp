@@ -195,6 +195,10 @@ namespace STM32T
 			return strv(s_buf_strv, len);
 		}
 		
+		const char * c_str() const
+		{
+			return operator strv().data();
+		}
 		
 		operator wstrv() const
 		{

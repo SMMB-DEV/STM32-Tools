@@ -106,7 +106,12 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		
 		void SendUART(strv data)
 		{
-			HAL_UART_Transmit(p_huart, (uint8_t*)data.data(), data.length(), DEFAUL_TRANSMIT_TIMEOUT);
+			HAL_UART_Transmit(p_huart, reinterpret_cast<const uint8_t *>(data.data()), data.length(), DEFAUL_TRANSMIT_TIMEOUT);
+		}
+		
+		void SendUART(const char ch)
+		{
+			HAL_UART_Transmit(p_huart, reinterpret_cast<const uint8_t *>(&ch), 1, DEFAUL_TRANSMIT_TIMEOUT);
 		}
 		
 		virtual int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
