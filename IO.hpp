@@ -1,7 +1,7 @@
 #pragma once
 
-#include "./Timing.hpp"
-#include "./Common.hpp"
+#include "./Core/Time.hpp"
+#include "./Core/Utils.hpp"
 
 
 

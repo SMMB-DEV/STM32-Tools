@@ -1,5 +1,3 @@
-// *** TODO: ADD LICENSE ***
-
 #include "./KS0108B.hpp"
 #include "../Timing.hpp"
 
@@ -467,213 +465,6 @@ namespace STM32T
 	
 	KS0108B::~KS0108B() { delete[] m_screenMap; }
 
-	/*void KS0108B::SetFa(void)
-	{
-		if (!init)
-		{
-			return;
-		}
-		FontFa=new Char[36];
-		////////////////////   1   ////////////////////
-		static const uint8_t
-		dh_comma[4]={0,0,0,0},                 dl_comma[4]={0,6,5,0},
-		dh_semicolon[4]={0,192,160,0},         dl_semicolon[4]={0,6,6,0},
-		dh_q[5]={0,128,128,128,0},             dl_q[5]={3,4,88,0,1},
-		dh_a[5]={12,4,244,4,6},                dl_a[5]={0,0,15,0,0},
-		dh_dal[4]={0,128,0,0},                 dl_dal[4]={0,16,9,6},
-		dh_zal[4]={0,128,32,0},                dl_zal[4]={0,16,9,6},
-		dh_reh[4]={0,0,0,0},                   dl_reh[4]={32,16,8,6},
-		dh_zeh[4]={0,0,0,64},                  dl_zeh[4]={32,16,8,6},
-		dh_ta[8]={0,0,240,0,0,128,128,0},      dl_ta[8]={4,4,7,6,5,4,4,3},
-		dh_za[8]={0,0,240,0,0,160,128,0},      dl_za[8]={4,4,7,6,5,4,4,3},
-		dh_vav[4]={0,0,0,0},                   dl_vav[4]={32,39,53,31};
-		
-		FontFa[0].SetStateCount(1);    FontFa[0].Set(dh_comma,dl_comma,initial,4);
-		FontFa[1].SetStateCount(1);    FontFa[1].Set(dh_semicolon,dl_semicolon,initial,4);
-		FontFa[2].SetStateCount(1);    FontFa[2].Set(dh_q,dl_q,initial,5);
-		FontFa[3].SetStateCount(1);    FontFa[3].Set(dh_a,dl_a,initial,5);
-		FontFa[13].SetStateCount(1);   FontFa[13].Set(dh_dal,dl_dal,initial,4);
-		FontFa[14].SetStateCount(1);   FontFa[14].Set(dh_zal,dl_zal,initial,4);
-		FontFa[15].SetStateCount(1);   FontFa[15].Set(dh_reh,dl_reh,initial,4);
-		FontFa[16].SetStateCount(1);   FontFa[16].Set(dh_zeh,dl_zeh,initial,4);
-		FontFa[22].SetStateCount(1);   FontFa[22].Set(dh_ta,dl_ta,initial,8);
-		FontFa[23].SetStateCount(1);   FontFa[23].Set(dh_za,dl_za,initial,8);
-		FontFa[33].SetStateCount(1);   FontFa[33].Set(dh_vav,dl_vav,initial,4);
-		
-		////////////////////   2   ////////////////////
-		static const uint8_t
-		dh_alef_initial[2]={0,240},                       dl_alef_initial[2]={0,7},
-		dh_alef_final[2]={0,240},                         dl_alef_final[2]={0,3},
-		dh_beh_initial[4]={0,0,0,0},                      dl_beh_initial[4]={4,4,20,3},
-		dh_beh_final[7]={0,0,0,0,0,0,0},                  dl_beh_final[7]={3,4,4,20,4,4,3},
-		dh_peh_initial[4]={0,0,0,0},                      dl_peh_initial[4]={4,20,36,19},
-		dh_peh_final[7]={0,0,0,0,0,0,0},                  dl_peh_final[7]={3,4,20,36,20,4,3},
-		dh_teh_initial[4]={0,64,0,64},                    dl_teh_initial[4]={4,4,4,3},
-		dh_teh_final[7]={0,0,64,0,64,0,0},                dl_teh_final[7]={3,4,4,4,4,4,3},
-		dh_seh_initial[4]={0,64,32,64},                   dl_seh_initial[4]={4,4,4,3},
-		dh_seh_final[7]={0,0,64,32,64,0,0},               dl_seh_final[7]={3,4,4,4,4,4,3},
-		dh_jim_initial[6]={0,0,128,128,0,0},              dl_jim_initial[6]={4,5,4,20,5,2},
-		dh_jim_final[6]={0,0,128,128,0,0},                dl_jim_final[6]={120,133,132,148,133,2},
-		dh_cheh_initial[6]={0,0,128,128,0,0},             dl_cheh_initial[6]={4,5,20,36,21,2},
-		dh_cheh_final[6]={0,0,128,128,0,0},               dl_cheh_final[6]={120,133,148,164,149,2},
-		dh_heh_initial[6]={0,0,128,128,0,0},              dl_heh_initial[6]={4,5,4,4,5,2},
-		dh_heh_final[6]={0,0,128,128,0,0},                dl_heh_final[6]={120,133,132,132,133,2},
-		dh_kheh_initial[6]={0,0,128,160,0,0},             dl_kheh_initial[6]={4,5,4,4,5,2},
-		dh_kheh_final[6]={0,0,128,160,0,0},               dl_kheh_final[6]={120,133,132,132,133,2},
-		dh_zheh_initial[5]={0,0,128,64,128},              dl_zheh_initial[5]={32,16,8,6,0},
-		dh_zheh_final[5]={0,0,128,64,128},                dl_zheh_final[5]={32,16,8,6,4},
-		dh_sad_initial[8]={0,0,0,0,0,128,128,0},          dl_sad_initial[8]={4,7,4,6,5,4,4,3},
-		dh_sad_final[11]={0,0,0,0,0,0,0,0,128,128,0},     dl_sad_final[11]={14,16,16,16,16,15,6,5,4,4,3},
-		dh_zad_initial[8]={0,0,0,0,0,128,160,0},          dl_zad_initial[8]={4,7,4,6,5,4,4,3},
-		dh_zad_final[11]={0,0,0,0,0,0,0,0,128,160,0},     dl_zad_final[11]={14,16,16,16,16,15,6,5,4,4,3},
-		dh_feh_initial[6]={0,0,0,0,64,0},                 dl_feh_initial[6]={4,4,4,7,5,7},
-		dh_feh_final[8]={0,0,0,0,0,0,64,0},               dl_feh_final[8]={3,4,4,4,4,7,5,7},
-		dh_ghaf_initial[6]={0,0,0,64,0,64},               dl_ghaf_initial[6]={4,4,4,7,5,7},
-		dh_ghaf_final[7]={0,0,0,0,64,0,64},               dl_ghaf_final[7]={30,32,32,32,39,37,31},
-		dh_lam_initial[4]={0,0,0,240},                    dl_lam_initial[4]={4,4,4,3},
-		dh_lam_final[5]={0,0,0,0,240},                    dl_lam_final[5]={6,8,8,8,7},
-		dh_mim_initial[5]={0,0,0,0,0},                    dl_mim_initial[5]={4,4,7,7,7},
-		dh_mim_final[5]={0,0,0,0,0},                      dl_mim_final[5]={252,4,7,7,7},
-		dh_noon_initial[4]={0,0,64,0},                    dl_noon_initial[4]={4,4,4,3},
-		dh_noon_final[6]={0,0,0,0,0,0},                   dl_noon_final[6]={14,16,16,17,16,15},
-		dh_yeh_initial[4]={0,0,0,0},                      dl_yeh_initial[4]={4,20,4,19},
-		dh_yeh_final[6]={0,0,0,0,0,0},                    dl_yeh_final[6]={112,128,128,156,148,116};
-		
-		FontFa[5].SetStateCount(2);
-		FontFa[6].SetStateCount(2);
-		FontFa[7].SetStateCount(2);
-		FontFa[8].SetStateCount(2);
-		FontFa[9].SetStateCount(2);
-		FontFa[10].SetStateCount(2);
-		FontFa[11].SetStateCount(2);
-		FontFa[12].SetStateCount(2);
-		FontFa[20].SetStateCount(2);
-		FontFa[21].SetStateCount(2);
-		FontFa[26].SetStateCount(2);
-		FontFa[27].SetStateCount(2);
-		FontFa[30].SetStateCount(2);
-		FontFa[31].SetStateCount(2);
-		FontFa[32].SetStateCount(2);
-		FontFa[35].SetStateCount(2);
-		
-		FontFa[5].Set(dh_beh_initial,dl_beh_initial,initial,4);
-		FontFa[5].Set(dh_beh_final,dl_beh_final,final,7);
-		FontFa[6].Set(dh_peh_initial,dl_peh_initial,initial,4);
-		FontFa[6].Set(dh_peh_final,dl_peh_final,final,7);
-		FontFa[7].Set(dh_teh_initial,dl_teh_initial,initial,4);
-		FontFa[7].Set(dh_teh_final,dl_teh_final,final,7);
-		FontFa[8].Set(dh_seh_initial,dl_seh_initial,initial,4);
-		FontFa[8].Set(dh_seh_final,dl_seh_final,final,7);
-		FontFa[9].Set(dh_jim_initial,dl_jim_initial,initial,6);
-		FontFa[9].Set(dh_jim_final,dl_jim_final,final,6);
-		FontFa[10].Set(dh_cheh_initial,dl_cheh_initial,initial,6);
-		FontFa[10].Set(dh_cheh_final,dl_cheh_final,final,6);
-		FontFa[11].Set(dh_heh_initial,dl_heh_initial,initial,6);
-		FontFa[11].Set(dh_heh_final,dl_heh_final,final,6);
-		FontFa[12].Set(dh_kheh_initial,dl_kheh_initial,initial,6);
-		FontFa[12].Set(dh_kheh_final,dl_kheh_final,final,6);
-		FontFa[20].Set(dh_sad_initial,dl_sad_initial,initial,8);
-		FontFa[20].Set(dh_sad_final,dl_sad_final,final,11);
-		FontFa[21].Set(dh_zad_initial,dl_zad_initial,initial,8);
-		FontFa[21].Set(dh_zad_final,dl_zad_final,final,11);
-		FontFa[26].Set(dh_feh_initial,dl_feh_initial,initial,6);
-		FontFa[26].Set(dh_feh_final,dl_feh_final,final,8);
-		FontFa[27].Set(dh_ghaf_initial,dl_ghaf_initial,initial,6);
-		FontFa[27].Set(dh_ghaf_final,dl_ghaf_final,final,7);
-		FontFa[30].Set(dh_lam_initial,dl_lam_initial,initial,4);
-		FontFa[30].Set(dh_lam_final,dl_lam_final,final,5);
-		FontFa[31].Set(dh_mim_initial,dl_mim_initial,initial,5);
-		FontFa[31].Set(dh_mim_final,dl_mim_final,final,5);
-		FontFa[32].Set(dh_noon_initial,dl_noon_initial,initial,4);
-		FontFa[32].Set(dh_noon_final,dl_noon_final,final,6);
-		FontFa[35].Set(dh_yeh_initial,dl_yeh_initial,initial,4);
-		FontFa[35].Set(dh_yeh_final,dl_yeh_final,final,6);
-		
-		////////////////////   3   ////////////////////
-		FontFa[4].SetStateCount(3);
-		FontFa[17].SetStateCount(3);
-		
-		FontFa[4].Set(dh_alef_initial,dl_alef_initial,initial,2);
-		FontFa[4].Set(dh_alef_final,dl_alef_final,final,2);
-		FontFa[4].Set(dh_alef_final,dl_alef_final,medial,2);
-		FontFa[17].Set(dh_zheh_initial,dl_zheh_initial,initial,5);
-		FontFa[17].Set(dh_zheh_final,dl_zheh_final,final,5);
-		FontFa[17].Set(dh_zheh_final,dl_zheh_final,medial,5);
-		
-		////////////////////   4   ////////////////////
-		static const uint8_t
-		dh_ain_initial[5]={0,0,0,128,128},                  dl_ain_initial[5]={4,4,7,4,4},
-		dh_ain_final[6]={0,128,128,128,128,0},              dl_ain_final[6]={120,133,134,134,5,4},
-		dh_ain_medial[5]={0,128,128,128,128},               dl_ain_medial[5]={4,5,6,6,5},
-		dh_ain_isolated[6]={0,0,0,0,128,128},               dl_ain_isolated[6]={120,132,132,135,4,4},
-		dh_ghain_initial[5]={0,0,0,160,128},                dl_ghain_initial[5]={4,4,7,4,4},
-		dh_ghain_final[6]={0,128,128,160,128,0},            dl_ghain_final[6]={120,133,134,134,5,4},
-		dh_ghain_medial[5]={0,128,160,128,128},             dl_ghain_medial[5]={4,5,6,6,5},
-		dh_ghain_isolated[6]={0,0,0,0,160,128},             dl_ghain_isolated[6]={120,132,132,135,4,4},
-		dh_kaf_initial[7]={0,0,0,224,16,8,4},               dl_kaf_initial[7]={4,4,4,3,0,0,0},
-		dh_kaf_final[10]={0,0,0,0,0,0,224,16,8,4},          dl_kaf_final[10]={3,4,4,4,4,4,3,4,4,4},
-		dh_kaf_medial[7]={0,0,0,224,16,8,4},                dl_kaf_medial[7]={4,4,4,3,4,4,4},
-		dh_kaf_isolated[10]={0,0,0,0,0,0,224,16,8,4},       dl_kaf_isolated[10]={3,4,4,4,4,4,3,0,0,0},
-		dh_gaf_initial[7]={0,0,0,232,20,10,5},              dl_gaf_initial[7]={4,4,4,3,0,0,0},
-		dh_gaf_final[10]={0,0,0,0,0,0,232,20,10,5},         dl_gaf_final[10]={3,4,4,4,4,4,3,4,4,4},
-		dh_gaf_medial[7]={0,0,0,232,20,10,5},               dl_gaf_medial[7]={4,4,4,3,4,4,4},
-		dh_gaf_isolated[10]={0,0,0,0,0,0,232,20,10,5},      dl_gaf_isolated[10]={3,4,4,4,4,4,3,0,0,0},
-		dh_he_initial[8]={0,0,64,192,128,128,128,0},        dl_he_initial[8]={4,4,7,4,6,5,4,7},
-		dh_he_final[5]={0,0,128,128,0},                     dl_he_final[5]={0,3,0,0,3},
-		dh_he_medial[5]={0,0,0,128,128},                    dl_he_medial[5]={4,4,31,36,63},
-		dh_he_isolated[6]={0,0,128,0,0,0},                  dl_he_isolated[6]={0,6,9,9,6,0},
-		
-		dh_sin_initial[7]={0,0,0,0,0,0,0},                  dl_sin_initial[7]={4,4,7,4,7,4,3},
-		dh_sin_final[10]={0,0,0,0,0,0,0,0,0,0},             dl_sin_final[10]={56,64,64,64,64,63,4,7,4,3},
-		dl_sin_medial[7]={4,4,7,4,7,4,7},                   dl_sin_isolated[10]={56,64,64,64,64,63,4,7,4,7},
-		
-		dh_shin_initial[7]={0,0,0,64,32,64,0},              dl_shin_initial[7]={4,4,7,4,7,4,3},	
-		dh_shin_final[10]={0,0,0,0,0,0,64,32,64,0},         dl_shin_final[10]={56,64,64,64,64,63,4,7,4,3},
-		dl_shin_medial[7]={4,4,7,4,7,4,7},	                dl_shin_isolated[10]={56,64,64,64,64,63,4,7,4,7};
-		
-		FontFa[24].SetStateCount(4);
-		FontFa[25].SetStateCount(4);
-		FontFa[28].SetStateCount(4);
-		FontFa[29].SetStateCount(4);
-		FontFa[34].SetStateCount(4);
-		
-		FontFa[24].Set(dh_ain_initial,dl_ain_initial,initial,5);
-		FontFa[24].Set(dh_ain_final,dl_ain_final,final,6);
-		FontFa[24].Set(dh_ain_medial,dl_ain_medial,medial,5);
-		FontFa[24].Set(dh_ain_isolated,dl_ain_isolated,isolated,6);
-		FontFa[25].Set(dh_ghain_initial,dl_ghain_initial,initial,5);
-		FontFa[25].Set(dh_ghain_final,dl_ghain_final,final,6);
-		FontFa[25].Set(dh_ghain_medial,dl_ghain_medial,medial,5);
-		FontFa[25].Set(dh_ghain_isolated,dl_ghain_isolated,isolated,6);
-		FontFa[28].Set(dh_kaf_initial,dl_kaf_initial,initial,7);
-		FontFa[28].Set(dh_kaf_final,dl_kaf_final,final,10);
-		FontFa[28].Set(dh_kaf_medial,dl_kaf_medial,medial,7);
-		FontFa[28].Set(dh_kaf_isolated,dl_kaf_isolated,isolated,10);
-		FontFa[29].Set(dh_gaf_initial,dl_gaf_initial,initial,7);
-		FontFa[29].Set(dh_gaf_final,dl_gaf_final,final,10);
-		FontFa[29].Set(dh_gaf_medial,dl_gaf_medial,medial,7);
-		FontFa[29].Set(dh_gaf_isolated,dl_gaf_isolated,isolated,10);
-		FontFa[34].Set(dh_he_initial,dl_he_initial,initial,8);
-		FontFa[34].Set(dh_he_final,dl_he_final,final,5);
-		FontFa[34].Set(dh_he_medial,dl_he_medial,medial,5);
-		FontFa[34].Set(dh_he_isolated,dl_he_isolated,isolated,6);
-		
-		FontFa[18].SetStateCount(4);
-		FontFa[19].SetStateCount(4);
-		
-		FontFa[18].Set(dh_sin_initial,dl_sin_initial,initial,7);
-		FontFa[18].Set(dh_sin_final,dl_sin_final,final,10);
-		FontFa[18].Set(dh_sin_final,dl_sin_isolated,isolated,10);
-		FontFa[18].Set(dh_sin_initial,dl_sin_medial,medial,7);
-		
-		FontFa[19].Set(dh_shin_initial,dl_shin_initial,initial,7);
-		FontFa[19].Set(dh_shin_final,dl_shin_final,final,10);
-		FontFa[19].Set(dh_shin_final,dl_shin_isolated,isolated,10);
-		FontFa[19].Set(dh_shin_initial,dl_shin_medial,medial,7);
-		
-		faset=1;
-	}*/
-
 
 	void KS0108B::Test()
 	{
@@ -828,54 +619,11 @@ namespace STM32T
 		}
 	}
 
-	/*uint8_t KS0108B::Read(void)
-	{
-		if (init)
-		{
-			uint8_t data=0;
-			GPIO_InitTypeDef GPIO_InitStruct;
-			GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-			GPIO_InitStruct.Pull = GPIO_NOPULL;
-			GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-			for (uint8_t i=0;i<8;i++)
-			{
-				GPIO_InitStruct.Pin = Pin[i];
-				HAL_GPIO_Init(Port[i], &GPIO_InitStruct);
-			}
-			
-			Port[10]->BSRR=Pin[10];
-			Port[9]->BSRR=Pin[9];
-			
-			HAL_GPIO_WritePin(Port[8], Pin[8], GPIO_PIN_RESET);
-			GLCD_Delay_us(80);
-			HAL_GPIO_WritePin(Port[8], Pin[8], GPIO_PIN_SET);
-			GLCD_Delay_us(80);
-			data=(uint8_t)HAL_GPIO_ReadPin(Port[7],Pin[7]);
-			for (int8_t i=6;i>=0;i--)
-			{
-				data<<=1;
-				data|=(uint8_t)HAL_GPIO_ReadPin(Port[i],Pin[i]);
-			}
-			GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-			for (uint8_t i=0;i<8;i++)
-			{
-				GPIO_InitStruct.Pin = Pin[i];
-				HAL_GPIO_Init(Port[i], &GPIO_InitStruct);
-			}
-			
-			CheckCursor();
-			return data;
-		}
-		return 0;
-	}*/
-
 	KS0108B& KS0108B::NextLine(const line_t lines)
 	{
 		bool force = SetPage(0);
 		SetCursor(0, force);
 		SetLine(m_line + lines);
-		
-		//SetLine(m_line+1+Fa);
 		
 		return *this;
 	}
@@ -1228,198 +976,6 @@ namespace STM32T
 		Bitmap(bmp, x, y);
 	}
 
-	/*void KS0108B::PutNum(int32_t num)
-	{
-		uint8_t n[11];
-		itoa(n,num);
-		PutStr(n);
-	}
-
-	void KS0108B::PutNum(float num)
-	{
-		uint8_t n[20];
-		itoa(n,num);
-		PutStr(n);
-	}*/
-
-	/*void KS0108B::PutCharFa(uint8_t ch, State s)
-	{
-		if (faset)
-		{
-			Fa=1;
-			uint8_t w=FontFa[ch].getwidth(s), i;
-			const uint8_t *dh=FontFa[ch].getdh(s), *dl=FontFa[ch].getdl(s);
-			if (m_page==0 && m_cursor+1<w)
-			{
-				Goto(screenLen-1,m_line+2);
-			}
-			uint8_t l=m_line, c=64*m_page+m_cursor+1-w;
-			if (m_row==0)
-			{
-				const uint8_t *d=dh;
-				for (uint8_t j=0;j<2;j++)
-				{
-					Goto(c,l+j);
-					for (i=0;i<w;i++)
-					{
-						Write(d[i] | m_screenMap[m_line][c+i]);
-					}
-					d=dl;
-				}
-			}
-			else
-			{
-				Goto(c,l);
-				for (i=0;i<w;i++)
-				{
-					Write((dh[i]<<m_row) | m_screenMap[m_line][c+i]);
-				}
-				l++;
-				Goto(c,l);
-				for (i=0;i<w;i++)
-				{
-					Write((dh[i]>>(8-m_row)) | (dl[i]<<m_row));
-				}
-				l++;
-				Goto(c,l);
-				for (i=0;i<w;i++)
-				{
-					Write((dl[i]>>(8-m_row)) | m_screenMap[m_line][c+i]);
-				}
-				l-=2;
-			}
-			if (c==0)
-			{
-				Goto(screenLen-1,l+2);
-			}
-			else
-			{
-				Goto(--c,l);
-			}
-			Fa=0;
-		}
-	}
-
-	void KS0108B::PutStrFa(uint8_t *str)
-	{
-		if (faset)
-		{
-			uint8_t c,cp=40;
-			uint16_t len=STRLEN(str),i=0,end=0;
-			State s=initial;
-			while (i<len)
-			{
-				if (i>=end)
-				{
-					end=i;
-					while (str[end]>0x80)
-					{
-						end++;
-					}
-				}
-				if (str[i]>=0xD8 && str[i]<=0xDB)
-				{
-					i++;
-				}
-				if (str[i]<128)
-				{
-					s=initial;
-					cp=40;
-					if (m_cursor+m_page*64+1<6)
-					{
-						Goto(screenLen-1,m_line+2);
-					}
-					Movexy(-6,5);
-					PutChar(str[i]);
-					Movexy(-6,-5);
-				}
-				else
-				{
-					if (str[i]>=0xAA && str[i]<=0xBA && str[i]!=0xAF)
-					{
-						c=str[i]-163+(1*(str[i]>=0xB3))+(1*(str[i]>=0xAD));
-						goto put;
-					}
-					switch (str[i])
-					{
-						case 0x81: c=26;    break;
-						case 0x82: c=27;    break;
-						case 0xA9: c=28;    break;
-						case 0x84: c=30;    break;
-						case 0x85: c=31;    break;
-						
-						case 0xA2: c=3;     break;
-						case 0xA7: c=4;     break;
-						case 0xA8: c=5;     break;
-						case 0x87: c=34;    break;
-						case 0x88: c=33;    break;
-						case 0xBE: c=6;     break;
-						case 0x98: c=17;    break;
-						case 0x9B: c=1;     break;
-						case 0x9F: c=2;     break;
-						case 0x8A: c=35;    break;
-						case 0x8C:
-						{
-							switch (str[i-1])
-							{
-								case 0xD8: c=0;    break;
-								case 0xDB: c=35;   break;
-							}
-							break;
-						}
-						case 0xAF:
-						{
-							switch (str[i-1])
-							{
-								case 0xDA: c=29;   break;
-								case 0xD8: c=13;   break;
-							}
-							break;
-						}
-						case 0x86:
-						{
-							switch (str[i-1])
-							{
-								case 0xDA: c=10;   break;
-								case 0xD9: c=32;   break;
-							}
-							break;
-						}
-					}
-		put:
-					if (cp==40)
-					{
-						s=initial;
-					}
-					else
-					{
-						s=medial;
-					}
-					if (cp<=4 || cp==33 || (cp>=13 && cp<=17))
-					{
-						s=initial;
-					}
-					if (end-i==1)
-					{
-						s=final;
-						if (cp<=4 || cp==33 || (cp>=13 && cp<=17))
-						{
-							s=isolated;
-						}
-					}
-					PutCharFa(c,s);
-					cp=c;
-				}
-				i++;
-			}
-		}
-	}
-
-	void KS0108B::PutStrFa(const char *str)
-	{
-		PutStrFa((uint8_t*)str);
-	}*/
-
 	void KS0108B::Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, bool draw)
 	{
 		if (x1 >= screenLen || x2 >= screenLen || y1 >= SCREEN_WIDTH || y2 >= SCREEN_WIDTH)
@@ -1444,8 +1000,6 @@ namespace STM32T
 			//Horizontal lines
 			//y - y1 = m(x - x1) ===> y - m(x - x1) - y1 = 0
 			
-			//float slope = ((float)dy + sgn(dy)) / (dx + sgn(dx));
-			
 			if (x1 > x2)
 			{
 				std::swap(x1, x2);
@@ -1456,13 +1010,11 @@ namespace STM32T
 			
 			while (x < x2)
 			{
-				//while (y - (int)(slope * (x - x1)) - y1 == 0)
 				while (y - (int)((dy + sgn(dy)) * (x - x1) / (dx + sgn(dx))) - y1 == 0)
 					++x;
 				
 				Line_x(prev_x, y, x - prev_x - 1, draw);
 				prev_x = x;
-				//y += sgn(slope);
 				y += sgn(y2 - y1);
 			}
 			
@@ -1474,8 +1026,6 @@ namespace STM32T
 			//Vertical lines (x -> y , y -> x)
 			//x - x1 = m(y - y1) ===> x - m(y - y1) - x1 = 0
 			
-			//float slope = ((float)dx + sgn(dx)) / (dy + sgn(dy));
-			
 			if (y1 > y2)
 			{
 				std::swap(x1, x2);
@@ -1486,59 +1036,17 @@ namespace STM32T
 			
 			while (y < y2)
 			{
-				//while (x - (int)(slope * (y - y1)) - x1 == 0)
 				while (x - (int)((dx + sgn(dx)) * (y - y1) / (dy + sgn(dy))) - x1 == 0)
 					++y;
 				
 				Line_y(x, prev_y, y - prev_y - 1, draw);
 				prev_y = y;
-				//x += sgn(slope);
 				x += sgn(x2 - x1);
 			}
 			
 			if (y == y2)
 				Pixel(x2, y2, draw);
 		}
-		
-		/*uint8_t maxDelta;
-		bool mirror;
-		float m;
-		
-		if (abs(dx) <= abs(dy))
-		{
-			maxDelta = abs(dy);
-			mirror = true;
-			m = ((float)dx + sgn(dx)) * sgn(dy) / (dy + sgn(dy));	//adds one to dy and dx to account for the end point
-		}
-		else
-		{
-			maxDelta = abs(dx);
-			mirror = false;
-			m = ((float)dy + sgn(dy)) * sgn(dx) / (dx + sgn(dx));
-		}
-		
-		Pixel(x1, y1, draw);
-		
-		int8_t pchange = 0;
-		for (uint8_t i = 1; i <= maxDelta; i++)
-		{
-			float change = m * i;
-			if (mirror)
-			{
-				//y1++;
-				y1 += sgn(dy);
-				x1 += (int8_t)(change - pchange);
-			}
-			else
-			{
-				//x1++;
-				x1 += sgn(dx);
-				y1 += (int8_t)(change - pchange);
-			}
-			
-			Pixel(x1, y1, draw);
-			pchange = change;
-		}*/
 	}
 
 
@@ -1560,66 +1068,6 @@ namespace STM32T
 		
 		if (y2 > y1)
 			Line_y(x2, y1, y2 - y1, draw);
-		
-		/*uint8_t row1 = y1 % 8, row2 = y2 % 8, write = 255 * d, y, jmax, corner;
-		y1 /= 8;
-		y2 /= 8;
-		
-		for (y = y1 + 1; y < y2; y++)
-		{
-			Goto(x1, y);
-			Write(write);
-			Goto(x2, y);
-			Write(write);
-		}
-		y = y1;
-		if (y1 == y2)
-		{
-			corner = 255 >> (7 - row2 + row1) << row1;
-			write = (1 << row1) | (1 << row2);
-			jmax = 1;
-		}
-		else
-		{
-			corner = 255 << row1;
-			write = 1 << row1;
-			jmax = 2;
-		}
-		
-		Goto(x1, y1);
-		
-		for (uint8_t j = 0; j < jmax; j++)
-		{
-			if (d)
-			{
-				Write(corner | m_screenMap[MapIndex(y, x1)]);
-				
-				for (uint8_t x = x1 + 1; x < x2; x++)
-					Write(write | m_screenMap[MapIndex(y, x)]);
-				
-				Write(corner | m_screenMap[MapIndex(y, x2)]);
-			}
-			else
-			{
-				write = ~write;
-				corner = ~corner;
-				
-				Write(corner & m_screenMap[MapIndex(y, x1)]);
-				
-				for (uint8_t x = x1 + 1; x < x2; x++)
-					Write(write & m_screenMap[MapIndex(y, x)]);
-				
-				Write(corner & m_screenMap[MapIndex(y, x2)]);
-			}
-			
-			if (j == jmax - 1)
-				break;
-			
-			write = 128 >> (7 - row2);
-			corner = 255 >> (7 - row2);
-			Goto(x1, y2);
-			y = y2;
-		}*/
 	}
 
 
@@ -1703,52 +1151,6 @@ namespace STM32T
 			for (uint8_t x = x1; x <= x2; ++x, ++index)
 				Write((bit_filter_table[row2] & ~m_screenMap[index]) | (~bit_filter_table[row2] & m_screenMap[index]));
 		}
-		
-		
-		
-		
-		/*uint8_t row1=y1%8,row2=y2%8,_xor,ymax,y;
-		y1/=8;
-		y2/=8;
-		y=y1+1;
-		ymax=y2;
-		if (row1==0)
-			y--;
-		if (row2==7)
-			ymax++;
-		for (;y<ymax;y++)
-		{
-			Goto(x1,y);
-			for (uint8_t x=x1;x<=x2;x++)
-				Write(~m_screenMap[MapIndex(y, x)]);
-		}
-		if (y1!=y2)
-		{
-			Goto(x1,y1);
-			if (row1!=0)
-			{
-				_xor=255<<row1;
-				for (uint8_t x=x1;x<=x2;x++)
-					Write(m_screenMap[MapIndex(y1, x)] ^ _xor);
-			}
-			Goto(x1,y2);
-			if (row2!=7)
-			{
-				_xor=255>>(7-row2);
-				for (uint8_t x=x1;x<=x2;x++)
-					Write(m_screenMap[MapIndex(y2, x)]^_xor);
-			}
-		}
-		else
-		{
-			if (row1!=0 || row2!=7)
-			{
-				Goto(x1,y1);
-				_xor=255>>(7-row2+row1)<<row1;
-				for (uint8_t x=x1;x<=x2;x++)
-					Write(m_screenMap[MapIndex(y1, x)]^_xor);
-			}
-		}*/
 	}
 
 	void KS0108B::Circle(uint8_t x, uint8_t y, uint8_t r, bool draw)
@@ -1868,17 +1270,8 @@ namespace STM32T
 		
 		_y += 8 - _y % 8;
 		
-		//Goto(x - len[y - (_y - 1)] / 2, (_y - 1) / 8);
-		
 		while (_y > y - r)
-		{
-			//for (uint8_t i = 0; i < len[y - _y] - len[y - (_y - 1)]; ++i, ++index)
-			//{
-			//	WriteTop(0xFF * fill, _y % 8);
-			//}
-			
 			--_y;
-		}
 		
 		_y = (y - r);
 		_y += 8 - _y % 8;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Timing.hpp"
+#include "../Core/Time.hpp"
 #include "./ILCD.hpp"
 
 
@@ -181,18 +181,6 @@ namespace STM32T
 					case '\r':
 						return NextLine();
 					
-					/*case '\b':
-					{
-						const uint16_t s = m_line * m_screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1);
-						const uint8_t cursor = s % m_screenLen, line = s / m_screenLen;
-						
-						Goto(cursor, line);
-						PutChar(' ');
-						Goto(cursor, line);
-						
-						return;
-					}*/
-					
 					case '\t':
 					{
 						PutChar(' ');
@@ -200,15 +188,6 @@ namespace STM32T
 						
 						return *this;
 					}
-					
-					/*case 127:	//DEL
-					{
-						uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
-						PutChar(' ');
-						Goto(cursor, line);
-						
-						return;
-					}*/
 				}
 			}
 			

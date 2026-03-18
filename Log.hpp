@@ -1,9 +1,8 @@
 #pragma once
 
-#include "./strv.hpp"
-#include "./Timing.hpp"
+#include "./Core/strv.hpp"
+#include "./Core/Time.hpp"
 
-#include "main.h"
 #include <cstdio>
 
 
@@ -57,7 +56,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	return 0; \
 }
 
-#define STM32T_SYS_WRITE_ITM() \
+#define STM32T_SYS_WRITE_ITM \
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
@@ -100,7 +99,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	return 0;	/* If non-zero is returned once, it stops working. */ \
 }
 
-#define STM32T_SYS_WRITE_DYN() \
+#define STM32T_SYS_WRITE_DYN \
 namespace STM32T::Log \
 { \
 	inline bool (*_g_dynLog)(const uint8_t *buf, uint32_t len) = nullptr; \

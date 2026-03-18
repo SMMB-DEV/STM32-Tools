@@ -1,7 +1,5 @@
 #pragma once
 
-#include "./Timing.hpp"
-
 #include <vector>
 #include <functional>
 #include <type_traits>
@@ -1342,54 +1340,6 @@ namespace STM32T
 			}
 			
 			return std::move(m_items[prio_index]);
-		}
-	};
-	
-	template <typename TIME_T = uint32_t>
-	class Filter
-	{
-		TIME_T (*const cf_cyc)();
-		const TIME_T c_minCyc;
-		
-		TIME_T m_prevCyc = 0, m_prevCyc2 = 0;
-		bool m_prevState = false, m_prevState2 = false;
-		
-	public:
-		Filter(TIME_T min_time, TIME_T (* cyc)() = Time::GetCycle) : c_minCyc(min_time), cf_cyc(cyc) {}
-		
-		/**
-		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
-		*/
-		std::optional<std::pair<TIME_T, bool>> validate(bool state)
-		{
-			const TIME_T now = cf_cyc();
-			
-			if (state == m_prevState)
-				return std::nullopt;
-			
-			const TIME_T duration = now - m_prevCyc;
-			
-			if (duration < c_minCyc)
-			{
-				m_prevState = m_prevState2;
-				m_prevCyc = m_prevCyc2;
-				
-				return std::pair{duration, false};
-			}
-			
-			m_prevState2 = m_prevState;
-			m_prevState = state;
-			
-			m_prevCyc2 = m_prevCyc;
-			m_prevCyc = now;
-			
-			return std::pair{duration, true};
-		}
-		
-		void reset()
-		{
-			m_prevCyc = m_prevCyc2 = cf_cyc();
-			m_prevState = m_prevState2;
 		}
 	};
 	

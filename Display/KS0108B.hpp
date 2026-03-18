@@ -1,5 +1,3 @@
-// *** TODO: ADD LICENSE ***
-
 #pragma once
 
 #include "./ILCD.hpp"
@@ -40,8 +38,6 @@ namespace STM32T
 		static constexpr uint8_t MAX_CHARS = 128, FONT_LENGTH = 5, FONT_WIDTH = PIXELS_PER_LINE;
 		
 	private:
-		//Char *FontFa = nullptr;          //[36];
-		
 		[[gnu::always_inline]] uint16_t MapIndex() const
 		{
 			return m_line * screenLen + m_page * MAX_CURSOR + m_cursor;
@@ -120,8 +116,6 @@ namespace STM32T
 		KS0108B(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), void (*set_cs)(uint8_t), const uint8_t page_count = 2);
 		~KS0108B();
 		
-		//void SetFa();
-		
 		void Test() override;
 		
 		void Init();
@@ -147,7 +141,6 @@ namespace STM32T
 			WriteByteArr(bytes, N);
 		}
 		
-		//uint8_t Read(void);
 		KS0108B& NextLine(const line_t lines = 1) override;								// Goes to the next line and sets the cursor to 0.
 		
 		void Pixel(const uint8_t x, const uint8_t y, bool fill = true);
@@ -157,13 +150,6 @@ namespace STM32T
 		void PutCharBig(const uint8_t ch, bool interpret_specials = true);
 		void PutStrBig(const char* str);
 		void PutStrnBig(const char* str, uint16_t n);
-		
-		//void PutNum(int32_t num);
-		//void PutNum(float num);
-		
-		//void PutCharFa(uint8_t ch, State s);								//Prints a character in Farsi. (ch:0-36   s:initial-medial-final-isolated)
-		//void PutStrFa(uint8_t *str);										//Prints a string in Farsi. (UTF-8 without signature)
-		//void PutStrFa(const char *str);
 		
 		/**
 		* @param bmp - The first four bytes contain two little endian shorts (length and width).

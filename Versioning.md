@@ -14,9 +14,9 @@ The version can be stored (and transferred) as a 32-bit number divided into four
 
 This makes comparing two versions as easy as comparing two 32-bit numbers while taking into account their precedence.
 
-### Pre-release identifiers
+## Pre-release identifiers
 
-Here are the **only** valid pre-release identifiers and their associated number:
+These are the **only** valid pre-release identifiers and their associated number:
 
 |	Number	|	Text Form					|	Meaning								|
 |-----------|-------------------------------|---------------------------------------|
@@ -29,4 +29,4 @@ Here are the **only** valid pre-release identifiers and their associated number:
 |	32		|	-alpha, -alpha0				|	Alpha version						|
 |	0		|	-x							|	Unspecified (not a valid pre-release but when comparing versions, it means that pre-release is not considered)	|
 
-The pre-release usually goes from -alpha to -beta and the to -rc and finally to a normal version but **it can *skip* any of these states**.
+The pre-release usually goes from -alpha to -beta and then to -rc and finally to a normal version but **it can *skip* any of these states**.

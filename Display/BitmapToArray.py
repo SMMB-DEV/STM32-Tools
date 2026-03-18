@@ -55,8 +55,6 @@ for input, output in files.items():
 	assert image.dtype == np.uint8
 	y, x = image.shape
 	
-	# iio.imwrite(os.path.splitext(input)[0] + "-new.bmp", image)
-	
 	file_name = os.path.splitext(os.path.split(output)[1])[0]
 	
 	with open(output, 'w') as output_file:

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../IO.hpp"
-#include "../Timing.hpp"
-#include "../Common.hpp"
+#include "../Core/Time.hpp"
+#include "../Core/Utils.hpp"
 #include "../Error Checking.hpp"
 
 #include <optional>

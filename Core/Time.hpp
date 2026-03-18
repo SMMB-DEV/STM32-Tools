@@ -4,6 +4,7 @@
 
 #include <type_traits>
 #include <limits>
+#include <optional>
 
 
 
@@ -25,11 +26,11 @@ namespace STM32T::Time
 	using us_cycle_t = uint32_t;
 	using ns_cycle_t = uint64_t;
 	
-	#ifndef STM32T_DELAY_CLK
-	#error "STM32T_DELAY_CLK not defined!"
+	#ifndef STM32T_TIME_CLK
+	#error "STM32T_TIME_CLK not defined!"
 	#endif
 	
-	static_assert(STM32T_DELAY_CLK % 1'000'000 == 0, "STM32T_DELAY_CLK must be divisible by 1,000,000!");
+	static_assert(STM32T_TIME_CLK % 1'000'000 == 0, "STM32T_TIME_CLK must be divisible by 1,000,000!");
 	
 	#ifdef DWT
 	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
@@ -53,13 +54,13 @@ namespace STM32T::Time
 	#else
 	inline void Init()
 	{
-		if (1000 * (SysTick->LOAD + 1) != STM32T_DELAY_CLK)
+		if (1000 * (SysTick->LOAD + 1) != STM32T_TIME_CLK)
 			Error_Handler();
 	}
 	
 	inline uint32_t GetCycle()
 	{
-		static constexpr uint32_t MS = STM32T_DELAY_CLK / 1000;
+		static constexpr uint32_t MS = STM32T_TIME_CLK / 1000;
 		
 		const uint32_t
 			big = HAL_GetTick(), small = SysTick->VAL,
@@ -74,38 +75,38 @@ namespace STM32T::Time
 	
 	inline constexpr cycle_t msToCycles(const ms_time_t time_ms)
 	{
-		static_assert(std::numeric_limits<ms_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000) <= std::numeric_limits<cycle_t>::max());
-		return time_ms * (STM32T_DELAY_CLK / 1'000);
+		static_assert(std::numeric_limits<ms_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000) <= std::numeric_limits<cycle_t>::max());
+		return time_ms * (STM32T_TIME_CLK / 1'000);
 	}
 	
 	inline constexpr cycle_t usToCycles(const us_time_t time_us)
 	{
-		static_assert(std::numeric_limits<us_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<cycle_t>::max());
-		return time_us * (STM32T_DELAY_CLK / 1'000'000);
+		static_assert(std::numeric_limits<us_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<cycle_t>::max());
+		return time_us * (STM32T_TIME_CLK / 1'000'000);
 	}
 	
 	inline constexpr cycle_t nsToCycles(const ns_time_t time_ns)
 	{
-		static_assert(std::numeric_limits<ns_time_t>::max() * uintmax_t(STM32T_DELAY_CLK / 1'000'000) / 1000 <= std::numeric_limits<cycle_t>::max());
-		return time_ns * (STM32T_DELAY_CLK / 1'000'000) / 1000;
+		static_assert(std::numeric_limits<ns_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000'000) / 1000 <= std::numeric_limits<cycle_t>::max());
+		return time_ns * (STM32T_TIME_CLK / 1'000'000) / 1000;
 	}
 	
 	inline constexpr ms_cycle_t CyclesTo_ms(cycle_t cyc)
 	{
-		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_DELAY_CLK / 1'000) <= std::numeric_limits<ms_cycle_t>::max());
-		return cyc / (STM32T_DELAY_CLK / 1'000);
+		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_TIME_CLK / 1'000) <= std::numeric_limits<ms_cycle_t>::max());
+		return cyc / (STM32T_TIME_CLK / 1'000);
 	}
 	
 	inline constexpr us_cycle_t CyclesTo_us(cycle_t cyc)
 	{
-		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<us_cycle_t>::max());
-		return cyc / (STM32T_DELAY_CLK / 1'000'000);
+		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<us_cycle_t>::max());
+		return cyc / (STM32T_TIME_CLK / 1'000'000);
 	}
 	
 	inline constexpr ns_cycle_t CyclesTo_ns(cycle_t cyc)
 	{
-		static_assert(std::numeric_limits<cycle_t>::max() * uintmax_t(1000) / (STM32T_DELAY_CLK / 1'000'000) <= std::numeric_limits<ns_cycle_t>::max());
-		return cyc * uint64_t(1000) / (STM32T_DELAY_CLK / 1'000'000);
+		static_assert(std::numeric_limits<cycle_t>::max() * uintmax_t(1000) / (STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<ns_cycle_t>::max());
+		return cyc * uint64_t(1000) / (STM32T_TIME_CLK / 1'000'000);
 	}
 	
 	inline void Delay(cycle_t cyc)
@@ -117,13 +118,13 @@ namespace STM32T::Time
 	inline void Delay_ms(ms_time_t ms)
 	{
 		const uint32_t start = GetCycle(), delay = msToCycles(ms);
-		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_DELAY_CLK is divisible by 1'000'000).
+		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_TIME_CLK is divisible by 1'000'000).
 	}
 	
 	inline void Delay_us(us_time_t us)
 	{
 		const uint32_t start = GetCycle(), delay = usToCycles(us);
-		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_DELAY_CLK is divisible by 1'000'000).
+		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_TIME_CLK is divisible by 1'000'000).
 	}
 	
 	inline void Delay_ns(ns_time_t ns)
@@ -309,4 +310,52 @@ namespace STM32T::Time
 		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
 #endif	// HAL_RTC_MODULE_ENABLED
+	
+	template <typename TIME_T = uint32_t>
+	class Filter
+	{
+		TIME_T (*const cf_cyc)();
+		const TIME_T c_minCyc;
+		
+		TIME_T m_prevCyc = 0, m_prevCyc2 = 0;
+		bool m_prevState = false, m_prevState2 = false;
+		
+	public:
+		Filter(TIME_T min_time, TIME_T (* cyc)() = Time::GetCycle) : c_minCyc(min_time), cf_cyc(cyc) {}
+		
+		/**
+		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
+		*/
+		std::optional<std::pair<TIME_T, bool>> validate(bool state)
+		{
+			const TIME_T now = cf_cyc();
+			
+			if (state == m_prevState)
+				return std::nullopt;
+			
+			const TIME_T duration = now - m_prevCyc;
+			
+			if (duration < c_minCyc)
+			{
+				m_prevState = m_prevState2;
+				m_prevCyc = m_prevCyc2;
+				
+				return std::pair{duration, false};
+			}
+			
+			m_prevState2 = m_prevState;
+			m_prevState = state;
+			
+			m_prevCyc2 = m_prevCyc;
+			m_prevCyc = now;
+			
+			return std::pair{duration, true};
+		}
+		
+		void reset()
+		{
+			m_prevCyc = m_prevCyc2 = cf_cyc();
+			m_prevState = m_prevState2;
+		}
+	};
 }
