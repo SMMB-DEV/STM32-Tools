@@ -177,9 +177,9 @@ namespace STM32T
 		}
 		
 		/**
-		* @param mode - Must be a value of @ref GPIO_mode_define
-		* @param pull - Must be a value of @ref GPIO_pull_define
-		* @param speed - Must be a value of @ref GPIO_speed_define
+		* @param mode - Must be a value of @ref GPIO_mode
+		* @param pull - Must be a value of @ref GPIO_pull
+		* @param speed - Must be a value of @ref GPIO_speed
 		*/
 		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
 		{
@@ -247,14 +247,14 @@ namespace STM32T
 		
 		virtual bool ReadBit(uint8_t bit_number) const
 		{
-			return (Read() >> bit_number) & 1;
+			return (Read() >> bit_number) & 1u;
 		}
 		
 		virtual uint32_t Check() const = 0;
 		
 		virtual bool CheckBit(uint8_t bit_number)
 		{
-			return (Check() >> bit_number) & 1;
+			return (Check() >> bit_number) & 1u;
 		}
 		
 		/**
@@ -262,9 +262,9 @@ namespace STM32T
 		*/
 		virtual bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) = 0;
 		
-		virtual bool SetBit(uint8_t bit_number, bool state)
+		virtual bool SetBit(uint8_t bit_number, bool state = true)
 		{
-			return Set(state << bit_number, 1 << bit_number);
+			return Set(state << bit_number, 1u << bit_number);
 		}
 		
 		/**
@@ -274,7 +274,7 @@ namespace STM32T
 		
 		virtual bool ResetBit(uint8_t bit_number)
 		{
-			return Reset(1 << bit_number);
+			return Reset(1u << bit_number);
 		}
 		
 		virtual void Toggle(const uint32_t mask = 0xFFFF'FFFF)
@@ -284,7 +284,19 @@ namespace STM32T
 		
 		virtual void ToggleBit(uint8_t bit_number)
 		{
-			Toggle(1 << bit_number);
+			Toggle(1u << bit_number);
+		}
+		
+		/**
+		* @param mode - Must be a value of @ref GPIO_mode
+		* @param pull - Must be a value of @ref GPIO_pull
+		* @param speed - Must be a value of @ref GPIO_speed
+		*/
+		virtual void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const uint32_t mask = 0xFFFF'FFFF) = 0;
+		
+		virtual void SetBitMode(uint8_t bit_number, uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
+		{
+			SetMode(mode, pull, speed, 1 << bit_number);
 		}
 		
 		template<typename T = uint32_t>
@@ -300,7 +312,7 @@ namespace STM32T
 		template<typename T = uint32_t>
 		void TimedBit(const T time, uint8_t bit_number, STM32T::Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
 		{
-			Timed<T>(time, state << bit_number, delay, 1 << bit_number);
+			Timed<T>(time, state << bit_number, delay, 1u << bit_number);
 		}
 	};
 	
@@ -346,16 +358,16 @@ namespace STM32T
 		{
 			bool changed = false;
 			
-			for (uint32_t i = 0; i < COUNT; i++)
+			for (size_t i = 0; i < COUNT; i++)
 			{
-				if (mask & (1 << i))
-					changed |= m_pins[i].Set((vals >> i) & 1);
+				if (mask & (1u << i))
+					changed |= m_pins[i].Set((vals >> i) & 1u);
 			}
 			
 			return changed;
 		}
 		
-		bool SetBit(uint8_t bit_number, bool state) override
+		bool SetBit(uint8_t bit_number, bool state = true) override
 		{
 			return m_pins[bit_number].Set(state);
 		}
@@ -372,9 +384,9 @@ namespace STM32T
 		
 		void Toggle(const uint32_t mask = 0xFFFF'FFFF) override
 		{
-			for (uint32_t i = 0; i < COUNT; i++)
+			for (size_t i = 0; i < COUNT; i++)
 			{
-				if (mask & (1 << i))
+				if (mask & (1u << i))
 					m_pins[i].Toggle();
 			}
 		}
@@ -382,6 +394,20 @@ namespace STM32T
 		void ToggleBit(uint8_t bit_number) override
 		{
 			m_pins[bit_number].Toggle();
+		}
+		
+		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const uint32_t mask = 0xFFFF'FFFF) override
+		{
+			for (size_t i = 0; i < COUNT; i++)
+			{
+				if (mask & (1u << i))
+					m_pins[i].SetMode(mode, pull, speed);
+			}
+		}
+		
+		void SetBitMode(uint8_t bit_number, uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW) override
+		{
+			m_pins[bit_number].SetMode(mode, pull, speed);
 		}
 	};
 	

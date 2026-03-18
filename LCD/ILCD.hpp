@@ -41,7 +41,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		ILCD& PutStrn(const char* str, size_t n)
+		ILCD& PutStr(size_t n, const char* str)
 		{
 			while (n--)
 				PutChar(*str++);
@@ -49,9 +49,15 @@ namespace STM32T
 			return *this;
 		}
 		
+		[[deprecated("Use PutStr().")]]
+		ILCD& PutStrn(const char* str, size_t n)
+		{
+			return PutStr(n, str);
+		}
+		
 		ILCD& PutStr(const strv view)
 		{
-			return PutStrn(view.data(), view.length());
+			return PutStr(view.length(), view.data());
 		}
 		
 		template <size_t BUF_SIZE = 64>
@@ -64,7 +70,7 @@ namespace STM32T
 			const int len = vsnprintf(buf, sizeof(buf), fmt, args);
 			va_end(args);
 			
-			return PutStrn(buf, std::min((size_t)len, BUF_SIZE - 1));
+			return PutStr(std::min((size_t)len, BUF_SIZE - 1), buf);
 		}
 		
 		template <size_t BUF_SIZE = 64>
@@ -74,7 +80,7 @@ namespace STM32T
 			
 			const size_t len = std::strftime(buf, std::size(buf), fmt, tm);
 			
-			return PutStrn(buf, len);
+			return PutStr(len, buf);
 		}
 		
 		ILCD& PutStrCtr(const size_t field_width, const strv str)
@@ -120,7 +126,7 @@ namespace STM32T
 			if (len < min_field_width)
 				PutCharn(filler, min_field_width - len);
 			
-			return PutStrn(buf, len);
+			return PutStr(len, buf);
 		}
 		
 		template <typename F, size_t BUF_SIZE = 32>
@@ -134,7 +140,7 @@ namespace STM32T
 			if (result.ec != std::errc())
 				PutChar('?');
 			else
-				PutStrn(buf, result.ptr - buf);
+				PutStr(result.ptr - buf, buf);
 			
 			return *this;
 		}

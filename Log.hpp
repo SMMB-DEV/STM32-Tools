@@ -132,15 +132,15 @@ namespace STM32T::Log
 {
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
-		uint8_t res;
 		uint32_t start = HAL_GetTick();
-		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)data.data(), data.size())) == USBD_BUSY && HAL_GetTick() - start < 50);
+		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && CDC_Transmit_FS((uint8_t*)data.data(), data.size()) == USBD_BUSY && HAL_GetTick() - start < 50);
 	}
 }
 #endif
 
 namespace STM32T::Log
 {
+	// todo: add Fatal handler
 	enum class Level : uint8_t
 	{
 		None, Fatal, Error, Warning, Info, Debug, Max = 255
@@ -156,7 +156,7 @@ namespace STM32T::Log
 			case Level::Warning:	return "Warn "sv;
 			case Level::Info:		return "Info "sv;
 			case Level::Debug:		return "Debug"sv;
-			default:				return " XXX "sv;
+			default:				return " ??? "sv;
 		}
 	}
 	
@@ -196,25 +196,11 @@ namespace STM32T::Log
 			level(level), name(name), outputs(outputs), timestamp(timestamp) {}
 		constexpr Logger(Level level, strv name, timestamp_t timestamp) : level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
 		
-		constexpr Logger Clone(Level level, strv name) const
-		{
-			return Logger(level, name, outputs, timestamp);
-		}
+		constexpr Logger Clone(Level level, strv name) const { return Logger(level, name, outputs, timestamp); }
+		constexpr Logger Clone() const { return Logger(level, name, outputs, timestamp); }
 		
-		constexpr Logger Clone() const
-		{
-			return Logger(level, name, outputs, timestamp);
-		}
-		
-		constexpr bool isEnabled() const
-		{
-			return level > Level::None;
-		}
-		
-		constexpr bool isEnabled(const Level level) const
-		{
-			return this->level >= level;
-		}
+		constexpr bool isEnabled() const { return level > Level::None; }
+		constexpr bool isEnabled(const Level level) const { return this->level >= level; }
 		
 		void log(const Level level, const char *fmt, ...) const
 		{
@@ -648,40 +634,47 @@ namespace STM32T::Log
 			
 			// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
 			const uint32_t reset_flags = RCC->CSR;
-			__HAL_RCC_CLEAR_RESET_FLAGS();
 			
 			LOG_N<level, logger>("Cause of reset: |");
 			
-			if (reset_flags & RCC_CSR_PINRSTF)
-				LOG_N<level, logger>(" Reset Pin |");
+			// b31
+			if (reset_flags & RCC_CSR_LPWRRSTF)
+				LOG_N<level, logger>(" Low Power |");
 			
-			if (reset_flags & RCC_CSR_PORRSTF)
-				LOG_N<level, logger>(" POR/PDR |");
-			
-			if (reset_flags & RCC_CSR_SFTRSTF)
-				LOG_N<level, logger>(" Software |");
-			
-			if (reset_flags & RCC_CSR_IWDGRSTF)
-				LOG_N<level, logger>(" IWDG |");
-			
+			// b30
 			if (reset_flags & RCC_CSR_WWDGRSTF)
 				LOG_N<level, logger>(" WWDG |");
 			
-			if (reset_flags & RCC_CSR_LPWRRSTF)
-				LOG_N<level, logger>(" Low Power |");
+			// b29
+			if (reset_flags & RCC_CSR_IWDGRSTF)
+				LOG_N<level, logger>(" IWDG |");
+			
+			// b28
+			if (reset_flags & RCC_CSR_SFTRSTF)
+				LOG_N<level, logger>(" Software |");
+			
+			// b27
+			#ifdef RCC_CSR_PORRSTF
+			if (reset_flags & RCC_CSR_PORRSTF)
+			#else
+			if (reset_flags & RCC_CSR_PWRRSTF)
+			#endif
+				LOG_N<level, logger>(" POR/PDR |");
+			
+			// b26
+			if (reset_flags & RCC_CSR_PINRSTF)
+				LOG_N<level, logger>(" Reset Pin |");
+			
+			// b25
+			#ifdef RCC_CSR_PORRSTF
+			if (reset_flags & RCC_CSR_BORRSTF)
+				LOG_N<level, logger>(" BOR |");
+			#else
+			if (reset_flags & RCC_CSR_OBLRSTF)
+				LOG_N<level, logger>(" OBL |");
+			#endif
 			
 			LOG_N<level, logger>("\n\n");
 		}
 	}
 }
-
-
-
-using STM32T::Log::LOG_N;
-using STM32T::Log::LOG_F;
-using STM32T::Log::LOG_E;
-using STM32T::Log::LOG_W;
-using STM32T::Log::LOG_I;
-using STM32T::Log::LOG_D;
-using STM32T::Log::LOGA;
-using STM32T::Log::LOGSEP;
