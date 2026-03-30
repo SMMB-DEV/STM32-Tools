@@ -10,10 +10,10 @@ namespace STM32T
 {
 	using std::operator"" sv;
 	
-	template <class CharT>
-	class bstrv : public std::basic_string_view<CharT>
+	template <class CharT, class Traits = std::char_traits<CharT>>
+	class bstrv : public std::basic_string_view<CharT, Traits>
 	{
-		using base = std::basic_string_view<CharT>;
+		using base = std::basic_string_view<CharT, Traits>;
 		
 		static constexpr base whitespace()
 		{
@@ -60,11 +60,15 @@ namespace STM32T
 		using typename base::size_type;
 		using typename base::value_type;
 		
+		using base::back;
 		using base::data;
+		
 		using base::size;
+		using base::empty;
 		using base::remove_prefix;
 		using base::remove_suffix;
 		using base::find;
+		using base::rfind;
 		using base::find_first_not_of;
 		using base::find_last_not_of;
 		
@@ -72,10 +76,23 @@ namespace STM32T
 		
 		constexpr bstrv(base&& other) : base(std::move(other)) {}
 			
-		constexpr bstrv substr(size_type pos, size_type count = npos) const
-		{
-			return base::substr(pos, count);
-		}
+		constexpr bstrv substr(size_type pos, size_type count = npos) const { return base::substr(pos, count); }
+		
+		constexpr bool starts_with(bstrv sv) const noexcept { return bstrv(data(), std::min(size(), sv.size())) == sv; }
+		constexpr bool starts_with(CharT ch) const noexcept { return !empty() && Traits::eq(back(), ch); }
+		constexpr bool starts_with(const CharT *s) const { return starts_with(bstrv(s)); }
+		
+		constexpr bool ends_with(bstrv sv) const noexcept { return size() >= sv.size() && compare(size() - sv.size(), npos, sv) == 0; }
+		constexpr bool ends_with(CharT ch) const noexcept { return !empty() && Traits::eq(back(), ch); }
+		constexpr bool ends_with(const CharT *s) const { return ends_with(bstrv(s)); }
+		
+		constexpr bool contains(bstrv sv) const noexcept { return find(sv) != npos; }
+		constexpr bool contains(CharT c) const noexcept { return find(c) != npos; }
+		constexpr bool contains(const CharT *s) const { return find(s) != npos; }
+		
+		constexpr bool rcontains(bstrv sv) const noexcept { return rfind(sv) != npos; }
+		constexpr bool rcontains(CharT c) const noexcept { return rfind(c) != npos; }
+		constexpr bool rcontains(const CharT *s) const { return rfind(s) != npos; }
 		
 		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens.")]]
 		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
@@ -276,7 +293,7 @@ namespace STM32T
 		
 		bool remove_prefix(base prefix)
 		{
-			if (base::compare(0, prefix.size(), prefix) == 0)
+			if (starts_with(prefix))
 			{
 				remove_prefix(prefix.size());
 				return true;
@@ -285,9 +302,21 @@ namespace STM32T
 			return false;
 		}
 		
+		bool remove_prefix(CharT ch)
+		{
+			if (starts_with(ch))
+			{
+				remove_prefix(1);
+				return true;
+			}
+
+			return false;
+		}
+		bool remove_prefix(const CharT *s) { return remove_prefix(bstrv(s)); }
+		
 		bool remove_suffix(base suffix)
 		{
-			if (size() >= suffix.size() && base::compare(size() - suffix.size(), suffix.size(), suffix) == 0)
+			if (ends_with(suffix))
 			{
 				remove_suffix(suffix.size());
 				return true;
@@ -295,6 +324,19 @@ namespace STM32T
 
 			return false;
 		}
+		
+		bool remove_suffix(CharT ch)
+		{
+			if (ends_with(ch))
+			{
+				remove_suffix(1);
+				return true;
+			}
+
+			return false;
+		}
+		
+		bool remove_suffix(const CharT *s) { return remove_suffix(bstrv(s)); }
 		
 		[[deprecated("Use remove_prefix(strv) instead.")]]
 		bool compare_remove_prefix(base remove)
@@ -316,30 +358,33 @@ namespace STM32T
 		
 		
 		
-		template <typename I>
-		size_t ExtractInteger(I& integer, size_t from = 0, size_t count = bstrv<CharT>::npos) const
+		template <typename N>
+		size_t to_num(N& num, size_t from = 0, size_t count = npos) const
 		{
-			const size_t to = (from + count > from && from + count < size()) ? from + count : size();
+			static_assert(std::is_arithmetic_v<N>);
 			
-			while (from < to && std::isspace(data()[from]))
-				from++;
+			bstrv sub = substr(from, count).trim();
+			sub.remove_prefix(CharT('+'));
 			
-			if (from < to && data()[from] == CharT('+'))
-				from++;
+			if (!sub.empty())
+			{
+				const std::from_chars_result result = std::from_chars(sub.data(), sub.data() + sub.size(), num);
+				if (result.ec == std::errc())
+					return result.ptr - sub.data();
+			}
 			
-			if (to <= from)
-				return 0;
-			
-			const std::from_chars_result result = std::from_chars(data() + from, data() + to, integer);
-			
-			return result.ec == std::errc() ? result.ptr - (data() + from) : 0;
+			return 0;
 		}
+		
+		template <typename I>
+		[[deprecated("Use to_num() instead.")]]
+		size_t ExtractInteger(I& integer, size_t from = 0, size_t count = npos) const { return to_num<I>(integer, from, count); }
 	};
 	
-	using strv = bstrv<std::string_view::value_type>;
-	using u16strv = bstrv<std::u16string_view::value_type>;
-	using u32strv = bstrv<std::u32string_view::value_type>;
-	using wstrv = bstrv<std::wstring_view::value_type>;
+	using strv		= bstrv<std::string_view::value_type>;
+	using u16strv	= bstrv<std::u16string_view::value_type>;
+	using u32strv	= bstrv<std::u32string_view::value_type>;
+	using wstrv		= bstrv<std::wstring_view::value_type>;
 	
 	constexpr strv		operator ""_sv(const char* str, std::size_t len) noexcept		{ return strv(str, len); }
 	constexpr u16strv	operator ""_sv(const char16_t* str, std::size_t len) noexcept	{ return u16strv(str, len); }
@@ -347,7 +392,7 @@ namespace STM32T
 	constexpr wstrv		operator ""_sv(const wchar_t* str, std::size_t len) noexcept	{ return wstrv(str, len); }
 	
 	#if __cplusplus >= 202002L
-	using u8strv = bstrv<std::u8string_view::value_type>;
+	using u8strv	= bstrv<std::u8string_view::value_type>;
 	constexpr u8strv	operator ""_sv(const char8_t* str, std::size_t len) noexcept 	{ return u8strv(str, len); }
 	#endif
 }
