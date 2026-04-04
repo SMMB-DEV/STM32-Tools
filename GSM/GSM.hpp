@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Common.hpp"
-#include "../strv.hpp"
-#include "../span.hpp"
+#include "../Core/Utils.hpp"
+#include "../Core/strv.hpp"
+#include "../Core/span.hpp"
 #include "../Log.hpp"
 
 #include <memory>	// unique_ptr
@@ -730,7 +730,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 				
 				if (int n; sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
 				{
-					view.remove_prefix(n);
+					view.remove_prefix(size_t(n));
 					if (sscanf(view.data(), "%3hhd\"", &dt.zz) != 1)
 					{
 						if (view == "\""sv)
@@ -765,7 +765,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 				
 				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
 				{
-					view.remove_prefix(n);
+					view.remove_prefix(size_t(n));
 					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
 					{
 						if (view.empty())
@@ -877,7 +877,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			if (code != OK)
 				return code;
 			
-			return strv(imei_s, IMEI_LEN).ExtractInteger(imei) == IMEI_LEN ? OK : WRONG_FORMAT;
+			return strv(imei_s, IMEI_LEN).to_num(imei) == IMEI_LEN ? OK : WRONG_FORMAT;
 		}
 		
 		/**
@@ -900,7 +900,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 				return code;
 			
 			strv imsi_sv(imsi, IMSI_LEN);
-			if (imsi_sv.ExtractInteger(mcc, 0, 3) != 3 || imsi_sv.ExtractInteger(mnc, 3, 2) != 2)
+			if (imsi_sv.to_num(mcc, 0, 3) != 3 || imsi_sv.to_num(mnc, 3, 2) != 2)
 				return WRONG_FORMAT;
 			
 			return OK;

@@ -1,5 +1,5 @@
 #include "./KS0108B.hpp"
-#include "../Timing.hpp"
+#include "../Core/Time.hpp"
 
 #include <algorithm>
 

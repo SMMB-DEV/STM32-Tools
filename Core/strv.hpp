@@ -54,11 +54,12 @@ namespace STM32T
 	public:
 		static constexpr base WHITESPACE = whitespace(), NUMBERS = numbers();
 		
-		using base::npos;
 		using typename base::const_pointer;
 		using typename base::pointer;
 		using typename base::size_type;
 		using typename base::value_type;
+		
+		using base::base;
 		
 		using base::back;
 		using base::data;
@@ -67,30 +68,32 @@ namespace STM32T
 		using base::empty;
 		using base::remove_prefix;
 		using base::remove_suffix;
+		
+		using base::compare;
 		using base::find;
 		using base::rfind;
 		using base::find_first_not_of;
 		using base::find_last_not_of;
 		
-		using base::base;
+		using base::npos;
 		
 		constexpr bstrv(base&& other) : base(std::move(other)) {}
 			
 		constexpr bstrv substr(size_type pos, size_type count = npos) const { return base::substr(pos, count); }
 		
-		constexpr bool starts_with(bstrv sv) const noexcept { return bstrv(data(), std::min(size(), sv.size())) == sv; }
+		constexpr bool starts_with(base sv) const noexcept { return base(data(), std::min(size(), sv.size())) == sv; }
 		constexpr bool starts_with(CharT ch) const noexcept { return !empty() && Traits::eq(back(), ch); }
-		constexpr bool starts_with(const CharT *s) const { return starts_with(bstrv(s)); }
+		constexpr bool starts_with(const CharT *s) const { return starts_with(base(s)); }
 		
-		constexpr bool ends_with(bstrv sv) const noexcept { return size() >= sv.size() && compare(size() - sv.size(), npos, sv) == 0; }
+		constexpr bool ends_with(base sv) const noexcept { return size() >= sv.size() && compare(size() - sv.size(), npos, sv) == 0; }
 		constexpr bool ends_with(CharT ch) const noexcept { return !empty() && Traits::eq(back(), ch); }
-		constexpr bool ends_with(const CharT *s) const { return ends_with(bstrv(s)); }
+		constexpr bool ends_with(const CharT *s) const { return ends_with(base(s)); }
 		
-		constexpr bool contains(bstrv sv) const noexcept { return find(sv) != npos; }
+		constexpr bool contains(base sv) const noexcept { return find(sv) != npos; }
 		constexpr bool contains(CharT c) const noexcept { return find(c) != npos; }
 		constexpr bool contains(const CharT *s) const { return find(s) != npos; }
 		
-		constexpr bool rcontains(bstrv sv) const noexcept { return rfind(sv) != npos; }
+		constexpr bool rcontains(base sv) const noexcept { return rfind(sv) != npos; }
 		constexpr bool rcontains(CharT c) const noexcept { return rfind(c) != npos; }
 		constexpr bool rcontains(const CharT *s) const { return rfind(s) != npos; }
 		
@@ -306,7 +309,7 @@ namespace STM32T
 		{
 			if (starts_with(ch))
 			{
-				remove_prefix(1);
+				remove_prefix(1u);
 				return true;
 			}
 

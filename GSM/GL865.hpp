@@ -2,7 +2,7 @@
 
 #include "./GSM.hpp"
 #include "../IO.hpp"
-#include "../span.hpp"
+#include "../Core/span.hpp"
 
 
 
@@ -33,7 +33,7 @@ class GL865 : public STM32T::GSM<120, 22, 50, 3>
 		for (const auto& octet : tokens)
 		{
 			uint8_t x;
-			if (octet.ExtractInteger(x) == 0)
+			if (octet.to_num(x) == 0)
 				return false;
 		}
 		
@@ -204,6 +204,9 @@ public:
 	{
 		static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
 		
+		using STM32T::Log::LOG_D;
+		using STM32T::Log::LOG_W;
+		
 		LOG_D<LG>("Sending SM to %.*s...", number.size(), number.data());
 		
 		auto number2 = std::make_unique<char[]>(number.size() * 4);
@@ -248,7 +251,7 @@ public:
 	
 	ErrorCode Call(strv number, const uint32_t timeout = 30'000)
 	{
-		LOG_D<LG>("Calling %.*s...", number.size(), number.data());
+		STM32T::Log::LOG_D<LG>("Calling %.*s...", number.size(), number.data());
 		return SingleToken(timeout, CommandType::Execute, "D"sv, {{"OK"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "%.*s;", number.size(), number.data());
 	}
 	

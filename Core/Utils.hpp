@@ -1,5 +1,7 @@
 #pragma once
 
+#include "main.h"
+
 #include <vector>
 #include <functional>
 #include <type_traits>
@@ -17,35 +19,12 @@ namespace STM32T
 	template <class T>
 	constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
 	
-	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept
-	{
-		return x * 1024;
-	}
-	
-	inline constexpr size_t operator"" _Ki(long double x) noexcept
-	{
-		return x * 1024;
-	}
-	
-	inline constexpr uint8_t operator"" _u8(unsigned long long x) noexcept
-	{
-		return x;
-	}
-
-	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept
-	{
-		return x;
-	}
-
-	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept
-	{
-		return x;
-	}
-
-	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept
-	{
-		return x;
-	}
+	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept { return x * 1024; }
+	inline constexpr size_t operator"" _Ki(long double x) noexcept { return x * 1024; }
+	inline constexpr uint8_t operator"" _u8(unsigned long long x) noexcept { return x; }
+	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept { return x; }
+	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept { return x; }
+	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept { return x; }
 	
 	template<class T, size_t N>
 	[[deprecated("Use std::size() instead.")]] inline constexpr size_t _countof(const T (&arr)[N]) noexcept
@@ -1246,6 +1225,8 @@ namespace STM32T
 		using parent::full;
 		using parent::clear;
 		
+		enum class PopAction : uint8_t { Cancel, Stop, RemNone, RemFirst, RemSecond, RemBoth };
+		
 		/**
 		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 		*/
@@ -1271,10 +1252,15 @@ namespace STM32T
 		}
 		
 		/**
-		* @param filter - Should return an optional pair of bools indicating which of the two items should be removed.
-		*					If it returns nothing, the search is canceled and the first item is returned, otherwise the search continues.
+		* @param filter - Should return a PopAction value. The behavior of this funtion is determined based on the returned value:
+		*					- Cancel: The search is canceled and nothing is returned.
+		*					- Stop: The search is stopped and the first item is returned.
+		*					- RemNone: The search continues.
+		*					- RemFirst: The first item is removed from the queue and the search continues.
+		*					- RemSecond: The second item is removed from the queue and the search continues.
+		*					- RemBoth: Both items are removed from the queue and the search is restarted.
 		*/
-		std::optional<T> pop_front(const func<std::optional<std::pair<bool, bool>> (const T&, const T&)>& filter = nullptr)
+		std::optional<T> pop_front(const func<PopAction (const T *, std::optional<const T *>)>& filter = nullptr)
 		{
 			const index_t back = m_back, front = m_front;	// For fewer volatile accesses
 			
@@ -1296,7 +1282,7 @@ namespace STM32T
 				return std::nullopt;
 			}
 			
-			if (filter && prio_index != back)
+			if (filter)
 			{
 				index_t i = prio_index;
 				++i;
@@ -1305,41 +1291,69 @@ namespace STM32T
 				{
 					if (m_prio[i] == max_prio)
 					{
-						const auto opt = filter(m_items[prio_index], m_items[i]);
-						if (!opt)
-							break;
+						const PopAction action = filter(&m_items[prio_index], &m_items[i]);
 						
-						const auto [rem_first, rem_second] = *opt;
-						
-						if (rem_first && rem_second)
+						switch (action)
 						{
-							m_prio[prio_index] = m_prio[i] = 0;
-							return pop_front(filter);
+							case PopAction::Cancel:
+								goto cleanupOnly;
+							
+							case PopAction::Stop:
+								goto ret;
+							
+							case PopAction::RemNone:
+								break;
+							
+							case PopAction::RemFirst:
+								m_prio[prio_index] = 0;
+								prio_index = i;
+								break;
+							
+							case PopAction::RemSecond:
+								m_prio[i] = 0;
+								break;
+							
+							case PopAction::RemBoth:
+								m_prio[prio_index] = m_prio[i] = 0;
+								return pop_front(filter);
 						}
-						else if (rem_first)
-						{
-							m_prio[prio_index] = 0;
-							prio_index = i;
-						}
-						else if (rem_second)
-							m_prio[i] = 0;
 					}
+				}
+				
+				const PopAction action = filter(&m_items[prio_index], std::nullopt);
+				
+				switch (action)
+				{
+					case PopAction::Cancel:
+						goto cleanupOnly;
+					
+					case PopAction::Stop:
+					case PopAction::RemNone:
+					case PopAction::RemSecond:
+						break;
+					
+					case PopAction::RemFirst:
+					case PopAction::RemBoth:
+						m_front = back;		// Can't call clear(). m_back might have changed.
+						return std::nullopt;
 				}
 			}
 			
-			
+		ret:
 			m_prio[prio_index] = 0;
 			
 			// Remove handled items at the beginning of the list
-			for (index_t i = front; i != back; ++i)
-			{
-				if (m_prio[i])
-					break;
-				
+			for (index_t i = front; i != back && !m_prio[i]; ++i)
 				++m_front;
-			}
 			
 			return std::move(m_items[prio_index]);
+			
+		cleanupOnly:
+			// Remove handled items at the beginning of the list
+			for (index_t i = front; i != back && !m_prio[i]; ++i)
+				++m_front;
+			
+			return std::nullopt;
 		}
 	};
 	
@@ -1349,7 +1363,6 @@ namespace STM32T
 	template<> struct __attribute__((deprecated)) warn_if<false> { constexpr warn_if() = default; };
 	
 	#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
-	//#define static_warn(x, ...) (__attribute__((deprecated)) (void))
 	
 	template<typename T>
 	inline T pack_be(const void *buf)
@@ -1436,18 +1449,18 @@ namespace STM32T
 	template <class F, class R, class... Args>
 	inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, void (* const fail)(), Args&&... args)
 	{
-		if (_try(std::forward<Args>(args)...) == ok)
+		if (_try() == ok)
 			return true;
 		
 		while (retry--)
 		{
 			HAL_Delay(delay_ms);
-			if (_try(std::forward<Args>(args)...) == ok)
+			if (_try() == ok)
 				return true;
 		}
 		
 		if (fail)
-			fail();
+			fail(std::forward<Args>(args)...);
 		
 		return false;
 	}
