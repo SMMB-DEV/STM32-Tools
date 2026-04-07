@@ -195,8 +195,9 @@ namespace STM32T::Log
 			level(level), name(name), outputs(outputs), timestamp(timestamp) {}
 		constexpr Logger(Level level, strv name, timestamp_t timestamp) : level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
 		
-		constexpr Logger Clone(Level level, strv name) const { return Logger(level, name, outputs, timestamp); }
 		constexpr Logger Clone() const { return Logger(level, name, outputs, timestamp); }
+		constexpr Logger Clone(strv name) const { return Logger(level, name, outputs, timestamp); }
+		constexpr Logger Clone(Level level, strv name) const { return Logger(level, name, outputs, timestamp); }
 		
 		constexpr bool isEnabled() const { return level > Level::None; }
 		constexpr bool isEnabled(const Level level) const { return this->level >= level; }
@@ -222,12 +223,13 @@ namespace STM32T::Log
 				if (timestamp)
 					dispatch_format(timestamp());
 				
-				dispatch_format(LevelStr(level));
+				if (level != Level::Max)
+					dispatch_format(LevelStr(level));
 				
 				if (!name.empty())
 					dispatch_format(name);
 				
-				dispatch_chunk(": ", 2);
+				dispatch_chunk(": "sv);
 			}
 			
 			size_t written = 0;

@@ -16,7 +16,7 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 
 
-class GL865 : public STM32T::GSM<120, 22, 50, 3>
+class GL865 : public STM32T::GSM<120, 50>
 {
 	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 500'000;
 	
@@ -300,7 +300,8 @@ public:
 			return INVALID;
 		
 		// \r\n#SGACT: xxx.xxx.xxx.xxx\r\n + \r\nOK\r\n
-		return ResponseToken<27 + 6>(timeout_ms, CommandType::Write, "#SGACT"sv, [](strv token) { return OK; }, true, "%hhu,%hhu", cid, enable);
+		return ResponseToken(timeout_ms, CommandType::Write, "#SGACT"sv, [](strv token) { return IsIPAddress(token) ? OK : WRONG_FORMAT; }, true, "%hhu,%hhu",
+			cid, enable);
 	}
 	
 	int32_t ContextStatus(const uint8_t cid)
@@ -414,30 +415,18 @@ public:
 		if (conn_id < MIN_CONN_ID || conn_id > MAX_CONN_ID || len > 1500)
 			return INVALID;
 		
-		timeout_ms += SEND_GUARD_TIME;
-		const uint32_t start = HAL_GetTick();
-		
-		ErrorCode code = NoToken<2>(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SRECV"sv, [](strv data) -> ErrorCode
-		{
-			return data == "\r\n"sv ? OK : ERR;
-		}, "%hhu,%hu", conn_id, len);
-		
-		if (code != OK)
-			return code;
-		
-		m_noSendWait = true;
-		
 		// #SRECV: x,yyyy\r\n + \r\ndata\r\n + \r\nOK\r\n
-		return ResponseToken<16 + 4 + 1500 * 2 + 6>(3, STM32T::Time::Remaining_Tick(start, timeout_ms), CommandType::Bare, "#SRECV"sv, {}, 2,
+		return ResponseToken<DEFAULT_ARG_LEN, 16 + 4 + 1500 * 2 + 6>(3, timeout_ms, CommandType::Write, "#SRECV"sv, 2,
 		[this, conn_id, len, data](std::vector<strv>& tokens) -> ErrorCode
 		{
 			uint8_t recv_conn_id;
 			uint16_t recv_len;
 			
-			if (2 != sscanf(tokens[0].data(), "%1hhu,%4hu", &recv_conn_id, &recv_len) || recv_len > len || tokens[1].size() != recv_len * 2 || recv_conn_id != conn_id)
+			if (2 != sscanf(tokens[0].data(), "%1hhu,%4hu", &recv_conn_id, &recv_len)
+				|| recv_len > len || tokens[1].size() != recv_len * 2 || recv_conn_id != conn_id)
 				return WRONG_FORMAT;
 			
-			for (uint16_t i = 0, j = 0; i < tokens[1].size(); i++, j += 2)
+			for (uint16_t i = 0, j = 0; i < recv_len; i++, j += 2)
 			{
 				const auto opt = STM32T::C2H<uint8_t>(tokens[1].data() + j);
 				if (!opt)
@@ -448,7 +437,7 @@ public:
 			}
 			
 			return ErrorCode(recv_len);
-		});
+		}, "%hhu,%hu", conn_id, len);
 	}
 	
 	ErrorCode FTPTimeout(uint32_t ftp_to)

@@ -78,6 +78,7 @@ namespace STM32T
 		using base::npos;
 		
 		constexpr bstrv(base&& other) : base(std::move(other)) {}
+		constexpr bstrv(const std::basic_string<CharT, Traits>& str) : bstrv(base(str)) {}
 			
 		constexpr bstrv substr(size_type pos, size_type count = npos) const { return base::substr(pos, count); }
 		

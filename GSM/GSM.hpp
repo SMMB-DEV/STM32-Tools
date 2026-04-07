@@ -30,14 +30,14 @@ CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_C
 CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
 
 
-	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t SEND_GUARD = 0, uint32_t SEND_DELAY = 0, size_t DEF_RESP_LEN = 64, size_t DEF_ARG_LEN = 64>
+	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20>
 	class GSM
 	{
-		using This = GSM<DEF_RX_TO, DEF_IDLE_TO, SEND_GUARD, SEND_DELAY, DEF_RESP_LEN, DEF_ARG_LEN>;
+		using This = GSM<DEF_RX_TO, DEF_IDLE_TO>;
 		
 	public:
 		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15;
-		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO, SEND_GUARD_TIME = SEND_GUARD, SEND_DELAY_TIME = SEND_DELAY;
+		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO;
 		
 		#ifdef HAL_UART_TIMEOUT_VALUE
 		static constexpr uint32_t DEFAUL_TRANSMIT_TIMEOUT = HAL_UART_TIMEOUT_VALUE;
@@ -71,7 +71,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 	protected:
 		static constexpr STM32T::Log::Logger LG = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
 		
-		static constexpr size_t DEFAULT_RESPONSE_LEN = DEF_RESP_LEN, DEFAULT_ARG_LEN = DEF_ARG_LEN;
+		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
 		
 		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv, CMD_MODE = "+++"sv;
 		
@@ -91,10 +91,10 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		bool m_urcEnabled = false, m_noSendWait = false, m_noSendDelay = false;
 		
 		
-		void addURCs(const vec<strv>& tokens)
+		void addURCs(const vec<strv>& tokens, size_t len = SIZE_MAX)
 		{
-			for (auto& token: tokens)
-				addURC(token);
+			for (size_t i = 0; i < tokens.size() && i < len; ++i)
+				addURC(tokens[i]);
 		}
 		
 		void addURCFromBuf(const strv buf)
@@ -118,22 +118,6 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		
 		int32_t Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, const uint16_t len)
 		{
-			const bool data_sent = type != CommandType::Bare || !args.empty();
-			
-			if constexpr (SEND_GUARD_TIME)
-			{
-				if (data_sent)
-				{
-					if (m_noSendWait)
-						m_noSendWait = false;
-					else
-					{
-						while (HAL_GetTick() - m_lastSend <= SEND_GUARD_TIME);
-						m_lastSend = HAL_GetTick();
-					}
-				}
-			}
-			
 			if (type != CommandType::Bare)
 			{
 				SendUART("AT"sv);
@@ -150,17 +134,6 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			
 			if (type != CommandType::Bare)
 				SendUART("\r"sv);
-			
-			if constexpr (SEND_DELAY_TIME)
-			{
-				if (data_sent)
-				{
-					if (m_noSendDelay)
-						m_noSendDelay = false;
-					else
-						HAL_Delay(SEND_DELAY_TIME);
-				}
-			}
 			
 			if (buffer && len)
 			{
@@ -515,37 +488,49 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
+		ErrorCode ResponseToken(size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
 			const func<ErrorCode (vec<strv>&)>& op)
 		{
 			if (!op)
 				return INVALID_PARAM;
 			
-			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens) -> ErrorCode
+			return Tokens2<LEN>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](vec<strv>& tokens) mutable -> ErrorCode
 			{
-				bool ok = tokens.size() == expectedTokens;
+				bool ok = tokens.size() >= expectedTokens;
+				size_t offset = 0;
 				
 				if (ok && ok_pos < expectedTokens)
 				{
-					ok &= tokens[ok_pos] == "OK"sv;
-					if (ok)
-						tokens.erase(tokens.begin() + ok_pos);
+					--expectedTokens;
+					ok = false;
+					for (; offset + ok_pos < tokens.size(); ++offset)
+					{
+						if (tokens[offset + ok_pos] == "OK"sv)
+						{
+							tokens.erase(tokens.begin() + offset + ok_pos);
+							ok = true;
+							break;
+						}
+					}
 				}
 				
 				if (ok)
 				{
-					const auto first = tokens[0];
-					ok &= tokens[0].remove_prefix(cmd) && (tokens[0].remove_prefix(": "sv) || tokens[0].remove_prefix(":"sv));
+					const auto first = tokens[offset];
+					ok &= tokens[offset].remove_prefix(cmd) && (tokens[offset].remove_prefix(": "sv) || tokens[offset].remove_prefix(":"sv));
 					if (!ok)
-						tokens[0] = first;
+						tokens[offset] = first;
 				}
 				
 				if (!ok)
-				{
-					//addURCs(tokens);
-					//return UNKNOWN;
 					return Error(tokens);
-				}
+				
+				addURCs(tokens, offset);
+				for (size_t i = offset + expectedTokens; i < tokens.size(); ++i)
+					addURC(tokens[i]);
+				
+				tokens.erase(tokens.begin(), tokens.begin() + offset);
+				tokens.erase(tokens.begin() + expectedTokens, tokens.end());
 				
 				return op(tokens);
 			});
@@ -641,9 +626,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			if (code != OK || done)
 				return code;
 			
-			m_noSendWait = true;
-			
-			return ResponseToken<LEN>(1, Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd, strv(), SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
+			return ResponseToken<LEN>(1, Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd, {}, SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -910,8 +893,8 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 	private:
 		class URC
 		{
-			friend class GSM<DEF_RX_TO, DEF_IDLE_TO, SEND_GUARD, SEND_DELAY, DEF_RESP_LEN, DEF_ARG_LEN>;
-			friend class LinkedList<URC, 64>;
+			friend class GSM<DEF_RX_TO, DEF_IDLE_TO>;
+			friend class LinkedList<URC, 32>;
 			
 			char *m_buf;
 			size_t m_size;
@@ -942,7 +925,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		};
 		
 		uint8_t m_buf[512];
-		LinkedList<URC, 64> m_urcs;
+		LinkedList<URC, 32> m_urcs;
 		
 		static inline This *s_this = nullptr;
 		

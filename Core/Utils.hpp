@@ -1485,6 +1485,8 @@ namespace STM32T
 				_fail; \
 		} \
 	}
+	
+	inline constexpr void Assert(const bool cond) { assert_param(cond); }
 }
 
 using STM32T::_countof;
