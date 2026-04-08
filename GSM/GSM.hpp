@@ -71,7 +71,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 	protected:
 		static constexpr STM32T::Log::Logger LG = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
 		
-		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64;
+		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64, RESPONSE_EXTRA = 12;
 		
 		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv, CMD_MODE = "+++"sv;
 		
@@ -494,7 +494,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			if (!op)
 				return INVALID_PARAM;
 			
-			return Tokens2<LEN>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](vec<strv>& tokens) mutable -> ErrorCode
+			return Tokens2<LEN + RESPONSE_EXTRA>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](vec<strv>& tokens) mutable -> ErrorCode
 			{
 				bool ok = tokens.size() >= expectedTokens;
 				size_t offset = 0;

@@ -1486,7 +1486,13 @@ namespace STM32T
 		} \
 	}
 	
-	inline constexpr void Assert(const bool cond) { assert_param(cond); }
 }
+
+#ifdef STM32T_ASSERT
+
+extern "C" void AssertFailed(const char *file, uint32_t line);
+
+#define ASSERT(cond)	((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__))
+#endif	// STM32T_ASSERT
 
 using STM32T::_countof;

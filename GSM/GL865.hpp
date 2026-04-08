@@ -16,7 +16,7 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 
 
-class GL865 : public STM32T::GSM<120, 50>
+class GL865 : public STM32T::GSM<130, 50>
 {
 	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 500'000;
 	
