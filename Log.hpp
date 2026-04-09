@@ -96,7 +96,7 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 	\
 	uint8_t res = USBD_OK; \
 	uint32_t start = HAL_GetTick(); \
-	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 100); \
+	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 50); \
 	return 0;	/* If non-zero is returned once, it stops working. */ \
 }
 
@@ -132,8 +132,58 @@ namespace STM32T::Log
 {
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
-		uint32_t start = HAL_GetTick();
-		while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && CDC_Transmit_FS((uint8_t*)data.data(), data.size()) == USBD_BUSY && HAL_GetTick() - start < 50);
+		static constexpr uint32_t TIMEOUT = 50;
+		
+		static char s_buf[CDC_DATA_FS_MAX_PACKET_SIZE];
+		static size_t s_index = 0;
+		
+		static auto send = [](const char *buf, uint16_t len)
+		{
+			const uint32_t start = HAL_GetTick();
+			
+			while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED
+				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
+				&& HAL_GetTick() - start < TIMEOUT);
+		};
+		
+		
+		if (s_index)
+		{
+			if (s_index + data.size() < std::size(s_buf))
+			{
+				std::memcpy(s_buf + s_index, data.data(), data.size());
+				s_index += data.size();
+				
+				if (last_chunk)
+				{
+					send(s_buf, s_index);
+					s_index = 0;
+				}
+				
+				return;
+			}
+			
+			const size_t copied = std::size(s_buf) - s_index;
+			std::memcpy(s_buf + s_index, data.data(), copied);
+			
+			send(s_buf, std::size(s_buf));
+			s_index = 0;
+			data.remove_prefix(copied);
+		}
+		
+		while (data.size() >= std::size(s_buf))
+		{
+			send(data.data(), std::size(s_buf));
+			data.remove_prefix(std::size(s_buf));
+		}
+		
+		if (!last_chunk)
+		{
+			std::memcpy(s_buf, data.data(), data.size());
+			s_index = data.size();
+		}
+		else
+			send(data.data(), data.size());
 	}
 }
 #endif
