@@ -321,4 +321,6 @@ namespace STM32T
 			}
 		}
 	};
+	
+	constexpr Version VER(0, 1, 0, Version::Normal);		// Current version of the framework
 }

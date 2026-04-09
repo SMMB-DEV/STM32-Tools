@@ -2,6 +2,7 @@
 
 #include "./Core/strv.hpp"
 #include "./Core/Time.hpp"
+#include "./Versioning.hpp"
 
 #include <cstdio>
 
@@ -626,9 +627,12 @@ namespace STM32T::Log
 		{
 			LOG_N<level, logger>("\n\n\n--------------------------------------------------------------------------------\nStart!\n");
 			
+			strv ver = VER;
+			LOG_N<level, logger>("\nSTM32T v%.*s\n", ver.size(), ver.data());
+			
 			const uint32_t version = HAL_GetHalVersion();	// major.minor.patch-rc
 			
-			LOG_N<level, logger>("\nHAL v%hhu.%hhu.%hhu-rc%hhu\n" "RevID: 0x%04X, DevID: 0x%03X, UID: 0x%08X%08X%08X\n" "HCLK: %.1f MHz\n",
+			LOG_N<level, logger>("HAL v%hhu.%hhu.%hhu-rc%hhu\nRevID: 0x%04X, DevID: 0x%03X, UID: 0x%08X%08X%08X\nHCLK: %.1f MHz\n",
 				version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
 				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
 				HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
