@@ -16,3 +16,7 @@ The module also has functions for working with the conventional tick provided by
 - Checking if a certain amount of time has passed since a specific cycle or tick.
 - Add or subtract an amount of time to a pair of `RTC_DateTypeDef` and `RTC_TimeTypeDef`
 - A `Filter` class to remove spurious changes in a boolean stream (e.g. the state of a pin)
+
+---
+
+##### [Go Back](./README.md)

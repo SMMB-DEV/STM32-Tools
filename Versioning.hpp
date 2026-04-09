@@ -51,7 +51,7 @@ namespace STM32T
 		/**
 		* @brief Constructs an invald Version.
 		*/
-		Version() : m_data{ 0 } {}
+		constexpr Version() : m_data{ 0 } {}
 		constexpr Version(const uint32_t val) : m_data{.val = val} {}
 		constexpr Version(const uint8_t major, const uint8_t minor, const uint8_t patch, const PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
 		
@@ -259,12 +259,19 @@ namespace STM32T
 				ver.remove_prefix(std::min(sep_idx + 1, ver.size()));
 			}
 			
+			bool gamma_delta = false;
+			
 			if (ver.remove_prefix("alpha"sv))
 				data.arr[0] = Alpha0;
 			else if (ver.remove_prefix("beta"sv))
 				data.arr[0] = Beta0;
 			else if (ver.remove_prefix("rc"sv))
 				data.arr[0] = RC0;
+			else if (ver.remove_prefix("gamma"sv) || ver.remove_prefix("delta"sv))
+			{
+				gamma_delta = true;
+				data.arr[0] = RC0;
+			}
 			else if (ver == "x"sv)
 				data.arr[0] = Unspecified;
 			else if (ver.empty())
@@ -272,8 +279,11 @@ namespace STM32T
 			else
 				return Version();
 			
-			if (data.arr[0] != Unspecified && data.arr[0] != Normal && !ver.empty())
+			if (!ver.empty() && data.arr[0] != Unspecified && data.arr[0] != Normal)
 			{
+				if (gamma_delta)
+					return Version();
+				
 				uint8_t val;
 				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + ver.size(), val);
 				

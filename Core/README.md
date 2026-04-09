@@ -1,6 +1,6 @@
 # Core Module
 
-The Core module contains core utilities and header file that are not dependent on other modules or headers in this framework.
+The Core module contains core utilities and header files that are not dependent on other modules or headers in this framework.
 
 # Headers
 

@@ -1,4 +1,4 @@
-# STM32 Tools
+# STM32 Tools (v0.1.0)
 
 STM32T is a framework of useful utilities for working with STM32 microcontrollers. It is written in C++17 with only Keil (MDK-ARM) projects in mind.
 It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL functions and typedefs.
