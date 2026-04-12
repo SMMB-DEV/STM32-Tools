@@ -1493,6 +1493,8 @@ namespace STM32T
 extern "C" void AssertFailed(const char *file, uint32_t line);
 
 #define ASSERT(cond)	((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__))
+#else
+#define ASSERT(cond)	((void)0U)
 #endif	// STM32T_ASSERT
 
 using STM32T::_countof;
