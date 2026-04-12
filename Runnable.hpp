@@ -76,16 +76,16 @@ public:
 		if (s_lastIndex >= s_list.size())
 			s_lastIndex = 0;
 		
-		for (; s_lastIndex < s_list.size(); s_lastIndex++)
+		for (; s_lastIndex < s_list.size(); ++s_lastIndex)
 		{
 			if (const uint32_t now  = HAL_GetTick(); now - s_list[s_lastIndex].m_lastTime >= s_list[s_lastIndex].c_interval)
 			{
 				s_list[s_lastIndex].p_callable();
 				
 				if (!s_list[s_lastIndex].c_repeat)
-					s_list.erase(s_list.begin() + s_lastIndex--);
+					s_list.erase(s_list.begin() + s_lastIndex);
 				else
-					s_list[s_lastIndex].m_lastTime = now;
+					s_list[s_lastIndex++].m_lastTime = now;
 				
 				return;
 			}
