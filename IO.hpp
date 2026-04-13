@@ -163,15 +163,14 @@ namespace STM32T
 		
 		[[gnu::always_inline]] bool Set(bool state = true) override
 		{
+			const bool old = Check();
 			cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
 			
-			return true;	// todo: return actual change
+			return old != state;
 		}
 		
 		[[gnu::always_inline]] void Toggle() override
 		{
-			//cp_port->ODR ^= c_pin;
-			
 			const uint32_t odr = cp_port->ODR;
 			cp_port->BSRR = ((odr & c_pin) << GPIO_NUMBER) | (~odr & c_pin);	// Simply XORing ODR is not atomic.
 		}
