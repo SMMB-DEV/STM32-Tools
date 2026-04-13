@@ -16,7 +16,7 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 
 
-class GL865 : public STM32T::GSM<130, 50>
+class GL865 : public STM32T::GSM<130, 55>
 {
 	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 500'000;
 	
@@ -261,8 +261,8 @@ public:
 	}
 	
 	/**
-	* @param rssi - Signal strength in dbm. Not vailable if positive or zero.
-	* @param ber - Bit error rate (best case) in thousandths. Not vailable if negative.
+	* @param rssi - Signal strength in dbm. Not available if positive or zero.
+	* @param ber - Bit error rate (best case) in thousandths. Not available if negative.
 	*/
 	ErrorCode SignalQuality(int8_t& rssi, int16_t& ber)
 	{
