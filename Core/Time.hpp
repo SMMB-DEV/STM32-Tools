@@ -209,7 +209,8 @@ namespace STM32T::Time
 		while (GetCycle() - startCycle <= wait);
 	}
 	
-#ifdef HAL_RTC_MODULE_ENABLED
+	#ifdef HAL_RTC_MODULE_ENABLED
+	[[deprecated]]
 	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
 	{
 		// 24-Hour/Binary Format
@@ -223,8 +224,8 @@ namespace STM32T::Time
 		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
 		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
 		
-		int16_t mins = (sec / 60) % 60;
-		int16_t hours = (sec / (60 * 60)) % 24;
+		int8_t mins = (sec / 60) % 60;
+		int8_t hours = (sec / (60 * 60)) % 24;
 		int8_t days = sec / (24 * 60 * 60);
 		
 		if (sec > 0)
@@ -309,7 +310,47 @@ namespace STM32T::Time
 		
 		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
-#endif	// HAL_RTC_MODULE_ENABLED
+	
+	/**
+	* @note Expects date and time in 24-Hour, binary format. SubSeconds and SecondFraction must be set.
+	*/
+	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int64_t ms, uint16_t year_start = 2000)
+	{
+		std::tm tm{.tm_sec = time.Seconds, .tm_min = time.Minutes, .tm_hour = time.Hours,
+			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
+		
+		std::time_t ts = std::mktime(&tm) + (ms / 1000);
+		ms %= 1000;
+		
+		uint16_t msec = 1000u * (time.SecondFraction - time.SubSeconds) / (time.SecondFraction + 1u);
+		
+		if (ms >= 0)
+			msec += ms;
+		else
+		{
+			msec += 1000 + ms;
+			--ts;
+		}
+		
+		if (msec >= 1000)
+		{
+			msec -= 1000;
+			++ts;
+		}
+		
+		std::tm *tm2 = std::localtime(&ts);
+		
+		date.Year = tm2->tm_year % 100;
+		date.Month = tm2->tm_mon + 1;
+		date.Date = tm2->tm_mday;
+		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
+		
+		time.Minutes = tm2->tm_min;
+		time.Hours = tm2->tm_hour;
+		time.Seconds = tm2->tm_sec;
+		time.SubSeconds = time.SecondFraction - (time.SecondFraction + 1u) * msec / 1000u;
+	}
+	#endif	// HAL_RTC_MODULE_ENABLED
 	
 	template <typename TIME_T = uint32_t>
 	class Filter
