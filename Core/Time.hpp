@@ -209,7 +209,24 @@ namespace STM32T::Time
 		while (GetCycle() - startCycle <= wait);
 	}
 	
+	/**
+	* @param month - [0:11]
+	*/
+	inline constexpr uint8_t MonthDays(int month, int year = 2000)
+	{
+		constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
+		
+		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
+		const bool isLeapYear = year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
+		return MONTH_DAYS[month] + (month == 1 && isLeapYear);
+	}
+	
 	#ifdef HAL_RTC_MODULE_ENABLED
+	inline uint32_t GetSecondFraction(RTC_HandleTypeDef *hrtc)
+	{
+		return hrtc->Instance->PRER & RTC_PRER_PREDIV_S;
+	}
+	
 	[[deprecated]]
 	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
 	{
@@ -218,11 +235,7 @@ namespace STM32T::Time
 		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
 			return;
 		
-		static constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
-		
-		// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
-		const bool isLeapYear = date.Year % 4 == 0 && date.Year != 0;
-		const uint8_t monthDays = MONTH_DAYS[date.Month - 1] + (date.Month == 2 && isLeapYear);
+		const uint8_t monthDays = MonthDays(date.Month - 1);
 		
 		int8_t mins = (sec / 60) % 60;
 		int8_t hours = (sec / (60 * 60)) % 24;
@@ -296,7 +309,7 @@ namespace STM32T::Time
 			date.Date += days;
 			if (date.Date == 0 || date.Date > monthDays)	// underflow
 			{
-				date.Date = MONTH_DAYS[prevMonth - 1] + (prevMonth == 2 && isLeapYear) - (UINT8_MAX - date.Date + 1);
+				date.Date =MonthDays(prevMonth - 1) - (UINT8_MAX - date.Date + 1);
 				date.Month = prevMonth;
 				
 				if (prevMonth == 12)
@@ -349,6 +362,17 @@ namespace STM32T::Time
 		time.Hours = tm2->tm_hour;
 		time.Seconds = tm2->tm_sec;
 		time.SubSeconds = time.SecondFraction - (time.SecondFraction + 1u) * msec / 1000u;
+	}
+	
+	inline void SetWeekDay(RTC_DateTypeDef& date, uint16_t year_start = 2000)
+	{
+		std::tm tm{.tm_sec = 0, .tm_min = 0, .tm_hour = 0,
+			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
+		
+		const std::time_t ts = std::mktime(&tm);
+		std::tm *tm2 = std::localtime(&ts);
+		
+		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
 	}
 	#endif	// HAL_RTC_MODULE_ENABLED
 	

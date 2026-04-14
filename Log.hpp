@@ -639,6 +639,7 @@ namespace STM32T::Log
 		LOG_N<level, logger>("--------------------------------------------------------------------------------\n");
 	}
 	
+	[[deprecated]]
 	inline void DoIfEnabled(void (*f)())
 	{
 		if constexpr (IsEnabled())
@@ -646,6 +647,7 @@ namespace STM32T::Log
 	}
 	
 	template <typename R>
+	[[deprecated]]
 	inline R DoIfEnabled(R (*f)())
 	{
 		if constexpr (IsEnabled())
@@ -655,6 +657,7 @@ namespace STM32T::Log
 	}
 	
 	template <const Level level>
+	[[deprecated]]
 	inline void DoIfEnabled(void (*f)())
 	{
 		if constexpr (IsEnabled(level))
@@ -662,6 +665,7 @@ namespace STM32T::Log
 	}
 	
 	template <const Level level, typename R>
+	[[deprecated]]
 	inline R DoIfEnabled(R (*f)())
 	{
 		if constexpr (IsEnabled(level))

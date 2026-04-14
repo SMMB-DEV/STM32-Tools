@@ -132,8 +132,8 @@ namespace STM32T
 		std::pair<uint8_t, uint8_t> Getxy() { return { m_cursor + MAX_CURSOR * m_page, m_line * PIXELS_PER_LINE + m_row }; }
 		std::pair<uint8_t, uint8_t> Getxl() { return { m_cursor + MAX_CURSOR * m_page, m_line }; }
 		
-		void WriteByte(const uint8_t byte, const uint8_t repeat = 1);
-		void WriteByteArr(const uint8_t *bytes, size_t count);
+		KS0108B& WriteByte(const uint8_t byte, const uint8_t repeat = 1);
+		KS0108B& WriteByteArr(const uint8_t *bytes, size_t count);
 		
 		template <size_t N>
 		void WriteByteArr(const uint8_t (&bytes)[N])

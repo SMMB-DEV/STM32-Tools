@@ -573,7 +573,7 @@ namespace STM32T
 		return *this;
 	}
 
-	void KS0108B::WriteByte(const uint8_t byte, const uint8_t repeat)
+	KS0108B& KS0108B::WriteByte(const uint8_t byte, const uint8_t repeat)
 	{
 		if (m_row == 0)
 			for (uint8_t i = 0; i < repeat; i++)
@@ -594,9 +594,11 @@ namespace STM32T
 			for (uint8_t i = 0; i < repeat; i++)
 				WriteTop(byte, m_row);
 		}
+		
+		return *this;
 	}
 	
-	void KS0108B::WriteByteArr(const uint8_t *bytes, size_t count)
+	KS0108B& KS0108B::WriteByteArr(const uint8_t *bytes, size_t count)
 	{
 		if (m_row == 0)
 			for (size_t i = 0; i < count; i++)
@@ -617,6 +619,8 @@ namespace STM32T
 			for (size_t i = 0; i < count; i++)
 				WriteTop(bytes[i], m_row);
 		}
+		
+		return *this;
 	}
 
 	KS0108B& KS0108B::NextLine(const line_t lines)

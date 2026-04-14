@@ -157,6 +157,14 @@ namespace STM32T
 	}
 	
 	template <typename T>
+	inline constexpr T prev_multiple(T n, T multiple)
+	{
+		static_assert(is_int_v<T>);
+		
+		return n - n % multiple;
+	}
+	
+	template <typename T>
 	inline constexpr T next_multiple(T n, T multiple)
 	{
 		static_assert(is_int_v<T>);
@@ -260,8 +268,6 @@ namespace STM32T
 		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
 		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
 		
-		T val() const { return m_val; }
-		
 		operator T() const { return m_val; }
 		operator T() const volatile { return m_val; }
 		
@@ -280,6 +286,10 @@ namespace STM32T
 			m_val = std::clamp(val, MIN, MAX);
 			return *this;
 		}
+		
+		T val() const { return m_val; }
+		constexpr T min() const { return MIN; }
+		constexpr T max() const { return MAX; }
 		
 		template <typename E>
 		bool operator==(const E val)
@@ -600,8 +610,6 @@ namespace STM32T
 		DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
 		DynClampedInt(const T val, const T min, const T max) : m_range(max - min), m_min(min), m_max(max), m_val(std::clamp(val, min, max)) {}
 		
-		T val() const { return m_val; }
-		
 		operator T() const { return m_val; }
 		operator T() const volatile { return m_val; }
 		
@@ -616,6 +624,10 @@ namespace STM32T
 			m_val = std::clamp(val, m_min, m_max);
 			return *this;
 		}
+		
+		T val() const { return m_val; }
+		constexpr T min() const { return m_min; }
+		constexpr T max() const { return m_max; }
 		
 		template <typename E>
 		bool operator==(const E val)
