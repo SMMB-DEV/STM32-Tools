@@ -186,7 +186,7 @@ namespace STM32T::Log
 			send(data.data(), data.size());
 	}
 }
-#endif
+#endif	// __has_include("usbd_cdc_if.h")
 
 namespace STM32T::Log
 {
@@ -394,7 +394,7 @@ namespace STM32T::Log
 									precision = INT_MAX;
 								
 								const char *buf = va_arg(args, const char *);
-								const size_t len = std::min(std::strlen(buf), size_t(precision));	// todo: does strlen matter when precision is specified?
+								const size_t len = std::min(std::strlen(buf), size_t(precision));
 								
 								if (len > 0)
 								{

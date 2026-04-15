@@ -1,5 +1,7 @@
 #pragma once
 
+#include "main.h"
+
 #include "../Core/Utils.hpp"
 #include "../Core/strv.hpp"
 #include "../Core/span.hpp"
@@ -598,7 +600,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
 		{
 			bool done = false;
-			const uint32_t start = HAL_GetTick();	// todo: handle send guard time
+			const uint32_t start = HAL_GetTick();
 			
 			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
 			{
@@ -792,7 +794,8 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			{
 				static char fmt[32] = { 0 };
 				
-				const int mins = zz * 15, hour = mins / 60, min = mins % 60;
+				const int16_t mins = zz * 15;
+				const int8_t hour = mins / 60, min = mins % 60;
 				
 				sprintf(fmt, "%hhu%02hhu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+03hhd:%02hhu", yy < 70 ? 20u : 19u, yy, MM, dd, hh, mm, ss, hour, std::abs(min));
 				return fmt;

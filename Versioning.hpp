@@ -332,5 +332,6 @@ namespace STM32T
 		}
 	};
 	
+	// todo: check what need to be removed (deprecated) for each version.
 	constexpr Version VER(0, 1, 0, Version::Normal);		// Current version of the framework
 }

@@ -482,8 +482,6 @@ public:
 			return OK;
 		}, "\"%.*s\"", file.size(), file.data());
 		
-		
-		
 		ErrorCode code = SingleToken(m_ftpTimeout, CommandType::Write, "#FTPGET"sv, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "\"%.*s\"",
 			file.size(), file.data());
 		

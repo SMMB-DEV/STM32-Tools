@@ -76,7 +76,7 @@ namespace STM32T
 		bool SetPage(uint8_t page, const bool force = false);
 		bool SetLine(uint8_t line, const bool force = true);		//Lines:0-7
 		bool SetCursor(uint8_t cursor, const bool force = true);	//0-63
-		void Display(const bool display) const;							//0:OFF   1:ON
+		void Display(const bool display) const;
 		void Goto(const uint8_t cursor, const uint8_t line, const bool force = false);			//x:0-191   y:0-7
 		void CheckCursor(const uint8_t lines = 1);
 		void Write(uint8_t byte, const bool check = true, const uint8_t lines = 1);
