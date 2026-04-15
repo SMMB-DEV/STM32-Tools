@@ -27,11 +27,12 @@ public:
 		s_list.reserve(8);
 	}
 	
-	static void Do(callable_t callable)
+	static void Do(callable_t callable, uint32_t delay = 0)
 	{
-		s_list.push_back({callable, 0, 0, false});
+		s_list.push_back({callable, delay, HAL_GetTick(), false});
 	}
 	
+	[[deprecated("Use Do().")]]
 	static void DoAfter(callable_t callable, uint32_t interval)
 	{
 		s_list.push_back({callable, interval, HAL_GetTick(), false});
@@ -39,7 +40,7 @@ public:
 	
 	static void Repeat(callable_t callable, uint32_t interval)
 	{
-		s_list.push_back({callable, interval, 0, true});
+		s_list.push_back({callable, interval, HAL_GetTick(), true});
 	}
 	
 	static void DoAndRepeat(callable_t callable, uint32_t interval, uint32_t delay = 0)
@@ -47,26 +48,49 @@ public:
 		s_list.push_back({callable, interval, HAL_GetTick() - interval + delay, true});
 	}
 	
-	static void Remove(callable_t callable)
+	static void Remove(callable_t callable, const bool all = false)
 	{
-		for (auto it = s_list.begin(); it != s_list.end(); ++it)
+		for (auto it = s_list.cbegin(); it != s_list.cend();)
 		{
 			if (it->p_callable == callable)
 			{
-				s_list.erase(it);
-				return;
+				it = s_list.erase(it);
+				if (!all)
+					return;
 			}
+			else
+				 ++it;
 		}
 	}
 	
-	static void Refresh(callable_t callable)
+	/**
+	* @brief As if the last execution of the callable was now. Refreshes the delay.
+	*/
+	static void Refresh(callable_t callable, const bool all = false)
 	{
 		for (auto& r : s_list)
 		{
 			if (r.p_callable == callable)
 			{
 				r.m_lastTime = HAL_GetTick();
-				return;
+				if (!all)
+					return;
+			}
+		}
+	}
+	
+	/**
+	* @brief As if the callable needs to be executed now.
+	*/
+	static void Advance(callable_t callable, const bool all = false)
+	{
+		for (auto& r : s_list)
+		{
+			if (r.p_callable == callable)
+			{
+				r.m_lastTime = HAL_GetTick() - r.c_interval;
+				if (!all)
+					return;
 			}
 		}
 	}
