@@ -212,7 +212,7 @@ namespace STM32T::Time
 	/**
 	* @param month - [0:11]
 	*/
-	inline constexpr uint8_t MonthDays(int month, int year = 2000)
+	inline constexpr uint8_t MonthDays(int month, int year = 2001)
 	{
 		constexpr uint8_t MONTH_DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
 		
