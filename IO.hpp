@@ -235,7 +235,9 @@ namespace STM32T
 		
 		virtual ~_IOs() {}
 		
-		static constexpr size_t PinCount() { return COUNT; }
+		static constexpr size_t PIN_COUNT = COUNT;
+		
+		constexpr size_t PinCount() { return COUNT; }
 		
 		PinProxy Proxy(uint8_t pin_number)
 		{
