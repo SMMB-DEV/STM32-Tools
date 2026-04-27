@@ -9,139 +9,105 @@ namespace STM32T
 {
 	static constexpr uint8_t bit_filter_table[8] = { 0b0000'0001, 0b0000'0011, 0b0000'0111, 0b0000'1111, 0b0001'1111, 0b0011'1111, 0b0111'1111, 0b1111'1111 };
 
-	static constexpr uint8_t Font[KS0108B::MAX_CHARS][KS0108B::FONT_LENGTH] =
+	static constexpr uint8_t Font[][KS0108B::FONT_WIDTH] =
 	{
-		0, 0, 0, 0, 0,					/*0*/
-		0, 0, 0, 0, 0,					/*1*/
-		0, 0, 0, 0, 0,					/*2*/
-		0, 0, 0, 0, 0,					/*3*/
-		0, 0, 0, 0, 0,					/*4*/
-		0, 0, 0, 0, 0,					/*5*/
-		0, 0, 0, 0, 0,					/*6*/
-		0, 0, 0, 0, 0,					/*7*/
-		0, 0, 0, 0, 0,					/*8*/
-		0, 0, 0, 0, 0,					/*9*/
-		0, 0, 0, 0, 0,					/*10*/
-		0, 0, 0, 0, 0,					/*11*/
-		0, 0, 0, 0, 0,					/*12*/
-		0, 0, 0, 0, 0,					/*13*/
-		0, 0, 0, 0, 0,					/*14*/
-		0, 0, 0, 0, 0,					/*15*/
-		0, 0, 0, 0, 0,					/*16*/
-		0, 0, 0, 0, 0,					/*17*/
-		0, 0, 0, 0, 0,					/*18*/
-		0, 0, 0, 0, 0,					/*19*/
-		0, 0, 0, 0, 0,					/*20*/
-		0, 0, 0, 0, 0,					/*21*/
-		0, 0, 0, 0, 0,					/*22*/
-		0, 0, 0, 0, 0,					/*23*/
-		0, 0, 0, 0, 0,					/*24*/
-		0, 0, 0, 0, 0,					/*25*/
-		0, 0, 0, 0, 0,					/*26*/
-		0, 0, 0, 0, 0,					/*27*/
-		0, 0, 0, 0, 0,					/*28*/
-		0, 0, 0, 0, 0,					/*29*/
-		0, 0, 0, 0, 0,					/*30*/
-		0, 0, 0, 0, 0,					/*31*/
-		0, 0, 0, 0, 0,					/*32*/
-		0x00, 0x00, 0x5F, 0x00, 0x00,	/*!*/
-		0x00, 0x07, 0x00, 0x07, 0x00,	/*"*/
-		0x14, 0x7F, 0x14, 0x7F, 0x14,	/*#*/
-		0x24, 0x2A, 0x7F, 0x2A, 0x12,	/*$*/
-		0x23, 0x13, 0x08, 0x64, 0x62,	/*%*/
-		0x36, 0x49, 0x55, 0x22, 0x50,	/*&*/
-		0x00, 0x05, 0x03, 0x00, 0x00,	/*'*/
-		0x00, 0x1C, 0x22, 0x41, 0x00,	/*(*/
-		0x00, 0x41, 0x22, 0x1C, 0x00,	/*)*/
-		0x08, 0x2A, 0x1C, 0x2A, 0x08,	/***/
-		0x08, 0x08, 0x3E, 0x08, 0x08,	/*+*/
-		0x00, 0x50, 0x30, 0x00, 0x00,	/*,*/
-		0x08, 0x08, 0x08, 0x08, 0x08,	/*-*/
-		0x00, 0x30, 0x30, 0x00, 0x00,	/*.*/
-		0x20, 0x10, 0x08, 0x04, 0x02,	/*/*/
-		0x3E, 0x51, 0x49, 0x45, 0x3E,	/*0*/
-		0x00, 0x42, 0x7F, 0x40, 0x00,	/*1*/
-		0x42, 0x61, 0x51, 0x49, 0x46,	/*2*/
-		0x21, 0x41, 0x45, 0x4B, 0x31,	/*3*/
-		0x18, 0x14, 0x12, 0x7F, 0x10,	/*4*/
-		0x27, 0x45, 0x45, 0x45, 0x39,	/*5*/
-		0x3C, 0x4A, 0x49, 0x49, 0x30,	/*6*/
-		0x01, 0x71, 0x09, 0x05, 0x03,	/*7*/
-		0x36, 0x49, 0x49, 0x49, 0x36,	/*8*/
-		0x06, 0x49, 0x49, 0x29, 0x1E,	/*9*/
-		0x00, 0x36, 0x36, 0x00, 0x00,	/*:*/
-		0x00, 0x56, 0x36, 0x00, 0x00,	/*;*/
-		0x00, 0x08, 0x14, 0x22, 0x41,	/*<*/
-		0x14, 0x14, 0x14, 0x14, 0x14,	/*=*/
-		0x41, 0x22, 0x14, 0x08, 0x00,	/*>*/
-		0x02, 0x01, 0x51, 0x09, 0x06,	/*?*/
-		0x32, 0x49, 0x79, 0x41, 0x3E,	/*@*/
-		0x7E, 0x11, 0x11, 0x11, 0x7E,	/*A*/
-		0x7F, 0x49, 0x49, 0x49, 0x36,	/*B*/
-		0x3E, 0x41, 0x41, 0x41, 0x22,	/*C*/
-		0x7F, 0x41, 0x41, 0x22, 0x1C,	/*D*/
-		0x7F, 0x49, 0x49, 0x49, 0x41,	/*E*/
-		0x7F, 0x09, 0x09, 0x01, 0x01,	/*F*/
-		0x3E, 0x41, 0x41, 0x51, 0x32,	/*G*/
-		0x7F, 0x08, 0x08, 0x08, 0x7F,	/*H*/
-		0x00, 0x41, 0x7F, 0x41, 0x00,	/*I*/
-		0x20, 0x40, 0x41, 0x3F, 0x01,	/*J*/
-		0x7F, 0x08, 0x14, 0x22, 0x41,	/*K*/
-		0x7F, 0x40, 0x40, 0x40, 0x40,	/*L*/
-		0x7F, 0x02, 0x04, 0x02, 0x7F,	/*M*/
-		0x7F, 0x04, 0x08, 0x10, 0x7F,	/*N*/
-		0x3E, 0x41, 0x41, 0x41, 0x3E,	/*O*/
-		0x7F, 0x09, 0x09, 0x09, 0x06,	/*P*/
-		0x3E, 0x41, 0x51, 0x21, 0x5E,	/*Q*/
-		0x7F, 0x09, 0x19, 0x29, 0x46,	/*R*/
-		0x46, 0x49, 0x49, 0x49, 0x31,	/*S*/
-		0x01, 0x01, 0x7F, 0x01, 0x01,	/*T*/
-		0x3F, 0x40, 0x40, 0x40, 0x3F,	/*U*/
-		0x1F, 0x20, 0x40, 0x20, 0x1F,	/*V*/
-		0x7F, 0x20, 0x18, 0x20, 0x7F,	/*W*/
-		0x63, 0x14, 0x08, 0x14, 0x63,	/*X*/
-		0x03, 0x04, 0x78, 0x04, 0x03,	/*Y*/
-		0x61, 0x51, 0x49, 0x45, 0x43,	/*Z*/
-		0x00, 0x00, 0x7F, 0x41, 0x41,	/*[*/
-		0x02, 0x04, 0x08, 0x10, 0x20,	/*\*/
-		0x41, 0x41, 0x7F, 0x00, 0x00,	/*]*/
-		0x04, 0x02, 0x01, 0x02, 0x04,	/*^*/
-		0x40, 0x40, 0x40, 0x40, 0x40,	/*_*/
-		0x00, 0x01, 0x02, 0x04, 0x00,	/*`*/
-		0x20, 0x54, 0x54, 0x54, 0x78,	/*a*/
-		0x7F, 0x48, 0x44, 0x44, 0x38,	/*b*/
-		0x38, 0x44, 0x44, 0x44, 0x20,	/*c*/
-		0x38, 0x44, 0x44, 0x48, 0x7F,	/*d*/
-		0x38, 0x54, 0x54, 0x54, 0x18,	/*e*/
-		0x08, 0x7E, 0x09, 0x01, 0x02,	/*f*/
-		//0x00, 0x4C, 0x52, 0x52, 0x3E,	/*g*/
-		0x08, 0x14, 0x54, 0x54, 0x3C,	/*g*/
-		0x7F, 0x08, 0x04, 0x04, 0x78,	/*h*/
-		0x00, 0x44, 0x7D, 0x40, 0x00,	/*i*/
-		0x20, 0x40, 0x44, 0x3D, 0x00,	/*j*/
-		0x00, 0x7F, 0x10, 0x28, 0x44,	/*k*/
-		0x00, 0x41, 0x7F, 0x40, 0x00,	/*l*/
-		0x7C, 0x04, 0x18, 0x04, 0x78,	/*m*/
-		0x7C, 0x08, 0x04, 0x04, 0x78,	/*n*/
-		0x38, 0x44, 0x44, 0x44, 0x38,	/*o*/
-		0x7C, 0x14, 0x14, 0x14, 0x08,	/*p*/
-		0x08, 0x14, 0x14, 0x18, 0x7C,	/*q*/
-		0x7C, 0x08, 0x04, 0x04, 0x08,	/*r*/
-		0x48, 0x54, 0x54, 0x54, 0x20,	/*s*/
-		0x04, 0x3F, 0x44, 0x40, 0x20,	/*t*/
-		0x3C, 0x40, 0x40, 0x20, 0x7C,	/*u*/
-		0x1C, 0x20, 0x40, 0x20, 0x1C,	/*v*/
-		0x3C, 0x40, 0x30, 0x40, 0x3C,	/*w*/
-		0x44, 0x28, 0x10, 0x28, 0x44,	/*x*/
-		0x0C, 0x50, 0x50, 0x50, 0x3C,	/*y*/
-		0x44, 0x64, 0x54, 0x4C, 0x44,	/*z*/
-		0x00, 0x08, 0x36, 0x41, 0x00,	/*{*/
-		0x00, 0x00, 0x7F, 0x00, 0x00,	/*|*/
-		0x00, 0x41, 0x36, 0x08, 0x00,	/*}*/
-		0, 0, 0, 0, 0,					/*~*/
-		0, 0, 0, 0, 0,					/*DEL*/
-		//0x04, 0x02, 0x7F, 0x02, 0x04,	/*up*/
-		//0x10, 0x20, 0x7F, 0x20, 0x10	/*down*/
+		0, 0, 0, 0, 0,					/*  (32)*/
+		0x00, 0x00, 0x5F, 0x00, 0x00,	/*! (33)*/
+		0x00, 0x07, 0x00, 0x07, 0x00,	/*" (34)*/
+		0x14, 0x7F, 0x14, 0x7F, 0x14,	/*# (35)*/
+		0x24, 0x2A, 0x7F, 0x2A, 0x12,	/*$ (36)*/
+		0x23, 0x13, 0x08, 0x64, 0x62,	/*% (37)*/
+		0x36, 0x49, 0x55, 0x22, 0x50,	/*& (38)*/
+		0x00, 0x05, 0x03, 0x00, 0x00,	/*' (39)*/
+		0x00, 0x1C, 0x22, 0x41, 0x00,	/*( (40)*/
+		0x00, 0x41, 0x22, 0x1C, 0x00,	/*) (41)*/
+		0x08, 0x2A, 0x1C, 0x2A, 0x08,	/** (42)*/
+		0x08, 0x08, 0x3E, 0x08, 0x08,	/*+ (43)*/
+		0x00, 0x50, 0x30, 0x00, 0x00,	/*, (44)*/
+		0x08, 0x08, 0x08, 0x08, 0x08,	/*- (45)*/
+		0x00, 0x30, 0x30, 0x00, 0x00,	/*. (46)*/
+		0x20, 0x10, 0x08, 0x04, 0x02,	/*/ (47)*/
+		0x3E, 0x51, 0x49, 0x45, 0x3E,	/*0 (48)*/
+		0x00, 0x42, 0x7F, 0x40, 0x00,	/*1 (49)*/
+		0x42, 0x61, 0x51, 0x49, 0x46,	/*2 (50)*/
+		0x21, 0x41, 0x45, 0x4B, 0x31,	/*3 (51)*/
+		0x18, 0x14, 0x12, 0x7F, 0x10,	/*4 (52)*/
+		0x27, 0x45, 0x45, 0x45, 0x39,	/*5 (53)*/
+		0x3C, 0x4A, 0x49, 0x49, 0x30,	/*6 (54)*/
+		0x01, 0x71, 0x09, 0x05, 0x03,	/*7 (55)*/
+		0x36, 0x49, 0x49, 0x49, 0x36,	/*8 (56)*/
+		0x06, 0x49, 0x49, 0x29, 0x1E,	/*9 (57)*/
+		0x00, 0x36, 0x36, 0x00, 0x00,	/*: (58)*/
+		0x00, 0x56, 0x36, 0x00, 0x00,	/*; (59)*/
+		0x00, 0x08, 0x14, 0x22, 0x41,	/*< (60)*/
+		0x14, 0x14, 0x14, 0x14, 0x14,	/*= (61)*/
+		0x41, 0x22, 0x14, 0x08, 0x00,	/*> (62)*/
+		0x02, 0x01, 0x51, 0x09, 0x06,	/*? (63)*/
+		0x32, 0x49, 0x79, 0x41, 0x3E,	/*@ (64)*/
+		0x7E, 0x11, 0x11, 0x11, 0x7E,	/*A (65)*/
+		0x7F, 0x49, 0x49, 0x49, 0x36,	/*B (66)*/
+		0x3E, 0x41, 0x41, 0x41, 0x22,	/*C (67)*/
+		0x7F, 0x41, 0x41, 0x22, 0x1C,	/*D (68)*/
+		0x7F, 0x49, 0x49, 0x49, 0x41,	/*E (69)*/
+		0x7F, 0x09, 0x09, 0x01, 0x01,	/*F (70)*/
+		0x3E, 0x41, 0x41, 0x51, 0x32,	/*G (71)*/
+		0x7F, 0x08, 0x08, 0x08, 0x7F,	/*H (72)*/
+		0x00, 0x41, 0x7F, 0x41, 0x00,	/*I (73)*/
+		0x20, 0x40, 0x41, 0x3F, 0x01,	/*J (74)*/
+		0x7F, 0x08, 0x14, 0x22, 0x41,	/*K (75)*/
+		0x7F, 0x40, 0x40, 0x40, 0x40,	/*L (76)*/
+		0x7F, 0x02, 0x04, 0x02, 0x7F,	/*M (77)*/
+		0x7F, 0x04, 0x08, 0x10, 0x7F,	/*N (78)*/
+		0x3E, 0x41, 0x41, 0x41, 0x3E,	/*O (79)*/
+		0x7F, 0x09, 0x09, 0x09, 0x06,	/*P (80)*/
+		0x3E, 0x41, 0x51, 0x21, 0x5E,	/*Q (81)*/
+		0x7F, 0x09, 0x19, 0x29, 0x46,	/*R (82)*/
+		0x46, 0x49, 0x49, 0x49, 0x31,	/*S (83)*/
+		0x01, 0x01, 0x7F, 0x01, 0x01,	/*T (84)*/
+		0x3F, 0x40, 0x40, 0x40, 0x3F,	/*U (85)*/
+		0x1F, 0x20, 0x40, 0x20, 0x1F,	/*V (86)*/
+		0x7F, 0x20, 0x18, 0x20, 0x7F,	/*W (87)*/
+		0x63, 0x14, 0x08, 0x14, 0x63,	/*X (88)*/
+		0x03, 0x04, 0x78, 0x04, 0x03,	/*Y (89)*/
+		0x61, 0x51, 0x49, 0x45, 0x43,	/*Z (90)*/
+		0x00, 0x00, 0x7F, 0x41, 0x41,	/*[ (91)*/
+		0x02, 0x04, 0x08, 0x10, 0x20,	/*\ (92)*/
+		0x41, 0x41, 0x7F, 0x00, 0x00,	/*] (93)*/
+		0x04, 0x02, 0x01, 0x02, 0x04,	/*^ (94)*/
+		0x40, 0x40, 0x40, 0x40, 0x40,	/*_ (95)*/
+		0x00, 0x01, 0x02, 0x04, 0x00,	/*` (96)*/
+		0x20, 0x54, 0x54, 0x54, 0x78,	/*a (97)*/
+		0x7F, 0x48, 0x44, 0x44, 0x38,	/*b (98)*/
+		0x38, 0x44, 0x44, 0x44, 0x20,	/*c (99)*/
+		0x38, 0x44, 0x44, 0x48, 0x7F,	/*d (100)*/
+		0x38, 0x54, 0x54, 0x54, 0x18,	/*e (101)*/
+		0x08, 0x7E, 0x09, 0x01, 0x02,	/*f (102)*/
+		//0x00, 0x4C, 0x52, 0x52, 0x3E,	/*g (103)*/
+		0x08, 0x14, 0x54, 0x54, 0x3C,	/*g (103)*/
+		0x7F, 0x08, 0x04, 0x04, 0x78,	/*h (104)*/
+		0x00, 0x44, 0x7D, 0x40, 0x00,	/*i (105)*/
+		0x20, 0x40, 0x44, 0x3D, 0x00,	/*j (106)*/
+		0x00, 0x7F, 0x10, 0x28, 0x44,	/*k (107)*/
+		0x00, 0x41, 0x7F, 0x40, 0x00,	/*l (108)*/
+		0x7C, 0x04, 0x18, 0x04, 0x78,	/*m (109)*/
+		0x7C, 0x08, 0x04, 0x04, 0x78,	/*n (110)*/
+		0x38, 0x44, 0x44, 0x44, 0x38,	/*o (111)*/
+		0x7C, 0x14, 0x14, 0x14, 0x08,	/*p (112)*/
+		0x08, 0x14, 0x14, 0x18, 0x7C,	/*q (113)*/
+		0x7C, 0x08, 0x04, 0x04, 0x08,	/*r (114)*/
+		0x48, 0x54, 0x54, 0x54, 0x20,	/*s (115)*/
+		0x04, 0x3F, 0x44, 0x40, 0x20,	/*t (116)*/
+		0x3C, 0x40, 0x40, 0x20, 0x7C,	/*u (117)*/
+		0x1C, 0x20, 0x40, 0x20, 0x1C,	/*v (118)*/
+		0x3C, 0x40, 0x30, 0x40, 0x3C,	/*w (119)*/
+		0x44, 0x28, 0x10, 0x28, 0x44,	/*x (120)*/
+		0x0C, 0x50, 0x50, 0x50, 0x3C,	/*y (121)*/
+		0x44, 0x64, 0x54, 0x4C, 0x44,	/*z (122)*/
+		0x00, 0x08, 0x36, 0x41, 0x00,	/*{ (123)*/
+		0x00, 0x00, 0x7F, 0x00, 0x00,	/*| (124)*/
+		0x00, 0x41, 0x36, 0x08, 0x00,	/*} (125)*/
+		0x10, 0x08, 0x10, 0x20, 0x10,	/*~ (126)*/
+		//0, 0, 0, 0, 0,					/*DEL (127)*/
 	};
 
 
@@ -155,115 +121,11 @@ namespace STM32T
 		std::swap(a, b);
 	}
 
-	template <class T>
-	T abs(T a)
-	{
-		if (a < 0)
-			return a*-1;
-		
-		return a;
-	}
-
 	template <typename T>
 	T sgn(T val)
 	{
 		return (T(0) < val) - (val < T(0));
 	}
-
-
-
-
-
-	Char::Char()
-	{
-		statecount=1;
-		width=0;
-		datah=0;
-		datal=0;
-		scset=0;
-		chset=0;
-	}
-
-	Char::~Char()
-	{
-		if (scset)
-		{
-			delete[] datah;
-			delete[] datal;
-			delete[] width;
-			delete[] chset;
-		}
-	}
-
-	void Char::SetStateCount(uint8_t s)
-	{
-		if (s>0 && s<=4 && !scset)
-		{
-			statecount=s;
-			datah=new const uint8_t*[s];
-			datal=new const uint8_t*[s];
-			width=new uint8_t[s];
-			chset=new bool[s];
-			
-			for (uint8_t i=0;i<s;i++)
-			{
-				chset[i]=0;
-			}
-			scset=1;
-		}
-	}
-
-	void Char::Set(const uint8_t *d1, const uint8_t *d2, State s, uint8_t wid)
-	{
-		if(scset && s<statecount && wid!=0)
-		{
-			if (!chset[s])
-			{
-				datah[s]=d1;
-				datal[s]=d2;
-				width[s]=wid;
-				chset[s]=1;
-			}
-		}
-	}
-
-	uint8_t Char::getwidth(State s)
-	{
-		if (scset)
-		{
-			if (chset[s%statecount])
-			{
-				return width[s%statecount];
-			}
-		}
-		return 0;
-	}
-
-	const uint8_t* Char::getdh(State s)
-	{
-		if (scset)
-		{
-			if (chset[s%statecount])
-			{
-				return datah[s%statecount];
-			}
-		}
-		return 0;
-	}
-
-	const uint8_t* Char::getdl(State s)
-	{
-		if (scset)
-		{
-			if (chset[s%statecount])
-			{
-				return datal[s%statecount];
-			}
-		}
-		return 0;
-	}
-
-
 
 
 
@@ -305,7 +167,7 @@ namespace STM32T
 		return true;
 	}
 
-	bool KS0108B::SetLine(uint8_t line, const bool force)
+	bool KS0108B::SetLine(line_t line, const bool force)
 	{
 		line %= MAX_LINES;
 		if (!force && m_line == line)
@@ -334,7 +196,7 @@ namespace STM32T
 		Instruction(0b0011'1110 | display);
 	}
 
-	void KS0108B::Goto(const uint8_t cursor, const uint8_t line, const bool force)
+	void KS0108B::Goto(const uint8_t cursor, const line_t line, const bool force)
 	{
 		if (SetPage(cursor / MAX_CURSOR, force))
 		{
@@ -347,7 +209,7 @@ namespace STM32T
 		SetLine(line, force);
 	}
 
-	void KS0108B::CheckCursor(const uint8_t lines)
+	void KS0108B::CheckCursor(const line_t lines)
 	{
 		if (++m_cursor >= MAX_CURSOR)
 		{
@@ -357,7 +219,7 @@ namespace STM32T
 		}
 	}
 	
-	void KS0108B::Write(uint8_t byte, const bool check, const uint8_t lines)
+	void KS0108B::Write(uint8_t byte, const bool check, const line_t lines)
 	{
 		if (negate)
 			byte = ~byte;
@@ -369,7 +231,7 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::WriteTop(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::WriteTop(uint8_t byte, const uint8_t shift, const bool check, const line_t lines)
 	{
 		if (negate)
 			byte = ~byte;
@@ -382,7 +244,7 @@ namespace STM32T
 			CheckCursor(lines);
 	}
 
-	void KS0108B::WriteBottom(uint8_t byte, const uint8_t shift, const bool check, const uint8_t lines)
+	void KS0108B::WriteBottom(uint8_t byte, const uint8_t shift, const bool check, const line_t lines)
 	{
 		if (negate)
 			byte = ~byte;
@@ -400,7 +262,8 @@ namespace STM32T
 	void KS0108B::Line_y(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
 	{
 		//assuming x and y are checked before calling this function
-		const uint8_t lineBegin = y / PIXELS_PER_LINE, lineEnd = (y + len) / PIXELS_PER_LINE, rowBegin = y % PIXELS_PER_LINE, rowEnd = (y + len) % PIXELS_PER_LINE;
+		const line_t lineBegin = y / PIXELS_PER_LINE, lineEnd = (y + len) / PIXELS_PER_LINE;
+		const uint8_t rowBegin = y % PIXELS_PER_LINE, rowEnd = (y + len) % PIXELS_PER_LINE;
 		
 		Goto(x, lineBegin);
 		
@@ -416,7 +279,7 @@ namespace STM32T
 			Write(draw ? ((0xFF << rowBegin) | m_screenMap[MapIndex(lineBegin, x)]) : ((0xFF >> (PIXELS_PER_LINE - rowBegin)) & m_screenMap[MapIndex(lineBegin, x)]), false);
 			
 			const uint8_t _write = draw * 0xFF;
-			for (uint8_t line = lineBegin + 1; line < lineEnd; line++)
+			for (line_t line = lineBegin + 1; line < lineEnd; line++)
 			{
 				SetLine(line);
 				SetCursor(x, true);
@@ -434,7 +297,8 @@ namespace STM32T
 	void KS0108B::Line_x(const uint8_t x, const uint8_t y, const uint8_t len, const bool draw)
 	{
 		//assuming x and y are checked before calling this function
-		const uint8_t &begin = x, end = x + len, line = y / PIXELS_PER_LINE;
+		const uint8_t &begin = x, end = x + len;
+		const line_t line = y / PIXELS_PER_LINE;
 		uint8_t _write = 1 << (y % PIXELS_PER_LINE);
 		
 		Goto(x, line);
@@ -452,20 +316,7 @@ namespace STM32T
 				Write(_write & m_screenMap[MapIndex(line, i)]);
 		}
 	}
-
-
-
-
-
-
-
-	KS0108B::KS0108B(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), void (*set_cs)(uint8_t), const uint8_t page_count) :
-			f_rw(rw), f_setCS(set_cs), m_pageCount(std::min((size_t)page_count, 8u)), screenLen(m_pageCount * MAX_CURSOR),
-			m_screenMap(new uint8_t[MAX_LINES * screenLen]) {}
 	
-	KS0108B::~KS0108B() { delete[] m_screenMap; }
-
-
 	void KS0108B::Test()
 	{
 		Clear(true);
@@ -488,15 +339,15 @@ namespace STM32T
 		FillRectangle(60, 10, 90, 20);
 		Clear(65, 15, 85, 15);
 		
-		XY(0, 4);
-		PutStr("Normal");
+		XY(1, 4);
+		PutStrf("Normal (%zu)", std::size(Font));
 		NextLine(2);
 		PutStrBig("Big");
 		
 		while (1)
 		{
 			HAL_Delay(1000);
-			NegateRectangle(0, 4, 6 * 6, 4 + 7);
+			NegateRectangle(0, 3, 6 * (FONT_WIDTH + 1), 3 + FONT_HEIGHT);
 		}
 		
 		// todo: add tests for bitmap functions
@@ -550,7 +401,7 @@ namespace STM32T
 		return *this;
 	}
 	
-	KS0108B& KS0108B::XL(const uint8_t x, const uint8_t line)
+	KS0108B& KS0108B::XL(const uint8_t x, const line_t line)
 	{
 		m_row = 0;
 		Goto(x, line);
@@ -580,7 +431,8 @@ namespace STM32T
 				Write(byte);
 		else
 		{
-			const uint8_t line = m_line, cursor = LongCursor();
+			const line_t line = m_line;
+			const uint8_t cursor = LongCursor();
 			
 			// todo: Do all the T & B writes in one page, then move to the next page.
 			
@@ -605,7 +457,8 @@ namespace STM32T
 				Write(bytes[i]);
 		else
 		{
-			const uint8_t line = m_line, cursor = LongCursor();
+			const line_t line = m_line;
+			const uint8_t cursor = LongCursor();
 			
 			// todo: Do all the T & B writes in one page, then move to the next page.
 			
@@ -645,12 +498,9 @@ namespace STM32T
 		Write(fill ? (m_screenMap[MapIndex(y, x)] | (1 << row)) : (m_screenMap[MapIndex(y, x)] & (~(1 << row))));
 	}
 
-	KS0108B& KS0108B::PutChar(const char ch, bool interpret_specials, bool auto_next_line)
+	KS0108B& KS0108B::PutChar(char ch, bool interpret_specials, bool auto_next_line)
 	{
 		//todo: space between characters
-		
-		if (ch >= MAX_CHARS)
-			return *this;
 		
 		if (interpret_specials)
 		{
@@ -662,7 +512,7 @@ namespace STM32T
 				
 				case '\b':
 				{
-					const uint16_t s = Fa ? m_line * screenLen + m_cursor + 6 : m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_LENGTH + 1);
+					const uint16_t s = m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1);
 					const uint8_t cursor = s % screenLen, line = s / screenLen;
 					
 					Goto(cursor, line);
@@ -682,7 +532,8 @@ namespace STM32T
 				
 				case 127:	//DEL
 				{
-					uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
+					uint8_t cursor = m_page * MAX_CURSOR + m_cursor;
+					const line_t line = m_line;
 					PutChar(' ');
 					Goto(cursor, line);
 					
@@ -691,22 +542,28 @@ namespace STM32T
 			}
 		}
 		
+		if (ch < 32 || ch >= 32 + std::size(Font))
+			return *this;
+		
+		ch -= 32;
+		
 		uint8_t writeSpace = 1;
 		
 		if (m_page == m_pageCount - 1)
 		{
-			uint8_t maxCursor = MAX_CURSOR - FONT_LENGTH;
+			uint8_t maxCursor = MAX_CURSOR - FONT_WIDTH;
 			if (m_cursor > maxCursor)
 				NextLine();
 			else
 				writeSpace = std::min(1, maxCursor - m_cursor);
 		}
 		
-		const uint8_t line = m_line, cursor = m_page * MAX_CURSOR + m_cursor;
+		const line_t line = m_line;
+		const uint8_t cursor = m_page * MAX_CURSOR + m_cursor;
 		
 		if (m_row == 0)
 		{
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 				Write(Font[ch][i]);
 			
 			if (writeSpace)
@@ -716,14 +573,14 @@ namespace STM32T
 		{
 			SetLine(line + 1);
 			
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 				WriteBottom(Font[ch][i], m_row);
 			
 			if (writeSpace)
 				WriteBottom(0, m_row, false);
 			
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 				WriteTop(Font[ch][i], m_row);
 			
 			if (writeSpace)
@@ -733,12 +590,9 @@ namespace STM32T
 		return *this;
 	}
 	
-	void KS0108B::PutCharBig(const uint8_t ch, bool interpret_specials)
+	void KS0108B::PutCharBig(uint8_t ch, bool interpret_specials)
 	{
 		//todo: space between characters
-		
-		if (ch >= MAX_CHARS)
-			return;
 		
 		if (interpret_specials)
 		{
@@ -754,7 +608,7 @@ namespace STM32T
 				
 				case '\b':
 				{
-					const uint16_t s = Fa ? m_line * screenLen + m_cursor + 6 : m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_LENGTH + 1) * 2;
+					const uint16_t s = m_line * screenLen + m_page * MAX_CURSOR + m_cursor - (FONT_WIDTH + 1) * 2;
 					const uint8_t cursor = s % screenLen, line = s / screenLen;
 					
 					Goto(cursor, line);
@@ -774,7 +628,8 @@ namespace STM32T
 				
 				case 127:	//DEL
 				{
-					uint8_t cursor = m_page * MAX_CURSOR + m_cursor, line = m_line;
+					uint8_t cursor = m_page * MAX_CURSOR + m_cursor;
+					line_t line = m_line;
 					PutCharBig(' ');
 					Goto(cursor, line);
 					
@@ -783,21 +638,27 @@ namespace STM32T
 			}
 		}
 		
+		if (ch < 32 || ch >= 32 + std::size(Font))
+			return;
+		
+		ch -= 32;
+		
 		uint8_t writeSpace = 2;
 		
 		if (m_page == m_pageCount - 1)
 		{
-			uint8_t maxCursor = MAX_CURSOR - (FONT_LENGTH) * 2;
+			uint8_t maxCursor = MAX_CURSOR - (FONT_WIDTH) * 2;
 			if (m_cursor > maxCursor)
 				NextLine(2);
 			else
 				writeSpace = std::min(2, maxCursor - m_cursor);
 		}
 		
-		const uint8_t line = m_line, cursor = m_page * MAX_CURSOR + m_cursor;
+		const line_t line = m_line;
+		const uint8_t cursor = m_page * MAX_CURSOR + m_cursor;
 		
-		uint16_t bigCh[FONT_LENGTH] = { 0 };
-		for (uint8_t i = 0; i < FONT_LENGTH; i++)
+		uint16_t bigCh[FONT_WIDTH] = { 0 };
+		for (uint8_t i = 0; i < FONT_WIDTH; i++)
 		{
 			for (uint8_t j = 0; j < 8; j++)
 				bigCh[i] |= (Font[ch][i] & (1 << j)) << j;
@@ -810,7 +671,7 @@ namespace STM32T
 		{
 			//Low
 			SetLine(line + 1);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
 				Write(bigCh[i] >> PIXELS_PER_LINE);
 				Write(bigCh[i] >> PIXELS_PER_LINE);
@@ -824,7 +685,7 @@ namespace STM32T
 			
 			//High
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
 				Write(bigCh[i]);
 				Write(bigCh[i], true, 2);
@@ -837,7 +698,7 @@ namespace STM32T
 		{
 			//Low
 			SetLine(line + 2);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
 				WriteBottom(bigCh[i] >> PIXELS_PER_LINE, m_row);
 				WriteBottom(bigCh[i] >> PIXELS_PER_LINE, m_row);
@@ -851,7 +712,7 @@ namespace STM32T
 			
 			//Mid
 			Goto(cursor, line + 1, true);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
 				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
 				Write(bigCh[i] >> (PIXELS_PER_LINE - m_row));
@@ -865,7 +726,7 @@ namespace STM32T
 			
 			//High
 			Goto(cursor, line, true);
-			for (uint8_t i = 0; i < FONT_LENGTH; i++)
+			for (uint8_t i = 0; i < FONT_WIDTH; i++)
 			{
 				WriteTop(bigCh[i], m_row);
 				WriteTop(bigCh[i], m_row, true, 2);
@@ -898,7 +759,8 @@ namespace STM32T
 		bmp += sizeof(bmp_x) + sizeof(bmp_y);
 		
 		m_row = Row(y);
-		const uint8_t new_row = Row(y + bmp_y), line1 = Line(y), line2 = Line(y + bmp_y);
+		const uint8_t new_row = Row(y + bmp_y);
+		const line_t line1 = Line(y), line2 = Line(y + bmp_y);
 		
 		Goto(x, line1);
 		
@@ -915,7 +777,7 @@ namespace STM32T
 			for (uint8_t i = 0; i < bmp_x; i++)
 				WriteTop(bmp[i], m_row);
 			
-			for (uint8_t line = line1 + 1; line < line2; line++)
+			for (line_t line = line1 + 1; line < line2; line++)
 			{
 				Goto(x, line);
 				
@@ -1083,7 +945,8 @@ namespace STM32T
 		sort(x1, x2);
 		sort(y1, y2);
 		
-		const uint8_t row1 = y1 % PIXELS_PER_LINE, row2 = y2 % PIXELS_PER_LINE, line1 = y1 / PIXELS_PER_LINE, line2 = y2 / PIXELS_PER_LINE;
+		const uint8_t row1 = y1 % PIXELS_PER_LINE, row2 = y2 % PIXELS_PER_LINE;
+		const line_t line1 = y1 / PIXELS_PER_LINE, line2 = y2 / PIXELS_PER_LINE;
 		
 		Goto(x1, line1);
 		uint16_t index = MapIndex(line1, x1);
@@ -1099,7 +962,7 @@ namespace STM32T
 				Write(fill ? ((0xFF << row1) | m_screenMap[index]) : ((0xFF >> (PIXELS_PER_LINE - row1)) & m_screenMap[index]));
 			
 			const uint8_t _write = fill * 0xFF;
-			for (uint8_t line = line1 + 1; line < line2; line++)
+			for (line_t line = line1 + 1; line < line2; line++)
 			{
 				Goto(x1, line);
 				
@@ -1123,7 +986,8 @@ namespace STM32T
 		sort(x1, x2);
 		sort(y1, y2);
 		
-		const uint8_t row1 = y1 % PIXELS_PER_LINE, row2 = y2 % PIXELS_PER_LINE, line1 = y1 / PIXELS_PER_LINE, line2 = y2 / PIXELS_PER_LINE;
+		const uint8_t row1 = y1 % PIXELS_PER_LINE, row2 = y2 % PIXELS_PER_LINE;
+		const line_t line1 = y1 / PIXELS_PER_LINE, line2 = y2 / PIXELS_PER_LINE;
 		
 		Goto(x1, line1);
 		uint16_t index = MapIndex(line1, x1);
@@ -1140,7 +1004,7 @@ namespace STM32T
 			for (uint8_t x = x1; x <= x2; ++x, ++index)
 				Write((bit_filter_row1[row1] & ~m_screenMap[index]) | (~bit_filter_row1[row1] & m_screenMap[index]));
 			
-			for (uint8_t line = line1 + 1; line < line2; line++)
+			for (line_t line = line1 + 1; line < line2; line++)
 			{
 				Goto(x1, line);
 				index = MapIndex(line, x1);

@@ -101,7 +101,7 @@ namespace STM32T
 		* @deprecated
 		*/
 		[[deprecated]]
-		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const uint8_t line_count, const uint8_t col_count, bool _4_bit = true)
+		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const line_t line_count, const uint8_t col_count, bool _4_bit = true)
 			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
 		
 		/**
@@ -110,7 +110,7 @@ namespace STM32T
 		*				The E pin must also be cycled according to the datasheet.
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
 		*/
-		HD44780(const uint8_t col_count, const uint8_t line_count, uint8_t (* const rw)(bool rw, bool rs, uint8_t data), bool _4_bit = true)
+		HD44780(const uint8_t col_count, const line_t line_count, uint8_t (* const rw)(bool rw, bool rs, uint8_t data), bool _4_bit = true)
 			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
 		
 		~HD44780() {}
@@ -171,7 +171,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		HD44780& PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) override
+		HD44780& PutChar(char ch, bool interpret_specials = true, bool auto_next_line = true) override
 		{
 			if (interpret_specials)
 			{

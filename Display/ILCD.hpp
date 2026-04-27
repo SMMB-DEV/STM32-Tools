@@ -17,11 +17,13 @@ namespace STM32T
 		using coord_t = uint16_t;
 		using coordx_t = coord_t;
 		using coordy_t = coord_t;
-		using line_t = uint16_t;
+		using line_t = uint8_t;
+	
+		virtual ~ILCD() {}
 		
 		virtual ILCD& NextLine(const line_t lines = 1) = 0;
 		
-		virtual ILCD& PutChar(const char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
+		virtual ILCD& PutChar(char ch, bool interpret_specials = true, bool auto_next_line = true) = 0;
 		
 		virtual void Test() {}
 		
