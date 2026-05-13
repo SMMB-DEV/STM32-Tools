@@ -61,6 +61,7 @@ namespace STM32T
 		
 		using base::base;
 		
+		using base::front;
 		using base::back;
 		using base::data;
 		
@@ -83,7 +84,7 @@ namespace STM32T
 		constexpr bstrv substr(size_type pos, size_type count = npos) const { return base::substr(pos, count); }
 		
 		constexpr bool starts_with(base sv) const noexcept { return base(data(), std::min(size(), sv.size())) == sv; }
-		constexpr bool starts_with(CharT ch) const noexcept { return !empty() && Traits::eq(back(), ch); }
+		constexpr bool starts_with(CharT ch) const noexcept { return !empty() && Traits::eq(front(), ch); }
 		constexpr bool starts_with(const CharT *s) const { return starts_with(base(s)); }
 		
 		constexpr bool ends_with(base sv) const noexcept { return size() >= sv.size() && compare(size() - sv.size(), npos, sv) == 0; }
@@ -333,7 +334,7 @@ namespace STM32T
 		{
 			if (ends_with(ch))
 			{
-				remove_suffix(1);
+				remove_suffix(1u);
 				return true;
 			}
 
@@ -365,10 +366,10 @@ namespace STM32T
 		template <typename N>
 		size_t to_num(N& num, size_t from = 0, size_t count = npos) const
 		{
-			static_assert(std::is_arithmetic_v<N>);
+			static_assert(std::is_arithmetic_v<N> && std::is_same_v<CharT, char>);
 			
 			bstrv sub = substr(from, count).trim();
-			sub.remove_prefix(CharT('+'));
+			sub.remove_prefix('+');
 			
 			if (!sub.empty())
 			{
