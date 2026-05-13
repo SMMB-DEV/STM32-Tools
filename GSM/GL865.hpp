@@ -18,7 +18,7 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 class GL865 : public STM32T::GSM<130, 55>
 {
-	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 500'000;
+	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 10'000;
 	
 	STM32T::IO m_pwr;
 	const STM32T::IO c_pwrMon;
@@ -175,8 +175,8 @@ public:
 		// \r\n+CUSD: x,"str",yyy\r\n
 		return DelayedResponseToken<DEFAULT_ARG_LEN, 256 * 4 + 20>(resp_timeout, CommandType::Write, "+CUSD"sv, [buf, max_len](strv token)
 		{
-			size_t start, end;
-			if (0 != sscanf(token.data(), "%*1hhu,\"%zn%*[1234567890ABCDEF]%zn\",%*3hhu", &start, &end))
+			size_t start = 0, end = 0;
+			if (0 != sscanf(token.data(), "%*1hhu,\"%zn%*[1234567890ABCDEF]%zn\",%*3hhu", &start, &end) || start >= end)
 				return WRONG_FORMAT;
 			
 			strv data = token.substr(start, end - start);
