@@ -521,8 +521,6 @@ public:
 	ErrorCode FTPFileSize(strv file, size_t& size);
 	ErrorCode FTPPut(strv file);
 	ErrorCode FTPAppend(strv data, bool final = false);
-	ErrorCode FTPGet(strv file);
-	ErrorCode FTPRecv(char* buf, uint16_t& len);
 	
 	ErrorCode SIMCheck(uint8_t& status);
 	

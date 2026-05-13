@@ -30,43 +30,6 @@ GL865::ErrorCode GL865::FTPAppend(strv data, bool final)
 	});
 }
 
-GL865::ErrorCode GL865::FTPGet(strv file)
-{
-	return SingleToken(15'000, CommandType::Write, "#FTPGETPKT"sv, file);
-}
-
-GL865::ErrorCode GL865::FTPRecv(char* buf, uint16_t& len)
-{
-	return NoToken<DEFAULT_ARG_LEN, 3000 + DEFAULT_RESPONSE_LEN>(15'000, CommandType::Write, "#FTPRECV"sv, [&](strv data) -> ErrorCode
-	{
-		if (!data.remove_prefix("\r\n#FTPRECV: "sv))
-			return WRONG_FORMAT;
-		
-		uint16_t data_len;
-		uint32_t n;
-		if (sscanf(data.data(), "%hu%n", &data_len, &n) != 1)
-			return WRONG_FORMAT;
-		
-		if (data.compare(n, 2, "\r\n"sv) != 0)
-			return WRONG_FORMAT;
-		
-		data.remove_prefix(n + 2);
-		
-		static constexpr strv end = "\r\n\r\nOK\r\n"sv;
-		if (data.compare(data.size() - end.size(), end.size(), end) != 0)
-			return WRONG_FORMAT;
-		
-		data.remove_suffix(end.size());
-		
-		if (data.size() != data_len)
-			return WRONG_FORMAT;
-		
-		len = data.copy(buf, data_len);
-		
-		return ErrorCode::OK;
-	}, "%hu", std::min<uint16_t>(len , 3000));
-}
-
 GL865::ErrorCode GL865::SIMCheck(uint8_t& status)
 {
 	return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "#QSS"sv, strv(), [&](strv token) -> ErrorCode
