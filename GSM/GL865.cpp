@@ -8,11 +8,6 @@ GL865::ErrorCode GL865::FTPFileSize(strv file, size_t& size)
 	});
 }
 
-GL865::ErrorCode GL865::FTPPut(strv file)
-{
-	return ReceiveOK(15'000, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", file.length(), file.data());
-}
-
 GL865::ErrorCode GL865::FTPAppend(strv data, bool final)
 {
 	ErrorCode code = WaitForReady(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPAPPEXT"sv, "%hu,%hhu", std::min(data.size(), 1500u), final);

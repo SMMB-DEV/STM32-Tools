@@ -463,6 +463,68 @@ public:
 		return SingleToken(m_ftpTimeout, CommandType::Execute, "#FTPCLOSE"sv);
 	}
 	
+	#ifdef STM32T_GSM_URC_ENABLED
+private:
+	uint32_t m_ftpPutOStart, m_ftpPutOTimeout = 0;
+	
+public:
+	ErrorCode FTPPutO_Start(strv file, const uint32_t ul_to)
+	{
+		if (m_ftpPutOTimeout)
+			return NOT_ALLOWED;
+		
+		ErrorCode code = EnterOnline(m_ftpTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\"", file.size(), file.data());
+		
+		if (code == OK)
+		{
+			m_ftpPutOStart = HAL_GetTick();
+			m_ftpPutOTimeout = ul_to;
+		}
+		
+		return code;
+	}
+	
+	ErrorCode FTPPutO_Chunk(strv chunk)
+	{
+		if (!m_ftpPutOTimeout)
+			return NOT_ALLOWED;
+		
+		const bool closed = HandleURCs([this](strv urc, uint32_t ts) -> bool
+		{
+			return ts - m_ftpPutOStart <= m_ftpPutOTimeout && urc == "NO CARRIER"sv;
+		}, true);
+		
+		if (closed)
+			return ERR;
+		
+		if (HAL_GetTick() - m_ftpPutOStart > m_ftpPutOTimeout)
+			return TIMEOUT;
+		
+		SendUART(chunk);
+		
+		return OK;
+	}
+	
+	ErrorCode FTPPutO_End(const uint32_t wait = 15'000)
+	{
+		STM32T::Time::Delay_Tick(wait);
+		m_ftpPutOTimeout = 0;
+		return ExitOnline(m_ftpTimeout);
+	}
+	#endif	// STM32T_GSM_URC_ENABLED
+	
+	GL865::ErrorCode FTPPut(strv file)
+	{
+		return ReceiveOK(15'000, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", file.length(), file.data());
+	}
+	
+	template <size_t ARG_LEN = DEFAULT_ARG_LEN>
+	GL865::ErrorCode FTPPut(const char *fmt, ...)
+	{
+		_FORMAT_ARGS();
+		return FTPPut(strv(args, argsLen));
+	}
+	
 	int32_t FTPGetO(strv file, const std::function<void (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
 	{
 		return ReceiveOnline(m_ftpTimeout, dl_to, CommandType::Write, "#FTPGET"sv, [&](strv chunk, size_t handled) -> ErrorCode
@@ -489,6 +551,13 @@ public:
 		return SingleToken(m_ftpTimeout, CommandType::Write, "#FTPCWD"sv, dir);
 	}
 	
+	template <size_t ARG_LEN = DEFAULT_ARG_LEN>
+	ErrorCode FTPCWD(const char *fmt, ...)
+	{
+		_FORMAT_ARGS();
+		return FTPCWD(strv(args, argsLen));
+	}
+	
 	int32_t FTPListO(char *buf, size_t len, strv name = strv(), const uint32_t list_to = 15'000)
 	{
 		return ReceiveOnline(m_ftpTimeout, list_to, name.size() ? CommandType::Write : CommandType::Execute, "#FTPLIST"sv,
@@ -510,7 +579,6 @@ public:
 	}
 	
 	ErrorCode FTPFileSize(strv file, size_t& size);
-	ErrorCode FTPPut(strv file);
 	ErrorCode FTPAppend(strv data, bool final = false);
 	
 	ErrorCode SIMCheck(uint8_t& status);

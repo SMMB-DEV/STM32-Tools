@@ -265,8 +265,29 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		{
 			_FORMAT_ARGS();
 			return NoToken<LEN>(timeout, type, cmd, handler, strv(args, argsLen));
+		}
+		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode EnterOnline(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv())
+		{
+			ErrorCode code = SingleToken<LEN>(timeout, type, cmd, args, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}});
 			
+			if (code != OK)
+				ExitOnline();
 			
+			return code;
+		}
+		
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode EnterOnline(const uint32_t timeout, const CommandType type, const strv cmd, const char *const fmt, ...)
+		{
+			_FORMAT_ARGS();
+			return EnterOnline(timeout, type, cmd, strv(args, argsLen));
+		}
+		
+		ErrorCode ExitOnline(const uint32_t timeout = 1)
+		{
+			return SingleToken(timeout, CommandType::Bare, strv(), CMD_MODE, {{"NO CARRIER"sv, OK}});
 		}
 		
 		template <size_t CHUNK_LEN = 600, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -277,7 +298,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			if (!buf[0] || !buf[1])
 				return FAIL;
 			
-			ErrorCode code = SingleToken<LEN>(timeout, type, cmd, args, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}});
+			ErrorCode code = EnterOnline<LEN>(timeout, type, cmd, args);
 			
 			if (code != OK)
 				return code;
@@ -287,8 +308,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			ScopeActionF exit([this, urcEnabled]()
 			{
 				HAL_UART_AbortReceive_IT(p_huart);
-				
-				Command(0, CommandType::Bare, ""sv, CMD_MODE, nullptr, 0);
+				ExitOnline();
 				
 				if (urcEnabled)
 					EnableURC(true);	// Can't use stopURC() and startURC() because the EventCallback is bound and we're using HAL_UARTEx_ReceiveToIdle_IT().
@@ -803,6 +823,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
+		#define STM32T_GSM_URC_ENABLED
 	private:
 		class URC
 		{
