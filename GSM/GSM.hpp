@@ -2,6 +2,8 @@
 
 #include "main.h"
 
+#ifdef HAL_UART_MODULE_ENABLED
+
 #include "../Core/Utils.hpp"
 #include "../Core/strv.hpp"
 #include "../Core/span.hpp"
@@ -18,7 +20,6 @@ extern "C" IWDG_HandleTypeDef hiwdg;
 
 
 
-#ifdef HAL_UART_MODULE_ENABLED
 namespace STM32T
 {
 #define CM_CODE(name, code)		name = -(code)
@@ -38,7 +39,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		using This = GSM<DEF_RX_TO, DEF_IDLE_TO>;
 		
 	public:
-		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15;
+		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15, DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64, RESPONSE_EXTRA = 12;		// \r\n+CME: xxx\r\n
 		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO;
 		
 		#ifdef HAL_UART_TIMEOUT_VALUE
@@ -73,10 +74,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 	protected:
 		static constexpr STM32T::Log::Logger LG = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
 		
-		static constexpr size_t DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64, RESPONSE_EXTRA = 12;
-		
 		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv, CMD_MODE = "+++"sv;
-		
 		
 		enum class CommandType : uint8_t
 		{
@@ -87,11 +85,9 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			Bare		// ARGS
 		};
 		
-		
 		uint32_t m_lastSend = 0;
 		UART_HandleTypeDef* const p_huart;
 		bool m_urcEnabled = false, m_noSendWait = false, m_noSendDelay = false;
-		
 		
 		void addURCs(const vec<strv>& tokens, size_t len = SIZE_MAX)
 		{
@@ -654,7 +650,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated("Use StrToken2() instead.")]]
+		[[deprecated("Use StrToken2() instead. Will be removed before 1.0.0.")]]
 		ErrorCode StrToken(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
 			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
@@ -809,9 +805,10 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			return SingleToken(timeout, CommandType::Execute, {});
 		}
 		
+		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode Custom(strv command, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
-			return SingleToken(timeout, CommandType::Execute, command);
+			return SingleToken<LEN>(timeout, CommandType::Execute, command);
 		}
 		
 		int32_t GetBrand(char *const buf, const size_t max_len)
@@ -1032,7 +1029,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		
 	public:
 		void EnableURC(bool enable = true) {}
-		#endif	// USE_HAL_UART_REGISTER_CALLBACKS == 1
+		#endif	// defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 	};
 }
 #endif	// HAL_UART_MODULE_ENABLED

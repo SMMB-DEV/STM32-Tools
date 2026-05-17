@@ -99,7 +99,7 @@ namespace STM32T
 		constexpr bool rcontains(CharT c) const noexcept { return rfind(c) != npos; }
 		constexpr bool rcontains(const CharT *s) const { return rfind(s) != npos; }
 		
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 1.0.0.")]]
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
 		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// Assuming view is null-terminated.
@@ -151,7 +151,7 @@ namespace STM32T
 			}
 		}
 		
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 1.0.0.")]]
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
 		void tokenize(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// note: Assuming view is null-terminated.
@@ -206,7 +206,7 @@ namespace STM32T
 		/**
 		* @note If op returns true, this function returns.
 		*/
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 1.0.0.")]]
+		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
 		void tokenize(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
 		{
 			// note: Assuming view is null-terminated.
@@ -343,19 +343,19 @@ namespace STM32T
 		
 		bool remove_suffix(const CharT *s) { return remove_suffix(bstrv(s)); }
 		
-		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 1.0.0.")]]
+		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 0.3.0.")]]
 		bool compare_remove_prefix(base remove)
 		{
 			return remove_prefix(remove);
 		}
 		
-		[[deprecated("Use remove_suffix(strv) instead. Will be removed in 1.0.0.")]]
+		[[deprecated("Use remove_suffix(strv) instead. Will be removed in 0.3.0.")]]
 		bool compare_remove_suffix(base remove)
 		{
 			return remove_suffix(remove);
 		}
 		
-		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 1.0.0.")]]
+		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 0.3.0.")]]
 		bool compare_remove(base remove)
 		{
 			return compare_remove_prefix(remove);
@@ -385,7 +385,7 @@ namespace STM32T
 		}
 		
 		template <typename I>
-		[[deprecated("Use to_num() instead. Will be removed in 1.0.0.")]]
+		[[deprecated("Use to_num() instead. Will be removed in 0.3.0.")]]
 		size_t ExtractInteger(I& integer, size_t from = 0, size_t count = npos) const { return to_num<I>(integer, from, count); }
 	};
 	
