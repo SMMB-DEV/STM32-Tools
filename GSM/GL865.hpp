@@ -10,10 +10,6 @@ using STM32T::strv;
 using STM32T::wstrv;
 using std::operator"" sv;
 
-#ifdef STM32T_IWDG_TIMEOUT
-extern "C" IWDG_HandleTypeDef hiwdg;
-#endif	// STM32T_IWDG_TIMEOUT
-
 
 
 class GL865 : public STM32T::GSM<130, 55>
@@ -69,7 +65,7 @@ class GL865 : public STM32T::GSM<130, 55>
 			goto ok;
 		#endif	// STM32T_IWDG_TIMEOUT
 		
-		return stat == HAL_TIMEOUT ? TIMEOUT : UART_ERR;
+		return stat == HAL_TIMEOUT ? TIMEOUT : FAIL;
 		
 	ok:
 		const uint16_t orig_len = len;
@@ -91,7 +87,7 @@ class GL865 : public STM32T::GSM<130, 55>
 	{
 		static constexpr strv CMD = "E;&K;&P;+IPR=115200;"
 			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;#DIALMODE=1;"
-			"+CSAS;#SLEDSAV;&W"sv;
+			"+CSAS;&W"sv;
 		
 		// The first time might fail due to echo still being enabled, but the next tries should succeed.
 		return SingleToken<CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);

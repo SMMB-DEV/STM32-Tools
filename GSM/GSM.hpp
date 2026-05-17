@@ -32,7 +32,24 @@ CM_CODE(name##6, (code) * 10 + 6), CM_CODE(name##7, (code) * 10 + 7), CM_CODE(na
 CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_CODE_10(name##4, (code) * 10 + 4), CM_CODE_10(name##5, (code) * 10 + 5), \
 CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
 
-
+#define _FORMAT_ARGS()	\
+	if (!fmt) \
+		return INVALID; \
+	\
+	char args[ARG_LEN]; \
+	\
+	va_list print_args; \
+	va_start(print_args, fmt); \
+	const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args); \
+	va_end(print_args); \
+	\
+	if (argsLen < 0) \
+		return FAIL; \
+	\
+	if (argsLen >= sizeof(args)) \
+		return BIG_PARAM
+	
+	
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20>
 	class GSM
 	{
@@ -51,17 +68,16 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		enum ErrorCode : int32_t
 		{
 			OK				= +0,
-			INVALID			= -1,
-			INVALID_PARAM	= INVALID,
-			UART_ERR		= -2,
-			TIMEOUT			= -3,
-			WRONG_FORMAT	= -4,	// In response
-			ERR				= -5,	// Failure on the module side
-			FAIL			= -6,	// Failure on the MCU side
-			BIG_PARAM		= -7,
-			BUF_FULL		= -8,
-			ABORT			= -9,	// todo: remove?
-			UNKNOWN			= -10,
+			NOT_ALLOWED		= -1,
+			INVALID			= -2,
+			INVALID_PARAM	= INVALID,	// todo: remove?
+			BIG_PARAM		= -3,
+			TIMEOUT			= -4,
+			WRONG_FORMAT	= -5,	// In response
+			ERR				= -6,	// Failure on the module side
+			FAIL			= -7,	// Failure on the MCU side or in library
+			BUF_FULL		= -8,	// User's buffer
+			UNKNOWN			= -9,
 			
 			// GL865
 			CM_CODE_100(CME_0, 10), CM_CODE_100(CME_1, 11),
@@ -211,7 +227,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		/**
 		* @note Calls va_end()
 		*/
-		std::pair<int, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
+		std::pair<int32_t, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
 		{
 			if (!fmt)
 				return {INVALID, nullptr};
@@ -247,23 +263,10 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const char *const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return UNKNOWN;
-			
-			if (argsLen >= sizeof(args))	// did not fit inside {args}
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return NoToken<LEN>(timeout, type, cmd, handler, strv(args, argsLen));
+			
+			
 		}
 		
 		template <size_t CHUNK_LEN = 600, size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -288,7 +291,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 				Command(0, CommandType::Bare, ""sv, CMD_MODE, nullptr, 0);
 				
 				if (urcEnabled)
-					EnableURC(true);
+					EnableURC(true);	// Can't use stopURC() and startURC() because the EventCallback is bound and we're using HAL_UARTEx_ReceiveToIdle_IT().
 			});
 			
 			if (urcEnabled)
@@ -329,7 +332,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			}
 			
 			if ((state != HAL_UART_STATE_READY || stat != HAL_OK) && !len)
-				return UART_ERR;
+				return FAIL;
 			
 			if (code != OK && !len)
 				return code;
@@ -344,22 +347,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
 			const func<ErrorCode (strv, size_t)>& chunk_handler, const char *const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return UNKNOWN;
-			
-			if (argsLen >= sizeof(args))	// did not fit inside {args}
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return ReceiveOnline<CHUNK_LEN, LEN>(timeout, dl_to, type, cmd, chunk_handler, strv(args, argsLen));
 		}
 		
@@ -427,44 +415,14 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const span<const std::pair<strv, ErrorCode>> responses,
 			const bool allowSingleEnded, const char* const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return ErrorCode::UNKNOWN;
-			
-			if (argsLen >= sizeof(args))
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen), responses, allowSingleEnded);
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode ReceiveOK(const uint32_t timeout, const CommandType type, const strv cmd, const char* const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return ErrorCode::UNKNOWN;
-			
-			if (argsLen >= sizeof(args))
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen));
 		}
 		
@@ -550,22 +508,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const size_t ok_pos,
 			const func<ErrorCode (vec<strv>&)>& op, const char * const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID_PARAM;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return INVALID_PARAM;
-			
-			if (argsLen >= sizeof(args))
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return ResponseToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), ok_pos, op);
 		}
 		
@@ -573,22 +516,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd,
 			const func<ErrorCode (strv)>& op, const bool ok_last, const char * const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID_PARAM;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return INVALID_PARAM;
-			
-			if (argsLen >= sizeof(args))
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return ResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op, ok_last);
 		}
 		
@@ -630,22 +558,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& op, const char * const fmt, ...)
 		{
-			if (!fmt)
-				return INVALID_PARAM;
-			
-			char args[ARG_LEN];
-			
-			va_list print_args;
-			va_start(print_args, fmt);
-			const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args);
-			va_end(print_args);
-			
-			if (argsLen < 0)
-				return INVALID_PARAM;
-			
-			if (argsLen >= sizeof(args))
-				return BIG_PARAM;
-			
+			_FORMAT_ARGS();
 			return DelayedResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op);
 		}
 		
@@ -996,7 +909,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		
 		/**
 		* @param handler - If it returns true, the urc will be removed and considered handled.
-		* @retval - The nummber of urcs handled.
+		* @retval - The number of urcs handled.
 		*/
 		size_t HandleURCs(const func<bool (strv, uint32_t ts)>& handler, const bool stop_when_handled = false)
 		{
