@@ -89,10 +89,7 @@ class GL865 : public STM32T::GSM<130, 55>
 	
 	ErrorCode Setup(const uint32_t timeout_ms = 1000)
 	{
-		static constexpr strv CMD = "E0;&K0;&P;+IPR=115200;#SLED=2;"
-			"+CGDCONT=1,\"IP\";"
-			"#SCFGEXT=1,0,1,0,0,1;"					// <conneId>,<srMode>,<recvDataMode>,<keepalive>[,<ListenAutoRsp>[,<sendDataMode>]]
-			"#SCFGEXT=2,0,1,0,0,1;"
+		static constexpr strv CMD = "E;&K;&P;+IPR=115200;"
 			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;#DIALMODE=1;"
 			"+CSAS;#SLEDSAV;&W"sv;
 		
