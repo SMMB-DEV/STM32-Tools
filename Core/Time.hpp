@@ -10,11 +10,17 @@
 
 namespace STM32T::Time
 {
+	#ifdef STM32T_IWDG_TIMEOUT
+	extern "C" IWDG_HandleTypeDef hiwdg;
+	#endif	// STM32T_IWDG_TIMEOUT
+	
 	template <typename T>
 	using TickFuncPtr = T (*)();
 	
 	template <typename T>
 	using DelayFuncPtr = void (*)(T);
+	
+	using tick_t = decltype(HAL_GetTick());
 	
 	using cycle_t = uint32_t;
 	
@@ -50,7 +56,7 @@ namespace STM32T::Time
 		}
 	}
 	
-	[[gnu::always_inline]] inline uint32_t GetCycle() { return DWT->CYCCNT; }
+	[[gnu::always_inline]] inline cycle_t GetCycle() { return DWT->CYCCNT; }
 	#else
 	inline void Init()
 	{
@@ -58,7 +64,7 @@ namespace STM32T::Time
 			Error_Handler();
 	}
 	
-	inline uint32_t GetCycle()
+	inline cycle_t GetCycle()
 	{
 		static constexpr uint32_t MS = STM32T_TIME_CLK / 1000;
 		
@@ -109,38 +115,53 @@ namespace STM32T::Time
 		return cyc * uint64_t(1000) / (STM32T_TIME_CLK / 1'000'000);
 	}
 	
+	inline void Delay_Tick(tick_t ticks)
+	{
+		const tick_t start = HAL_GetTick();
+		
+		if (ticks < std::numeric_limits<tick_t>::max() - uwTickFreq)
+			ticks += uwTickFreq;	// Add a freq to guarantee minimum wait
+		
+		while (HAL_GetTick() - start < ticks)
+		{
+			#ifdef STM32T_IWDG_TIMEOUT
+			HAL_IWDG_Refresh(&hiwdg);
+			#endif	// STM32T_IWDG_TIMEOUT
+		}
+	}
+	
 	inline void Delay(cycle_t cyc)
 	{
-		const uint32_t start = GetCycle();
+		const cycle_t start = GetCycle();
 		while (GetCycle() - start < cyc);
 	}
 	
 	inline void Delay_ms(ms_time_t ms)
 	{
-		const uint32_t start = GetCycle(), delay = msToCycles(ms);
+		const cycle_t start = GetCycle(), delay = msToCycles(ms);
 		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_TIME_CLK is divisible by 1'000'000).
 	}
 	
 	inline void Delay_us(us_time_t us)
 	{
-		const uint32_t start = GetCycle(), delay = usToCycles(us);
+		const cycle_t start = GetCycle(), delay = usToCycles(us);
 		while (GetCycle() - start < delay);	// < because delay is usually accurate (when STM32T_TIME_CLK is divisible by 1'000'000).
 	}
 	
 	inline void Delay_ns(ns_time_t ns)
 	{
-		const uint32_t start = GetCycle(), delay = nsToCycles(ns);
+		const cycle_t start = GetCycle(), delay = nsToCycles(ns);
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
 	}
 	
-	inline bool Elapsed_Tick(const uint32_t start, const uint32_t msec)
+	inline bool Elapsed_Tick(const tick_t start, const tick_t ticks)
 	{
-		return HAL_GetTick() - start > msec;
+		return HAL_GetTick() - start > ticks;
 	}
 	
-	inline bool Elapsed_Tick(const uint32_t start, const uint32_t now, const uint32_t msec)
+	inline bool Elapsed_Tick(const tick_t start, const tick_t now, const tick_t ticks)
 	{
-		return now - start > msec;
+		return now - start > ticks;
 	}
 	
 	inline bool Elapsed(const cycle_t startCycle, const cycle_t time_cycles)
@@ -150,26 +171,26 @@ namespace STM32T::Time
 	
 	inline bool Elapsed_ms(const cycle_t startCycle, const ms_time_t time_ms)
 	{
-		const uint32_t delay = msToCycles(time_ms);
+		const cycle_t delay = msToCycles(time_ms);
 		return GetCycle() - startCycle >= delay;
 	}
 	
 	inline bool Elapsed_us(const cycle_t startCycle, const us_time_t time_us)
 	{
-		const uint32_t delay = usToCycles(time_us);
+		const cycle_t delay = usToCycles(time_us);
 		return GetCycle() - startCycle >= delay;
 	}
 	
 	inline bool Elapsed_ns(const cycle_t startCycle, const ns_time_t time_ns)
 	{
-		const uint32_t delay = nsToCycles(time_ns);
+		const cycle_t delay = nsToCycles(time_ns);
 		return GetCycle() - startCycle > delay;
 	}
 	
-	inline uint32_t Remaining_Tick(const uint32_t start, const uint32_t msec)
+	inline uint32_t Remaining_Tick(const tick_t start, const tick_t ticks)
 	{
 		const uint32_t now = HAL_GetTick();
-		return Elapsed_Tick(start, now, msec) ? 0 : (msec - (now - start));
+		return Elapsed_Tick(start, now, ticks) ? 0 : (ticks - (now - start));
 	}
 	
 	template <typename T>
@@ -181,9 +202,14 @@ namespace STM32T::Time
 		while (get_tick() - start < wait);
 	}
 	
-	inline void WaitAfter_Tick(const uint32_t start, const uint32_t wait)
+	inline void WaitAfter_Tick(const tick_t start, const tick_t wait)
 	{
-		while (HAL_GetTick() - start <= wait);
+		while (HAL_GetTick() - start <= wait)
+		{
+			#ifdef STM32T_IWDG_TIMEOUT
+			HAL_IWDG_Refresh(&hiwdg);
+			#endif	// STM32T_IWDG_TIMEOUT
+		}
 	}
 	
 	inline void WaitAfter(const cycle_t startCycle, const cycle_t wait_cycles)
@@ -193,19 +219,19 @@ namespace STM32T::Time
 	
 	inline void WaitAfter_ms(const cycle_t startCycle, const ms_time_t wait_ms)
 	{
-		const uint32_t wait = msToCycles(wait_ms);
+		const cycle_t wait = msToCycles(wait_ms);
 		while (GetCycle() - startCycle < wait);
 	}
 	
 	inline void WaitAfter_us(const cycle_t startCycle, const us_time_t wait_us)
 	{
-		const uint32_t wait = usToCycles(wait_us);
+		const cycle_t wait = usToCycles(wait_us);
 		while (GetCycle() - startCycle < wait);
 	}
 	
 	inline void WaitAfter_ns(const cycle_t startCycle, const ns_time_t wait_ns)
 	{
-		const uint32_t wait = nsToCycles(wait_ns);
+		const cycle_t wait = nsToCycles(wait_ns);
 		while (GetCycle() - startCycle <= wait);
 	}
 	
