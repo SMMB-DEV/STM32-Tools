@@ -11,7 +11,7 @@
 
 #include <memory>	// unique_ptr
 #include <optional>
-
+#include <variant>
 
 
 #ifdef STM32T_IWDG_TIMEOUT
@@ -34,21 +34,39 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 
 #define _FORMAT_ARGS()	\
 	if (!fmt) \
-		return INVALID; \
+		return FAIL; \
 	\
 	char args[ARG_LEN]; \
 	\
 	va_list print_args; \
 	va_start(print_args, fmt); \
-	const int argsLen = vsnprintf(args, sizeof(args), fmt, print_args); \
-	va_end(print_args); \
+	const ErrorCode argsLen = (ErrorCode)FormatArgs(args, sizeof(args), fmt, print_args); \
 	\
-	if (argsLen < 0) \
+	if (argsLen < OK) \
+		return argsLen
+	
+
+#define _GET_ARGS(var_name) \
+strv args; \
+char _args_buf[ARG_LEN]; \
+\
+if (const strv *p = std::get_if<const strv>(&var_name)) \
+	args = *p; \
+else \
+{ \
+	const char *const *fmt = std::get_if<const char *>(&var_name); \
+	if (!fmt) \
 		return FAIL; \
 	\
-	if (argsLen >= sizeof(args)) \
-		return BIG_PARAM
-	
+	va_list print_args; \
+	va_start(print_args, var_name); \
+	const ErrorCode argsLen = (ErrorCode)FormatArgs(_args_buf, sizeof(_args_buf), *fmt, print_args); \
+	\
+	if (argsLen < OK) \
+		return argsLen; \
+	\
+	args = {_args_buf, size_t(argsLen)}; \
+}
 	
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20>
 	class GSM
@@ -225,30 +243,31 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		/**
-		* @note Calls va_end()
+		* @note Calls va_end().
 		*/
-		std::pair<int32_t, std::unique_ptr<char[]>> FormatArgsDyn(const char *fmt, std::va_list args, size_t arg_len = DEFAULT_ARG_LEN)
+		int32_t FormatArgs(char *buf, size_t buf_len, const char *fmt, std::va_list args)
 		{
 			if (!fmt)
-				return {INVALID, nullptr};
+				return FAIL;
 			
-			auto buf = std::make_unique<char[]>(arg_len);
-			
-			const int len = vsnprintf(buf.get(), arg_len, fmt, args);
+			const int len = vsnprintf(buf, buf_len, fmt, args);
 			va_end(args);
 			
 			if (len < 0)
-				return {FAIL, nullptr};
+				return FAIL;
 			
-			if (len >= arg_len)
-				return {BIG_PARAM, nullptr};
+			if (len >= buf_len)
+				return BIG_PARAM;
 			
-			return {len, std::move(buf)};
+			return len;
 		}
 		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const strv args = strv())
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler,
+			const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
+			_GET_ARGS(fmt_args);
+			
 			if (!handler)
 				return INVALID_PARAM;
 			
@@ -261,16 +280,11 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler, const char *const fmt, ...)
+		ErrorCode EnterOnline(const uint32_t timeout, const CommandType type, const strv cmd, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
-			_FORMAT_ARGS();
-			return NoToken<LEN>(timeout, type, cmd, handler, strv(args, argsLen));
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode EnterOnline(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv())
-		{
-			ErrorCode code = SingleToken<LEN>(timeout, type, cmd, args, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}});
+			_GET_ARGS(fmt_args);
+			
+			ErrorCode code = SingleToken<LEN>(timeout, type, cmd, args, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}}, false);
 			
 			if (code != OK)
 				ExitOnline();
@@ -278,27 +292,22 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			return code;
 		}
 		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode EnterOnline(const uint32_t timeout, const CommandType type, const strv cmd, const char *const fmt, ...)
-		{
-			_FORMAT_ARGS();
-			return EnterOnline(timeout, type, cmd, strv(args, argsLen));
-		}
-		
 		ErrorCode ExitOnline(const uint32_t timeout = 1)
 		{
-			return SingleToken(timeout, CommandType::Bare, strv(), CMD_MODE, {{"NO CARRIER"sv, OK}});
+			return SingleToken(timeout, CommandType::Bare, strv(), CMD_MODE, {{"NO CARRIER"sv, OK}}, false);
 		}
 		
-		template <size_t CHUNK_LEN = 600, size_t LEN = DEFAULT_RESPONSE_LEN>
+		template <size_t CHUNK_LEN = 600, size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
-			const func<ErrorCode (strv, size_t)>& chunk_handler = nullptr, const strv args = strv())
+			const func<ErrorCode (strv, size_t)>& chunk_handler, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
+			_GET_ARGS(fmt_args);
+			
 			std::unique_ptr<char[]> buf[2] = {std::make_unique<char[]>(CHUNK_LEN), std::make_unique<char[]>(CHUNK_LEN)};
 			if (!buf[0] || !buf[1])
 				return FAIL;
 			
-			ErrorCode code = EnterOnline<LEN>(timeout, type, cmd, args);
+			ErrorCode code = EnterOnline<DEFAULT_ARG_LEN, LEN>(timeout, type, cmd, args);
 			
 			if (code != OK)
 				return code;
@@ -363,14 +372,6 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			return len;
 		}
 		
-		template <size_t CHUNK_LEN = 600, size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
-			const func<ErrorCode (strv, size_t)>& chunk_handler, const char *const fmt, ...)
-		{
-			_FORMAT_ARGS();
-			return ReceiveOnline<CHUNK_LEN, LEN>(timeout, dl_to, type, cmd, chunk_handler, strv(args, argsLen));
-		}
-		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (vec<strv>&)>& op,
 			const bool allowSingleEnded = false)
@@ -413,8 +414,8 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv(),
-			const span<const std::pair<strv, ErrorCode>> responses = {{"OK"sv, OK}}, const bool allowSingleEnded = false)
+		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args,
+			const span<const std::pair<strv, ErrorCode>> responses, const bool allowSingleEnded)
 		{
 			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
 			{
@@ -440,35 +441,27 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ReceiveOK(const uint32_t timeout, const CommandType type, const strv cmd, const char* const fmt, ...)
+		ErrorCode ReceiveOK(const uint32_t timeout, const CommandType type, const strv cmd, const std::variant<const char*, const strv> fmt_args = ""sv, ...)
 		{
-			_FORMAT_ARGS();
-			return SingleToken<LEN>(timeout, type, cmd, strv(args, argsLen));
+			_GET_ARGS(fmt_args);
+			return SingleToken<LEN>(timeout, type, cmd, args, {{"OK"sv, OK}}, false);
 		}
 		
-		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const strv args = strv())
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN>
+		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
+			_GET_ARGS(fmt_args);
 			return SingleToken(timeout, type, cmd, args, {{"> "sv, OK}}, true);
 		}
 		
-		ErrorCode WaitForReady(const uint32_t timeout, const CommandType type, const strv cmd, const char *fmt, ...)
-		{
-			va_list args;
-			va_start(args, fmt);
-			auto [len, buf] = FormatArgsDyn(fmt, args);
-			
-			if (len < OK)
-				return ErrorCode(len);
-			
-			return WaitForReady(timeout, type, cmd, {buf.get(), size_t(len)});
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const size_t ok_pos,
-			const func<ErrorCode (vec<strv>&)>& op)
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd,
+			const func<ErrorCode (vec<strv>&)>& op, const size_t ok_pos = 1, size_t expectedTokens = 2, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
 			if (!op)
 				return INVALID_PARAM;
+			
+			_GET_ARGS(fmt_args);
 			
 			return Tokens2<LEN + RESPONSE_EXTRA>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](vec<strv>& tokens) mutable -> ErrorCode
 			{
@@ -512,37 +505,12 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			});
 		}
 		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op, const bool ok_last = true)
+		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& op,
+			const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
-			if (!op)
-				return INVALID_PARAM;
+			_GET_ARGS(fmt_args);
 			
-			return ResponseToken(2, timeout, type, cmd, args, ok_last, [&](vec<strv>& tokens)
-			{
-				return op(tokens[0]);
-			});
-		}
-		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(const size_t expectedTokens, const uint32_t timeout, const CommandType type, const strv cmd, const size_t ok_pos,
-			const func<ErrorCode (vec<strv>&)>& op, const char * const fmt, ...)
-		{
-			_FORMAT_ARGS();
-			return ResponseToken<LEN>(expectedTokens, timeout, type, cmd, strv(args, argsLen), ok_pos, op);
-		}
-		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd,
-			const func<ErrorCode (strv)>& op, const bool ok_last, const char * const fmt, ...)
-		{
-			_FORMAT_ARGS();
-			return ResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op, ok_last);
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (strv)>& op)
-		{
 			bool done = false;
 			const uint32_t start = HAL_GetTick();
 			
@@ -572,21 +540,15 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 			if (code != OK || done)
 				return code;
 			
-			return ResponseToken<LEN>(1, Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd, {}, SIZE_MAX, [&](vec<strv>& tokens) { return op(tokens[0]); });
-		}
-		
-		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& op, const char * const fmt, ...)
-		{
-			_FORMAT_ARGS();
-			return DelayedResponseToken<LEN>(timeout, type, cmd, strv(args, argsLen), op);
+			return ResponseToken<ARG_LEN, LEN>(Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd,
+				[&](vec<strv>& tokens) { return op(tokens[0]); }, SIZE_MAX, 1);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		[[deprecated("Use StrToken2() instead. Will be removed before 1.0.0.")]]
 		ErrorCode StrToken(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
-			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
+			return NoToken<DEFAULT_ARG_LEN, LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
 			{
 				const strv orig = str;
 				
@@ -607,7 +569,7 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		int32_t StrToken2(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
-			return NoToken<LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str) -> ErrorCode
+			return NoToken<DEFAULT_ARG_LEN, LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str) -> ErrorCode
 			{
 				const strv orig = str;
 				
@@ -735,13 +697,13 @@ CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_C
 		
 		ErrorCode AT(const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
-			return SingleToken(timeout, CommandType::Execute, {});
+			return ReceiveOK(timeout, CommandType::Execute, {}, "");
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode Custom(strv command, const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
-			return SingleToken<LEN>(timeout, CommandType::Execute, command);
+			return ReceiveOK<DEFAULT_ARG_LEN, LEN>(timeout, CommandType::Execute, command);
 		}
 		
 		int32_t GetBrand(char *const buf, const size_t max_len)

@@ -90,7 +90,7 @@ class GL865 : public STM32T::GSM<130, 55>
 			"+CSAS;&W"sv;
 		
 		// The first time might fail due to echo still being enabled, but the next tries should succeed.
-		return SingleToken<CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
+		return ReceiveOK<DEFAULT_ARG_LEN, CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
 	}
 	
 	ErrorCode ConfigSocket(const uint8_t conn_id, const uint8_t cid, const uint32_t conn_to)
@@ -112,10 +112,10 @@ public:
 	
 	int32_t NetworkCheck()
 	{
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "+CGREG", strv(), [&](strv token) -> ErrorCode
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "+CGREG", [&](const std::vector<strv>& tokens) -> ErrorCode
 		{
 			uint8_t n, stat;
-			if (sscanf(token.data(), "%hhu,%hhu", &n, &stat) == 2)
+			if (sscanf(tokens[0].data(), "%hhu,%hhu", &n, &stat) == 2)
 				return ErrorCode(stat);
 			
 			return ERR;
@@ -124,9 +124,9 @@ public:
 	
 	ErrorCode ClockRead(DateTime& dt)
 	{
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "#CCLK"sv, strv(), [&](const strv token)
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "#CCLK"sv, [&](const std::vector<strv>& tokens)
 		{
-			if (auto opt = DateTime::Parse(token); opt)
+			if (auto opt = DateTime::Parse(tokens[0]); opt)
 			{
 				dt = opt.value();
 				return OK;
@@ -138,18 +138,18 @@ public:
 	
 	ErrorCode NTP(const strv host, const uint16_t port, DateTime& dt, const bool update_module_clock = false, const uint16_t timeout_s = 10)
 	{
-		return ResponseToken(timeout_s * 1000 + DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#NTP"sv, [&](const strv token)
+		return ResponseToken(timeout_s * 1000 + DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#NTP"sv, [&](const std::vector<strv>& tokens)
 		{
-			if (auto opt = DateTime::ParseNTP(token); opt)
+			if (auto opt = DateTime::ParseNTP(tokens[0]); opt)
 			{
 				dt = opt.value();
 				return OK;
 			}
 			
-			addURC(token);
+			addURC(tokens[0]);
 			
 			return WRONG_FORMAT;
-		}, true, "\"%.*s\",%hu,%hhu,%hu", host.length(), host.data(), port, update_module_clock, timeout_s);
+		}, 1, 2, "\"%.*s\",%hu,%hhu,%hu", host.length(), host.data(), port, update_module_clock, timeout_s);
 	}
 	
 	/**
@@ -205,7 +205,7 @@ public:
 			STM32T::H2C<uint16_t>(number[i], number2.get() + i * 4);
 		
 		const uint32_t start = HAL_GetTick();
-		ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, {number2.get(), number.size() * 4});
+		ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, strv(number2.get(), number.size() * 4));
 		if (code != OK)
 		{
 			SendUART(ESC);
@@ -227,10 +227,8 @@ public:
 		
 		// \r\n+CMGS: 255\r\n\r\nOK\r\n
 		uint8_t n;
-		ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv, CTRL_Z, [&n](strv token) -> ErrorCode
-		{
-			return sscanf(token.data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT;
-		});
+		ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv,
+			[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
 		
 		if (res == OK)
 			LOG_D<LG>("SM sent successfully (%hhu).", n);
@@ -248,7 +246,7 @@ public:
 	
 	ErrorCode HangUp(const uint32_t timeout = 30'000)
 	{
-		return SingleToken(timeout, CommandType::Execute, "H"sv);
+		return ReceiveOK(timeout, CommandType::Execute, "H"sv);
 	}
 	
 	/**
@@ -258,10 +256,10 @@ public:
 	ErrorCode SignalQuality(int8_t& rssi, int16_t& ber)
 	{
 		// \r\n+CSQ: 99,99\r\n + \r\nOK\r\n
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "+CSQ"sv, {}, [&rssi, &ber](strv token) -> ErrorCode
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "+CSQ"sv, [&rssi, &ber](const std::vector<strv>& tokens) -> ErrorCode
 		{
 			uint8_t t1, t2;
-			if (2 != sscanf(token.data(), "%2hhu,%2hhu", &t1, &t2) || (t1 > 31 && t1 != 99) || (t2 > 7 && t2 != 99))
+			if (2 != sscanf(tokens[0].data(), "%2hhu,%2hhu", &t1, &t2) || (t1 > 31 && t1 != 99) || (t2 > 7 && t2 != 99))
 				return WRONG_FORMAT;
 			
 			if (t1 <= 31)
@@ -291,8 +289,8 @@ public:
 			return INVALID;
 		
 		// \r\n#SGACT: xxx.xxx.xxx.xxx\r\n + \r\nOK\r\n
-		return ResponseToken(timeout_ms, CommandType::Write, "#SGACT"sv, [](strv token) { return IsIPAddress(token) ? OK : WRONG_FORMAT; }, true, "%hhu,%hhu",
-			cid, enable);
+		return ResponseToken(timeout_ms, CommandType::Write, "#SGACT"sv,
+			[](const std::vector<strv>& tokens) { return IsIPAddress(tokens[0]) ? OK : WRONG_FORMAT; }, 1, 2, "%hhu,%hhu", cid, enable);
 	}
 	
 	int32_t ContextStatus(const uint8_t cid)
@@ -358,14 +356,14 @@ public:
 			return INVALID;
 		
 		// \r\n#SS: 0,0,xxx.xxx.xxx.xxx,ppppp,yyy.yyy.yyy.yyy,ppppp\r\n + \r\nOK\r\n (62)
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SS"sv, [conn_id](strv token) -> ErrorCode
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#SS"sv, [conn_id](const std::vector<strv>& tokens) -> ErrorCode
 		{
 			uint8_t conn_id_r, conn_stat;
-			if (sscanf(token.data(), "%hhu,%hhu", &conn_id_r, &conn_stat) == 2 && conn_id_r == conn_id)
+			if (sscanf(tokens[0].data(), "%hhu,%hhu", &conn_id_r, &conn_stat) == 2 && conn_id_r == conn_id)
 				return ErrorCode(conn_stat);
 			
 			return WRONG_FORMAT;
-		}, true, "%hhu", conn_id);
+		}, 1, 2, "%hhu", conn_id);
 	}
 	
 	ErrorCode SocketSend(const uint8_t conn_id, STM32T::span<const strv> data)
@@ -395,7 +393,7 @@ public:
 		
 		m_noSendWait = true;
 		
-		return SingleToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
+		return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
 	}
 	
 	int32_t SocketRead(const uint8_t conn_id, char *const data, const uint16_t len, uint32_t timeout_ms = DEFAUL_RECEIVE_TIMEOUT)
@@ -407,8 +405,8 @@ public:
 			return INVALID;
 		
 		// #SRECV: x,yyyy\r\n + \r\ndata\r\n + \r\nOK\r\n
-		return ResponseToken<DEFAULT_ARG_LEN, 16 + 4 + 1500 * 2 + 6>(3, timeout_ms, CommandType::Write, "#SRECV"sv, 2,
-		[this, conn_id, len, data](std::vector<strv>& tokens) -> ErrorCode
+		return ResponseToken<DEFAULT_ARG_LEN, 16 + 4 + 1500 * 2 + 6>(timeout_ms, CommandType::Write, "#SRECV"sv,
+		[this, conn_id, len, data](const std::vector<strv>& tokens) -> ErrorCode
 		{
 			uint8_t recv_conn_id;
 			uint16_t recv_len;
@@ -428,7 +426,7 @@ public:
 			}
 			
 			return ErrorCode(recv_len);
-		}, "%hhu,%hu", conn_id, len);
+		}, 2, 3, "%hhu,%hu", conn_id, len);
 	}
 	
 	ErrorCode FTPTimeout(uint32_t ftp_to)
@@ -460,7 +458,7 @@ public:
 	
 	ErrorCode FTPClose()
 	{
-		return SingleToken(m_ftpTimeout, CommandType::Execute, "#FTPCLOSE"sv);
+		return ReceiveOK(m_ftpTimeout, CommandType::Execute, "#FTPCLOSE"sv);
 	}
 	
 	#ifdef STM32T_GSM_URC_ENABLED
@@ -513,16 +511,11 @@ public:
 	}
 	#endif	// STM32T_GSM_URC_ENABLED
 	
-	GL865::ErrorCode FTPPut(strv file)
-	{
-		return ReceiveOK(15'000, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", file.length(), file.data());
-	}
-	
 	template <size_t ARG_LEN = DEFAULT_ARG_LEN>
-	GL865::ErrorCode FTPPut(const char *fmt, ...)
+	GL865::ErrorCode FTPPut(const std::variant<const char *, const strv> file, ...)
 	{
-		_FORMAT_ARGS();
-		return FTPPut(strv(args, argsLen));
+		_GET_ARGS(file);
+		return ReceiveOK(m_ftpTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", args.length(), args.data());
 	}
 	
 	int32_t FTPGetO(strv file, const std::function<void (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
@@ -546,16 +539,11 @@ public:
 		return ReceiveOK(m_ftpTimeout, CommandType::Write, "#FTPTYPE"sv, "%hhu", ascii);
 	}
 	
-	ErrorCode FTPCWD(strv dir)
-	{
-		return SingleToken(m_ftpTimeout, CommandType::Write, "#FTPCWD"sv, dir);
-	}
-	
 	template <size_t ARG_LEN = DEFAULT_ARG_LEN>
-	ErrorCode FTPCWD(const char *fmt, ...)
+	ErrorCode FTPCWD(const std::variant<const char *, const strv> dir, ...)
 	{
-		_FORMAT_ARGS();
-		return FTPCWD(strv(args, argsLen));
+		_GET_ARGS(dir);
+		return ReceiveOK(m_ftpTimeout, CommandType::Write, "#FTPCWD"sv, args);
 	}
 	
 	int32_t FTPListO(char *buf, size_t len, strv name = strv(), const uint32_t list_to = 15'000)
