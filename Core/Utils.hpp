@@ -148,6 +148,59 @@ namespace STM32T
 		return (0b0110'1001'1001'0110 >> val) & 1;
 	}
 	
+	/**
+	* @brief https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
+	*/
+	template <typename T>
+	inline T reverse(T v)
+	{
+		static_assert(std::is_integral_v<T>);
+		
+		if constexpr (sizeof(T) <= 4)
+		{
+			static_assert(sizeof(int) == 4);	// All numbers are promoted to int
+			
+			if constexpr (sizeof(T) >= 4)		// swap 2-byte long pairs
+				v = (v >> 16) | (v << 16);
+			
+			if constexpr (sizeof(T) >= 2)		// swap bytes
+				v = ((v >> 8) & 0x00FF'00FF) | ((v & 0x00FF'00FF) << 8);
+			
+			// swap nibbles ... 
+			v = ((v >> 4) & 0x0F0F'0F0F) | ((v & 0x0F0F'0F0F) << 4);
+			
+			// swap consecutive pairs
+			v = ((v >> 2) & 0x3333'3333) | ((v & 0x3333'3333) << 2);
+			
+			// swap odd and even bits
+			v = ((v >> 1) & 0x5555'5555) | ((v & 0x5555'5555) << 1);
+		}
+		else if (sizeof(T) == 8)
+		{
+			// swap 4-byte long pairs
+			v = (v >> 32) | (v << 32);
+			
+			// swap 2-byte long pairs
+			v = ((v >> 16) & 0x0000'FFFF'0000'FFFF) | ((v & 0x0000'FFFF'0000'FFFF) << 16);
+			
+			// swap bytes
+			v = ((v >> 8) & 0x00FF'00FF'00FF'00FF) | ((v & 0x00FF'00FF'00FF'00FF) << 8);
+			
+			// swap nibbles ... 
+			v = ((v >> 4) & 0x0F0F'0F0F'0F0F'0F0F) | ((v & 0x0F0F'0F0F'0F0F'0F0F) << 4);
+			
+			// swap consecutive pairs
+			v = ((v >> 2) & 0x3333'3333'3333'3333) | ((v & 0x3333'3333'3333'3333) << 2);
+			
+			// swap odd and even bits
+			v = ((v >> 1) & 0x5555'5555'5555'5555) | ((v & 0x5555'5555'5555'5555) << 1);
+		}
+		else
+			return 0;
+		
+		return v;
+	}
+	
 	template <typename T>
 	inline constexpr T ceil(T p, T q)
 	{
@@ -161,7 +214,7 @@ namespace STM32T
 	{
 		static_assert(is_int_v<T>);
 		
-		return n - n % multiple;
+		return n / multiple * multiple;
 	}
 	
 	template <typename T>
@@ -169,7 +222,8 @@ namespace STM32T
 	{
 		static_assert(is_int_v<T>);
 		
-		return ceil(n, multiple) * multiple;
+		// todo: check this for negative numbers and min/max edge cases
+		return (n + multiple - 1) / multiple * multiple;
 	}
 	
 	template <typename T>
