@@ -402,7 +402,7 @@ namespace STM32T::Time
 	}
 	#endif	// HAL_RTC_MODULE_ENABLED
 	
-	template <typename TIME_T = uint32_t>
+	template <typename TIME_T = cycle_t>
 	class Filter
 	{
 		TIME_T (*const cf_cyc)();
@@ -412,7 +412,7 @@ namespace STM32T::Time
 		bool m_prevState = false, m_prevState2 = false;
 		
 	public:
-		Filter(TIME_T min_time, TIME_T (* cyc)() = Time::GetCycle) : c_minCyc(min_time), cf_cyc(cyc) {}
+		Filter(TIME_T min_time, TIME_T (* cyc)() = GetCycle) : c_minCyc(min_time), cf_cyc(cyc) {}
 		
 		/**
 		* @retval Duration of the pulse in microseconds or 0 in case of invalid pulse.
