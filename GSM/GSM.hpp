@@ -647,30 +647,27 @@ else \
 	public:
 		struct DateTime
 		{
-			static constexpr uint8_t MonthDays[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };	// February can be 29
-			
-			uint8_t yy, MM, dd, hh, mm, ss;
+			uint16_t yyyy;
+			uint8_t MM, dd, hh, mm, ss;
 			int8_t zz;
-			
-			[[deprecated]] static bool Parse(DateTime& dt, const strv view)
-			{
-				return 7 == sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%3hhd", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz) && dt.IsSet();
-			}
 			
 			static std::optional<DateTime> Parse(strv view)
 			{
 				DateTime dt;
 				
-				if (int n; sscanf(view.data(), "\"%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				size_t s1 = 0, s2 = 0;
+				
+				int n = sscanf(view.data(), "\"%4hu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%zn%3hhd%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz, &s1, &s2);
+				if (n >= 6 && s1 > 0)
 				{
-					view.remove_prefix(size_t(n));
-					if (sscanf(view.data(), "%3hhd\"", &dt.zz) != 1)
-					{
-						if (view == "\""sv)
-							dt.zz = 0;
-						else
-							return std::nullopt;
-					}
+					if (s1 == 17 && dt.yyyy < 100)
+						dt.yyyy = (dt.yyyy < 70 ? 2000 : 1900) + dt.yyyy;
+					else if (s1 != 19)
+						return std::nullopt;
+					
+					view.remove_prefix(std::max(s1, s2));
+					if (!view.starts_with('"'))
+						return std::nullopt;
 					
 					if (dt.IsSet())
 						return dt;
@@ -679,25 +676,14 @@ else \
 				return std::nullopt;
 			}
 			
-			[[deprecated]] static bool ParseNTP(DateTime& dt, const strv view)
-			{
-				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
-				{
-					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
-						dt.zz = 0;
-					
-					return dt.IsSet();
-				}
-				
-				return false;
-			}
-			
 			static std::optional<DateTime> ParseNTP(strv view)
 			{
 				DateTime dt;
 				
-				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
+				if (int n; sscanf(view.data(), "%2hhu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%n", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &n) == 6 && n > 0)
 				{
+					dt.yyyy = (dt.yyyy < 70 ? 2000 : 1900) + dt.yyyy;
+					
 					view.remove_prefix(size_t(n));
 					if (sscanf(view.data() + n, "%3hhd", &dt.zz) != 1)
 					{
@@ -718,8 +704,15 @@ else \
 			{
 				DateTime dt;
 				
-				if (7 == sscanf(view.data(), "\"20%2hhu/%2hhu/%2hhu %2hhu:%2hhu:%2hhu%3hhd\"", &dt.yy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz))
+				size_t s = 0;
+				
+				if (7 == sscanf(view.data(), "\"%4hhu/%2hhu/%2hhu %2hhu:%2hhu:%2hhu%3hhd\"%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz, &s) && s > 0)
 				{
+					if (s == 21 && dt.yyyy < 100)
+						dt.yyyy = (dt.yyyy < 70 ? 2000 : 1900) + dt.yyyy;
+					else if (s != 23)
+						return std::nullopt;
+					
 					if (dt.IsSet())
 						return dt;
 				}
@@ -727,15 +720,9 @@ else \
 				return std::nullopt;
 			}
 			
-			static bool IsLeapYear(uint8_t yy)
-			{
-				// These extra days occur in each year that is an integer multiple of 4 (except for years evenly divisible by 100, but not by 400) [https://en.wikipedia.org/wiki/Leap_year]
-				return yy % 4 == 0 && yy != 0;
-			}
-			
 			bool IsSet() const
 			{
-				return yy <= 99 && MM >= 1 && MM <= 12 && dd >= 1 && dd <= MonthDays[MM - 1] + (MM == 2 && IsLeapYear(yy)) && hh <= 23 && mm <= 59 && ss <= 60 && zz >= -47 && zz <= 48;
+				return MM >= 1 && MM <= 12 && dd >= 1 && dd <= Time::MonthDays(MM - 1, yyyy) && hh <= 23 && mm <= 59 && ss <= 60 && zz >= -47 && zz <= 48;
 			}
 			
 			const char* Format() const
@@ -745,7 +732,7 @@ else \
 				const int16_t mins = zz * 15;
 				const int8_t hour = mins / 60, min = mins % 60;
 				
-				sprintf(fmt, "%hhu%02hhu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+03hhd:%02hhu", yy < 70 ? 20u : 19u, yy, MM, dd, hh, mm, ss, hour, std::abs(min));
+				sprintf(fmt, "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu%+03hhd:%02hhu", yyyy, MM, dd, hh, mm, ss, hour, std::abs(min));
 				return fmt;
 			}
 		};
