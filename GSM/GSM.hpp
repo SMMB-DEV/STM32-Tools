@@ -18,10 +18,18 @@
 extern "C" IWDG_HandleTypeDef hiwdg;
 #endif	// STM32T_IWDG_TIMEOUT
 
+#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
+
+#define STM32T_GSM_URC_ENABLED
+
+#ifndef STM32T_GSM_URC_BUF_SIZE
+#define STM32T_GSM_URC_BUF_SIZE		512
+#endif	// STM32T_GSM_URC_BUF_SIZE
+
+#endif	// defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 
 
-namespace STM32T
-{
+
 #define CM_CODE(name, code)		name = -(code)
 
 #define CM_CODE_10(name, code)		CM_CODE(name##0, (code) * 10 + 0), CM_CODE(name##1, (code) * 10 + 1), \
@@ -31,6 +39,8 @@ CM_CODE(name##6, (code) * 10 + 6), CM_CODE(name##7, (code) * 10 + 7), CM_CODE(na
 #define CM_CODE_100(name, code)		CM_CODE_10(name##0, (code) * 10 + 0), CM_CODE_10(name##1, (code) * 10 + 1), \
 CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_CODE_10(name##4, (code) * 10 + 4), CM_CODE_10(name##5, (code) * 10 + 5), \
 CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
+
+
 
 #define _FORMAT_ARGS()	\
 	if (!fmt) \
@@ -67,21 +77,23 @@ else \
 	\
 	args = {_args_buf, size_t(argsLen)}; \
 }
-	
-	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20>
+
+
+
+namespace STM32T
+{
+	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t DEF_O2C_TO = 1000>
 	class GSM
 	{
-		using This = GSM<DEF_RX_TO, DEF_IDLE_TO>;
+		using This = GSM<DEF_RX_TO, DEF_IDLE_TO, DEF_O2C_TO>;
 		
 	public:
 		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15, DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64, RESPONSE_EXTRA = 12;		// \r\n+CME: xxx\r\n
-		static constexpr uint32_t DEFAUL_RECEIVE_TIMEOUT = DEF_RX_TO, DEFAULT_IDLE_TIMEOUT = DEF_IDLE_TO;
-		
-		#ifdef HAL_UART_TIMEOUT_VALUE
-		static constexpr uint32_t DEFAUL_TRANSMIT_TIMEOUT = HAL_UART_TIMEOUT_VALUE;
-		#else
-		static constexpr uint32_t DEFAUL_TRANSMIT_TIMEOUT = (HAL_MAX_DELAY);
-		#endif
+		static constexpr uint32_t
+			DEFAUL_TRANSMIT_TIMEOUT			= 10'000,
+			DEFAUL_RECEIVE_TIMEOUT			= DEF_RX_TO,
+			DEFAULT_IDLE_TIMEOUT			= DEF_IDLE_TO,
+			DEFAULT_ONLINE_TO_CMD_TIMEOUT	= DEF_O2C_TO;
 		
 		enum ErrorCode : int32_t
 		{
@@ -337,8 +349,9 @@ else \
 			return code;
 		}
 		
-		ErrorCode ExitOnline(const uint32_t timeout = 1)
+		ErrorCode ExitOnline(const uint32_t timeout = DEFAULT_ONLINE_TO_CMD_TIMEOUT)
 		{
+			HAL_Delay(timeout);	// Set with S12 - todo: check the last tranmisson/reception (CONNECT) time
 			return SingleToken(timeout, CommandType::Bare, strv(), CMD_MODE, {{"NO CARRIER"sv, OK}}, false);
 		}
 		
@@ -737,7 +750,7 @@ else \
 			}
 		};
 		
-		GSM(UART_HandleTypeDef* uart) : p_huart(uart) {}
+		GSM(UART_HandleTypeDef* huart) : p_huart(huart) {}
 		
 		ErrorCode AT(const uint32_t timeout = DEFAUL_RECEIVE_TIMEOUT)
 		{
@@ -749,6 +762,16 @@ else \
 		{
 			return ReceiveOK<DEFAULT_ARG_LEN, LEN>(timeout, CommandType::Execute, command);
 		}
+		
+		
+		// ********************************* V.25TER **********************************
+		ErrorCode FactoryReset()
+		{
+			return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "&F"sv);
+		}
+		
+		
+		// ****************************** 3GPP TS 27.007 ******************************
 		
 		int32_t GetBrand(char *const buf, const size_t max_len)
 		{
@@ -828,8 +851,6 @@ else \
 			return OK;
 		}
 		
-		#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
-		#define STM32T_GSM_URC_ENABLED
 		/**
 		* @param rssi - Signal strength in dbm. Not available if positive or zero.
 		* @param ber - Bit error rate (average) per ten thousand. Not available if negative.
@@ -909,6 +930,9 @@ else \
 			
 			return res;
 		}
+		
+		
+		#ifdef STM32T_GSM_URC_ENABLED
 	private:
 		class URC
 		{
@@ -943,7 +967,7 @@ else \
 			operator strv() const { return {m_buf, m_size}; }
 		};
 		
-		uint8_t m_buf[512];
+		uint8_t m_buf[(STM32T_GSM_URC_BUF_SIZE)];
 		LinkedList<URC, 32> m_urcs;
 		
 		static inline This *s_this = nullptr;
@@ -1048,7 +1072,7 @@ else \
 		
 	public:
 		void EnableURC(bool enable = true) {}
-		#endif	// defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
+		#endif	// STM32T_GSM_URC_ENABLED
 	};
 }
 #endif	// HAL_UART_MODULE_ENABLED

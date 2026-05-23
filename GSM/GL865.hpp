@@ -12,8 +12,10 @@ using std::operator"" sv;
 
 
 
-class GL865 : public STM32T::GSM<130, 55>
+class GL865 : public STM32T::GSM<130, 55, 50>
 {
+	using Parent = STM32T::GSM<130, 55>;	// todo: remove?
+	
 	static constexpr uint32_t MAX_DNS_TIME = 20'000, DEFAULT_FTP_TIMEOUT = 10'000;
 	
 	STM32T::IO m_pwr;
@@ -80,7 +82,7 @@ public:
 	
 	ErrorCode ClockRead(DateTime& dt)
 	{
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "#CCLK"sv, [&](const std::vector<strv>& tokens)
+		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "+CCLK"sv, [&](const std::vector<strv>& tokens)
 		{
 			if (auto opt = DateTime::Parse(tokens[0]); opt)
 			{
@@ -491,7 +493,7 @@ public:
 		STM32T::Time::WaitAfter_Tick(m_lastPowerOff, 1500);
 		m_pwr.Set();
 		
-		HAL_UART_Init(p_huart);		// fixme: necessary?
+		HAL_UART_Init(p_huart);		// todo: necessary?
 		EnableURC(enable_urc);
 		
 		if (initial)
