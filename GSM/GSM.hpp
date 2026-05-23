@@ -132,7 +132,7 @@ else \
 		void addURCFromBuf(const strv buf)
 		{
 			vec<strv> tokens;
-			buf.tokenize2("\r\n"sv, tokens, true);
+			buf.tokenize("\r\n"sv, tokens, true);
 			addURCs(tokens);
 		}
 		
@@ -385,7 +385,7 @@ else \
 				return ErrorCode(len);
 			
 			vec<strv> tokens;
-			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			return op(tokens);
 		}
@@ -403,7 +403,7 @@ else \
 				return ErrorCode(len);
 			
 			vec<strv> tokens;
-			strv(buffer, len).tokenize2("\r\n"sv, tokens, !allowSingleEnded);
+			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			if (tokens.size() == 0 || tokens.back() != "OK"sv)
 				return Error(tokens);
@@ -859,7 +859,7 @@ else \
 					const Time::cycle_t start = Time::GetCycle();
 					
 					strv data = {reinterpret_cast<const char *>(huart->pRxBuffPtr), size};
-					data.tokenize2("\r\n"sv, [](const strv token) { s_this->addURC(token); }, false);
+					data.tokenize("\r\n"sv, [](const strv token) { s_this->addURC(token); }, false);
 					
 					const Time::cycle_t end = Time::GetCycle();
 					const auto time = Time::CyclesTo_us(end - start);

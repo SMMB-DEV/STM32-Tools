@@ -99,36 +99,7 @@ namespace STM32T
 		constexpr bool rcontains(CharT c) const noexcept { return rfind(c) != npos; }
 		constexpr bool rcontains(const CharT *s) const { return rfind(s) != npos; }
 		
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
-		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
-		{
-			// Assuming view is null-terminated.
-			
-			bstrv view = *this;
-			const const_pointer start = view.data();
-			
-			while (!view.empty())
-			{
-				size_t end = (view.*f_find)(sep, 0);
-				if (end == npos)
-				{
-					if (!ignoreSingleEnded)
-						tokens.push_back(view);		// This is why the view must be null-terminated.
-				
-					return;
-				}
-				
-				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-				{
-					((pointer)view.data())[end] = '\0';	// No problems with C string functions. todo: use std::span
-					tokens.push_back(view.substr(0, end));
-				}
-				
-				view.remove_prefix(end + sep.size());
-			}
-		}
-		
-		void tokenize2(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded) const
+		void tokenize(const bstrv sep, std::vector<bstrv>& tokens, const bool ignoreSingleEnded) const
 		{
 			bstrv view = *this;
 			const const_pointer start = view.data();
@@ -151,36 +122,7 @@ namespace STM32T
 			}
 		}
 		
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
-		void tokenize(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
-		{
-			// note: Assuming view is null-terminated.
-			
-			bstrv view = *this;
-			const const_pointer start = view.data();
-			
-			while (!view.empty())
-			{
-				size_t end = (view.*f_find)(sep, 0);
-				if (end == npos)
-				{
-					if (!ignoreSingleEnded)
-						op(view);
-				
-					return;
-				}
-				
-				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-				{
-					((pointer)view.data())[end] = '\0';	// No problems with C string functions
-					op(view.substr(0, end));
-				}
-				
-				view.remove_prefix(end + sep.size());
-			}
-		}
-		
-		void tokenize2(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded) const
+		void tokenize(const bstrv sep, const std::function<void (bstrv)>& op, const bool ignoreSingleEnded) const
 		{
 			bstrv view = *this;
 			const const_pointer start = view.data();
@@ -206,37 +148,7 @@ namespace STM32T
 		/**
 		* @note If op returns true, this function returns.
 		*/
-		[[deprecated("Use a tokenizing method that doesn't null-terminate the tokens. Will be removed in 0.3.0.")]]
-		void tokenize(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded, size_t (bstrv::*f_find)(base, size_t) const = &base::find) const
-		{
-			// note: Assuming view is null-terminated.
-			
-			bstrv view = *this;
-			const const_pointer start = view.data();
-			
-			while (!view.empty())
-			{
-				size_t end = (view.*f_find)(sep, 0);
-				if (end == npos)
-				{
-					if (!ignoreSingleEnded)
-						op(view);
-				
-					return;
-				}
-				
-				if ((view.data() != start || !ignoreSingleEnded) && end > 0)	// No empty tokens
-				{
-					((pointer)view.data())[end] = '\0';	// No problems with C string functions
-					if (op(view.substr(0, end)))
-						return;
-				}
-				
-				view.remove_prefix(end + sep.size());
-			}
-		}
-		
-		void tokenize2(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded) const
+		void tokenize(const bstrv sep, const std::function<bool (bstrv)>& op, const bool ignoreSingleEnded) const
 		{
 			bstrv view = *this;
 			const const_pointer start = view.data();
