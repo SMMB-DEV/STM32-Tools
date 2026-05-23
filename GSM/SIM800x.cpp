@@ -2,64 +2,11 @@
 
 
 
+/*using STM32T::SIM800x;
 
 
 
-void SIM800x::handleURCs(void (* const handler)(URC urc))
-{
-	while (List)
-	{
-		if (!List->tokenized)
-			COM::Tokenize(strv(*List), "\r\n"sv, [&](strv urc) -> void { handler(URC(urc, List->timestamp)); }, true);
-		else
-			handler(URC(List->data, List->size - 1, List->timestamp));
-		
-		ListItem* current = List;
-		List = List->next;
-		delete current;
-	}
-}
-
-
-
-GSM::ErrorCode SIM800x::Setup()
-{
-	return Tokens(10000, CommandType::Execute, "E0;+IPR=115200;+CLTS=1;+CMGF=1;+CSCS=\"HEX\";+SLEDS=1,50,450;+SLEDS=2,400,3100;+SLEDS=3,100,100;+CREG=2;&W"sv);
-}
-
-
-
-GSM::ErrorCode SIM800x::GetSignalQuality(int8_t& rssi, uint8_t& ber, const uint32_t timeout)
-{
-	return FirstLastToken(2, timeout, CommandType::Execute, "+CSQ"sv, strv(), [&rssi, &ber](vect<strv>& tokens) -> ErrorCode
-	{
-		if (2 != sscanf(tokens[0].data(), "%2hhd,%1hhu", &rssi, &ber))
-			return ErrorCode::WRONG_FORMAT;
-		
-		switch (rssi)
-		{
-			case 0:
-				rssi = -115;
-				break;
-			
-			case 1:
-				rssi = -111;
-				break;
-			
-			default:
-				if (rssi >= 2 && rssi <= 31)
-					rssi = (rssi - 2) * 2 - 110;
-				else if (rssi != 99)
-					return ErrorCode::WRONG_FORMAT;
-		}
-		
-		return ErrorCode::OK;
-	});
-}
-
-
-
-GSM::ErrorCode SIM800x::SetClock(const DateTime &dt, const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::SetClock(const DateTime &dt, const uint32_t timeout)
 {
 	if (!dt.IsSet())
 		return ErrorCode::INVALID_PARAM;
@@ -67,7 +14,7 @@ GSM::ErrorCode SIM800x::SetClock(const DateTime &dt, const uint32_t timeout)
 	return Tokens(timeout, CommandType::Write, "+CCLK"sv, nullptr, false, "\"%02hhu/%02hhu/%02hhu,%02hhu:%02hhu:%02hhu%+02hhd\"", dt.yy, dt.MM, dt.dd, dt.hh, dt.mm, dt.ss, dt.zz);
 }
 
-GSM::ErrorCode SIM800x::GetClock(DateTime &dt, const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::GetClock(DateTime &dt, const uint32_t timeout)
 {
 	//40: \r\n+CCLK: "00/00/00,00:00:00:+00"\r\n\r\nOK\r\n
 	return FirstLastToken<40>(2, timeout, CommandType::Read, "+CCLK"sv, strv(), [&dt](vect<strv>& tokens) -> ErrorCode
@@ -78,7 +25,7 @@ GSM::ErrorCode SIM800x::GetClock(DateTime &dt, const uint32_t timeout)
 
 
 
-GSM::ErrorCode SIM800x::ReadSMS(uint32_t& number, DateTime& dt, char * const data, uint16_t& len, const uint8_t index, const CMGR_Mode mode, const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::ReadSMS(uint32_t& number, DateTime& dt, char * const data, uint16_t& len, const uint8_t index, const CMGR_Mode mode, const uint32_t timeout)
 {
 	if (!data || !len)
 		return ErrorCode::INVALID_PARAM;
@@ -154,7 +101,7 @@ GSM::ErrorCode SIM800x::ReadSMS(uint32_t& number, DateTime& dt, char * const dat
 	"%hhu,%hhu", index, mode);
 }
 
-GSM::ErrorCode SIM800x::DeleteSMS(const uint8_t index, const CMGD_DelFlag delFlag, const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::DeleteSMS(const uint8_t index, const CMGD_DelFlag delFlag, const uint32_t timeout)
 {
 	if (delFlag > CMGD_DelFlag::All)
 		return ErrorCode::INVALID_PARAM;
@@ -164,18 +111,17 @@ GSM::ErrorCode SIM800x::DeleteSMS(const uint8_t index, const CMGD_DelFlag delFla
 
 
 
-GSM::ErrorCode SIM800x::AnswerCall(const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::AnswerCall(const uint32_t timeout)
 {
 	return Tokens(timeout, CommandType::Execute, "A"sv);
 }
 
-GSM::ErrorCode SIM800x::Dial(const uint32_t number, const strv& prefix, const strv& postfix, const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::Dial(const uint32_t number, const strv& prefix, const strv& postfix, const uint32_t timeout)
 {
 	return Tokens(timeout, CommandType::Execute, "D"sv, nullptr, false, "%*s%u%*s", prefix.size(), prefix.data(), number, postfix.size(), postfix.data());
 }
 
-GSM::ErrorCode SIM800x::HangUp(const uint32_t timeout)
+SIM800x::ErrorCode SIM800x::HangUp(const uint32_t timeout)
 {
 	return Tokens(timeout, CommandType::Execute, "H"sv);
-}
 }*/
