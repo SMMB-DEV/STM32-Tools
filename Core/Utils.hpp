@@ -48,6 +48,18 @@ namespace STM32T
 			buf[i] = H2C(val >> b);
 	}
 	
+	template <typename T>
+	inline constexpr void H2C(T *conv, size_t conv_count, char *buf)
+	{
+		static_assert(is_int_v<T>);
+		
+		while (conv_count--)
+		{
+			H2C(*conv++, buf);
+			buf += sizeof(T) * 2;
+		}
+	}
+	
 	inline constexpr uint8_t C2H(char ch)
 	{
 		constexpr uint8_t HEX[256] =
@@ -91,6 +103,24 @@ namespace STM32T
 		}
 		
 		return ret;
+	}
+	
+	template <typename T>
+	inline constexpr bool C2H(const char *str, T *conv, size_t conv_count)
+	{
+		static_assert(is_int_v<T>);
+		
+		while (conv_count--)
+		{
+			const auto v = C2H<T>(str);
+			if (!v)
+				return false;
+			
+			*conv++ = *v;
+			str += sizeof(T) * 2;
+		}
+		
+		return true;
 	}
 	
 	inline constexpr uint32_t pow10(uint8_t pow)
@@ -1512,8 +1542,8 @@ namespace STM32T
 		return _t.val;
 	}
 	
-	template <class F, class R, class... Args>
-	inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, void (* const fail)(), Args&&... args)
+	template <class F, class F2, class R, class... Args>
+	inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, F2&& _fail)
 	{
 		if (_try() == ok)
 			return true;
@@ -1525,8 +1555,7 @@ namespace STM32T
 				return true;
 		}
 		
-		if (fail)
-			fail(std::forward<Args>(args)...);
+		_fail();
 		
 		return false;
 	}
