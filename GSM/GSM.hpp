@@ -121,7 +121,7 @@ else \
 		
 		uint32_t m_lastSend = 0;
 		UART_HandleTypeDef* const p_huart;
-		bool m_urcEnabled = false, m_noSendWait = false, m_noSendDelay = false;
+		bool m_urcEnabled = false;
 		
 		void addURCs(const vec<strv>& tokens, size_t len = SIZE_MAX)
 		{

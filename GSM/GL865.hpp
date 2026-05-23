@@ -223,8 +223,6 @@ public:
 			}
 		}
 		
-		m_noSendWait = true;
-		
 		// \r\n+CMGS: 255\r\n\r\nOK\r\n
 		uint8_t n;
 		ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv,
@@ -324,8 +322,6 @@ public:
 		if (code != OK)
 			return code;
 		
-		m_noSendWait = true;
-		
 		return ReceiveOK<256>((IsIPAddress(host) ? 0 : MAX_DNS_TIME) + timeout_ms, CommandType::Write, "#SD"sv, "%hhu,%hhu,%hu,\"%.*s\",0,%hu,1",
 			conn_id, bool(udp_port), port, host.length(), host.data(), udp_port);
 	}
@@ -335,8 +331,6 @@ public:
 		ErrorCode code = ConfigSocket(conn_id, cid, timeout_ms);
 		if (code != OK)
 			return code;
-		
-		m_noSendWait = true;
 		
 		return ReceiveOK(timeout_ms, CommandType::Write, "#SD"sv, "%hhu,%hhu,%hu,\"%hhu.%hhu.%hhu.%hhu\",0,%hu,1",
 			conn_id, bool(udp_port), port, host[0], host[1], host[2], host[3], udp_port);
@@ -390,8 +384,6 @@ public:
 				SendUART(STM32T::H2C(ch));
 			}
 		}
-		
-		m_noSendWait = true;
 		
 		return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
 	}

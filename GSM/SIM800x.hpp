@@ -1,12 +1,6 @@
 #pragma once
 
-#ifndef   _SIM800x_HPP_
-#define   _SIM800x_HPP_
-
-
 #include "./GSM.hpp"
-
-#include <cstdarg>
 
 
 
@@ -24,14 +18,6 @@ private:
 		0xFF, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 111
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 127
 		
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 143
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 159
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 175
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 191
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 207
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 223
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 239
-		//0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 	};
 	
 public:
@@ -94,41 +80,4 @@ public:
 	ErrorCode AnswerCall(const uint32_t timeout = 20000);
 	ErrorCode Dial(const uint32_t number, const strv& prefix = "09"sv, const strv& postfix = ";"sv, const uint32_t timeout = 20000);	//number: last 9 digits; if longer, specify prefix
 	ErrorCode HangUp(const uint32_t timeout = 20000);
-	
-	/*ErrorCode CGDCONT(uint8_t cid, const char* APN, const char* ip="0.0.0.0");
-	ErrorCode CGACT(uint8_t state, uint8_t cid);
-
-	ErrorCode CIMI(char* IMSI);																//13: Format Error
-
-	ErrorCode CIPSTART(bool mode, uint8_t* ip_d, uint16_t port);							//10:CONNECT OK    12:ALREADY CONNECT    13:CONNECT FAIL    14:OK but unclear
-	ErrorCode CIPSTART(bool mode, const char* ip_d, uint16_t port);							//10:CONNECT OK    12:ALREADY CONNECT    13:CONNECT FAIL    14:OK but unclear
-	
-	ErrorCode CIPSEND(uint8_t* data);														//10:SEND OK    13:SEND FAIL    14:'>' then unclear
-	ErrorCode CIPSEND(const char* data);													//10:SEND OK    13:SEND FAIL    14:'>' then unclear
-	ErrorCode CIPSEND(uint8_t* data, uint16_t len);
-	
-	ErrorCode CIPCLOSE(void);
-
-	ErrorCode CIPSHUT(void);																//10:SHUT OK
-	
-	ErrorCode CSMINS(void);																	//14:Unclear   20:SIM card inserted   21:SIM card not inserted
-	
-	ErrorCode CANT(void);																	//10-13:see SIM800C datasheet   21:ERROR(2)   14:OK but unclear   24:OK(2) but unclear
-	
-	ErrorCode CGREG(void);																	//5-10:see SIM800C datasheet   24:OK but unclear
-	
-	ErrorCode CUSD(uint8_t* code, uint8_t* response);										//20:1st OK, no 2nd OK
-	ErrorCode CUSD(const char* code, uint8_t* response);									//20:1st OK, no 2nd OK
-	
-	ErrorCode CIPSRIP_W(bool mode);
-	ErrorCode CIPSRIP_R(void);																//15:CIPSRIP=0   16:CIPSRIP=1
-	
-	ErrorCode CIPSTATUS(void);																//30-39:SIM800C 0-9
-	
-	ErrorCode CMGS(const char *da, const char * text_pdu, uint8_t toda=129);				//14:Unclear   21:ERROR(2)
-	
-	ErrorCode CSMP(uint8_t dcs, uint8_t fo=49, uint8_t vp=167, uint8_t pid=0);*/
 };
-
-#endif // _SIM800x_HPP_
-
