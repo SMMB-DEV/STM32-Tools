@@ -146,7 +146,52 @@ else \
 			HAL_UART_Transmit(p_huart, reinterpret_cast<const uint8_t *>(&ch), 1, DEFAUL_TRANSMIT_TIMEOUT);
 		}
 		
-		virtual int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) = 0;
+		int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout)
+		{
+			const auto start = HAL_GetTick();
+			
+			__HAL_UART_CLEAR_OREFLAG(p_huart);
+			HAL_StatusTypeDef stat = HAL_TIMEOUT;
+			
+			#ifdef STM32T_IWDG_TIMEOUT
+			while (1)
+			{
+				HAL_IWDG_Refresh(&hiwdg);
+				
+				if (stat == HAL_OK)
+					goto ok;
+				else if (stat != HAL_TIMEOUT)
+					break;
+				
+				const uint32_t t = std::min(STM32T::Time::Remaining_Tick(start, timeout), (STM32T_IWDG_TIMEOUT));
+				if (!t)
+					break;
+				
+				stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, t);
+			}
+			#else
+			stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, timeout);
+			if (stat == HAL_OK)
+				goto ok;
+			#endif	// STM32T_IWDG_TIMEOUT
+			
+			return stat == HAL_TIMEOUT ? TIMEOUT : FAIL;
+			
+		ok:
+			const uint16_t orig_len = len;
+			
+			for (uint16_t i = 1; i < len; i++)
+			{
+				if (HAL_GetTick() - start > timeout)
+					return i;
+				
+				stat = HAL_UART_Receive(p_huart, (uint8_t *)&buffer[i], 1, idle_timeout);
+				if (stat != HAL_OK)
+					return i;
+			}
+			
+			return orig_len;
+		}
 		
 		int32_t Command(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, char* buffer, const uint16_t len)
 		{
@@ -587,6 +632,18 @@ else \
 			}, args);
 		}
 		
+		
+		
+		virtual ErrorCode Setup(const uint32_t timeout_ms = 1000)
+		{
+			static constexpr strv CMD = "E0;+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";"
+				//"+CSMP=49,167,0,8;+CSAS;"
+				"&W"sv;
+			
+			// The first time might fail due to echo still being enabled, but the next tries should succeed.
+			return ReceiveOK<DEFAULT_ARG_LEN, CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
+		}
+		
 	public:
 		struct DateTime
 		{
@@ -786,6 +843,85 @@ else \
 		
 		#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 		#define STM32T_GSM_URC_ENABLED
+		/**
+		* @param rssi - Signal strength in dbm. Not available if positive or zero.
+		* @param ber - Bit error rate (average) per ten thousand. Not available if negative.
+		*/
+		ErrorCode GetSignalQuality(int8_t& rssi, int16_t& ber)
+		{
+			return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "+CSQ"sv, [&rssi, &ber](const std::vector<strv>& tokens) -> ErrorCode
+			{
+				uint8_t t1, t2;
+				if (2 != sscanf(tokens[0].data(), "%2hhu,%2hhu", &t1, &t2) || (t1 > 31 && t1 != 99) || (t2 > 7 && t2 != 99))
+					return WRONG_FORMAT;
+				
+				if (t1 <= 31)
+					rssi = -113 + t1 * 2;
+				else
+					rssi = 0;
+				
+				if (t2 <= 7)
+				{
+					static constexpr int16_t AVG[8] = {14, 28, 57, 113, 226, 453, 905, 1810};
+					
+					ber = AVG[t2];
+				}
+				else
+					ber = -1;
+				
+				return OK;
+			});
+		}
+		
+		
+		// ****************************** 3GPP TS 27.005 ******************************
+		
+		ErrorCode SMSend(u16strv number, STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
+		{
+			//using STM32T::Log::LOG_D;
+			//using STM32T::Log::LOG_W;
+			
+			// todo: fix logging (c16rtomb ?)
+			//LOG_D<LG>("Sending SM to %.*s...", number.size(), number.data());
+			
+			const size_t number2_len = number.size() * 4;
+			const auto number2_buf = std::make_unique<char[]>(number2_len);
+			if (!number2_buf)
+				return FAIL;
+			
+			STM32T::H2C(number.data(), number.size(), number2_buf.get());
+			
+			const uint32_t start = HAL_GetTick();
+			ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, "\"%.*s\"", number2_len, number2_buf.get());
+			if (code != OK)
+			{
+				SendUART(ESC);
+				return code;
+			}
+			
+			for (auto msg : msgs)
+			{
+				for (auto ch : msg)
+				{
+					SendUART(STM32T::H2C(ch >> 12));
+					SendUART(STM32T::H2C(ch >> 8));
+					SendUART(STM32T::H2C(ch >> 4));
+					SendUART(STM32T::H2C(ch));
+				}
+			}
+			
+			// \r\n+CMGS: 255\r\n\r\nOK\r\n
+			uint8_t n;
+			ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv,
+				[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
+			
+			//if (res == OK)
+			//	LOG_D<LG>("SM sent successfully (%hhu).", n);
+			//else
+			//	LOG_W<LG>("SM could not be sent (%hhu)!", res);
+			
+			return res;
+		}
 	private:
 		class URC
 		{

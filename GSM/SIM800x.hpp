@@ -73,7 +73,6 @@ public:
 	ErrorCode SetClock(const DateTime &dt, const uint32_t timeout = 10);
 	ErrorCode GetClock(DateTime &dt, const uint32_t timeout = 10);
 	
-	ErrorCode SendSMS(const uint32_t number, const char * const data, const uint16_t len, const uint32_t timeout = 60000);
 	ErrorCode ReadSMS(uint32_t& number, DateTime& dt, char * const data, uint16_t& len, const uint8_t index, const CMGR_Mode mode = CMGR_Mode::Normal, const uint32_t timeout = 5000);
 	ErrorCode DeleteSMS(const uint8_t index, const CMGD_DelFlag delFlag = CMGD_DelFlag::Single, const uint32_t timeout = 5000);
 	

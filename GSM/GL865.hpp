@@ -36,61 +36,17 @@ class GL865 : public STM32T::GSM<130, 55>
 		return true;
 	}
 	
-	int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout) override
+	ErrorCode Setup(const uint32_t timeout_ms = 1000) override
 	{
-		const uint32_t start = HAL_GetTick();
+		const ErrorCode code = Parent::Setup();
+		if (code != OK)
+			return code;
 		
-		__HAL_UART_CLEAR_OREFLAG(p_huart);
-		HAL_StatusTypeDef stat = HAL_TIMEOUT;
-		
-		#ifdef STM32T_IWDG_TIMEOUT
-		while (1)
-		{
-			HAL_IWDG_Refresh(&hiwdg);
-			
-			if (stat == HAL_OK)
-				goto ok;
-			else if (stat != HAL_TIMEOUT)
-				break;
-			
-			const uint32_t t = std::min(STM32T::Time::Remaining_Tick(start, timeout), (STM32T_IWDG_TIMEOUT));
-			if (!t)
-				break;
-			
-			stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, t);
-		}
-		#else
-		stat = HAL_UART_Receive(p_huart, (uint8_t *)buffer, 1, timeout);
-		if (stat == HAL_OK)
-			goto ok;
-		#endif	// STM32T_IWDG_TIMEOUT
-		
-		return stat == HAL_TIMEOUT ? TIMEOUT : FAIL;
-		
-	ok:
-		const uint16_t orig_len = len;
-		
-		for (uint16_t i = 1; i < len; i++)
-		{
-			if (HAL_GetTick() - start > timeout)
-				return i;
-			
-			stat = HAL_UART_Receive(p_huart, (uint8_t *)&buffer[i], 1, idle_timeout);
-			if (stat != HAL_OK)
-				return i;
-		}
-		
-		return orig_len;
-	}
-	
-	ErrorCode Setup(const uint32_t timeout_ms = 1000)
-	{
-		static constexpr strv CMD = "E;&K;&P;+IPR=115200;"
-			"+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";+CSMP=49,167,0,8;#DIALMODE=1;"
-			"+CSAS;&W"sv;
-		
-		// The first time might fail due to echo still being enabled, but the next tries should succeed.
-		return ReceiveOK<DEFAULT_ARG_LEN, CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
+		return ReceiveOK(timeout_ms, CommandType::Execute,
+			"&K;&P;+IPR=115200;"
+			"+CSDF=1,2;"	// Affects +CCLK and +CALA
+			"+CSMP=49,167,0,8;+CSAS;#DIALMODE=1;"
+			"&W"sv);
 	}
 	
 	ErrorCode ConfigSocket(const uint8_t conn_id, const uint8_t cid, const uint32_t conn_to)
@@ -191,6 +147,7 @@ public:
 		}, "1,\"%.*s\"", ussd.size(), ussd.data());
 	}
 	
+	[[deprecated("Use GSM::SMSend().")]]
 	ErrorCode SMSend(strv number, STM32T::span<const wstrv> msgs, const uint32_t timeout = 60'000)
 	{
 		static_assert(sizeof(wstrv::value_type) == sizeof(uint16_t));
@@ -245,40 +202,6 @@ public:
 	ErrorCode HangUp(const uint32_t timeout = 30'000)
 	{
 		return ReceiveOK(timeout, CommandType::Execute, "H"sv);
-	}
-	
-	/**
-	* @param rssi - Signal strength in dbm. Not available if positive or zero.
-	* @param ber - Bit error rate (best case) in thousandths. Not available if negative.
-	*/
-	ErrorCode SignalQuality(int8_t& rssi, int16_t& ber)
-	{
-		// \r\n+CSQ: 99,99\r\n + \r\nOK\r\n
-		return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "+CSQ"sv, [&rssi, &ber](const std::vector<strv>& tokens) -> ErrorCode
-		{
-			uint8_t t1, t2;
-			if (2 != sscanf(tokens[0].data(), "%2hhu,%2hhu", &t1, &t2) || (t1 > 31 && t1 != 99) || (t2 > 7 && t2 != 99))
-				return WRONG_FORMAT;
-			
-			if (t1 <= 31)
-				rssi = -113 + t1 * 2;
-			else
-				rssi = 0;
-			
-			if (t2 <= 7)
-			{
-				ber = 1;
-				for (uint8_t i = 0; i < t2; i++)
-					ber *= 2;
-				
-				if (t2 == 0)
-					ber = 0;
-			}
-			else
-				ber = -1;
-			
-			return OK;
-		});
 	}
 	
 	ErrorCode ContextActivate(const uint8_t cid, const bool enable = true, const uint32_t timeout_ms = 150'000)

@@ -78,46 +78,6 @@ GSM::ErrorCode SIM800x::GetClock(DateTime &dt, const uint32_t timeout)
 
 
 
-GSM::ErrorCode SIM800x::SendSMS(const uint32_t number, const char * const data, const uint16_t len, const uint32_t timeout)
-{
-	static constexpr char ctrl_z = 26, esc = 27;
-	
-	if (number > 999'999'999 || !data || len > 160)	//empty SMS is okay
-		return ErrorCode::INVALID_PARAM;
-	
-	
-	ErrorCode code = Tokens(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "+CMGS"sv,
-	[&](vect<strv>& tokens) -> ErrorCode { return tokens.size() == 1 && tokens[0] == "> "sv ? ErrorCode::OK : Standard(tokens); }, true, "\"09%09u\"", number);
-	
-	if (code != ErrorCode::OK)
-	{
-		HAL_UART_Transmit(phuart, (uint8_t*)&esc, sizeof(esc), HAL_UART_TIMEOUT_VALUE);
-		
-		return code;
-	}
-	
-	
-	
-	char args[160 * 2 + 1];
-	
-	for (uint16_t i = 0; i < len; i++)
-	{
-		if (2 != snprintf(args + i * 2, sizeof(args) - i * 2, "%02X", data[i]))
-			return ErrorCode::UNKNOWN;
-	}
-	
-	args[len * 2] = ctrl_z;
-	
-	// \r\n+CMGS: 255\r\n\r\nOK\r\n
-	return FirstLastToken(2, timeout, CommandType::Bare, "+CMGS"sv, strv(args, len * 2 + 1), [](vect<strv>& tokens) -> ErrorCode
-	{
-		if (0 != sscanf(tokens[0].data(), "%*3hhu"))
-			return ErrorCode::WRONG_FORMAT;
-		
-		return ErrorCode::OK;
-	});
-}
-
 GSM::ErrorCode SIM800x::ReadSMS(uint32_t& number, DateTime& dt, char * const data, uint16_t& len, const uint8_t index, const CMGR_Mode mode, const uint32_t timeout)
 {
 	if (!data || !len)
