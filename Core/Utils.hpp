@@ -1338,7 +1338,7 @@ namespace STM32T
 		/**
 		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 		*/
-		void push_back(const T& t, const prio_t prio)
+		void push_back(const T& t, const prio_t prio = 1)
 		{
 			if (full() || !prio)
 				return;

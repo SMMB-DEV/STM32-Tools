@@ -172,15 +172,7 @@ public:
 		}
 		
 		for (auto msg : msgs)
-		{
-			for (auto ch : msg)
-			{
-				SendUART(STM32T::H2C(ch >> 12));
-				SendUART(STM32T::H2C(ch >> 8));
-				SendUART(STM32T::H2C(ch >> 4));
-				SendUART(STM32T::H2C(ch));
-			}
-		}
+			SendUCS2(msg);
 		
 		// \r\n+CMGS: 255\r\n\r\nOK\r\n
 		uint8_t n;
@@ -302,13 +294,7 @@ public:
 		}
 		
 		for (auto chunk : data)
-		{
-			for (char ch : chunk)
-			{
-				SendUART(STM32T::H2C(ch >> 4));
-				SendUART(STM32T::H2C(ch));
-			}
-		}
+			SendUCS2(chunk);
 		
 		return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Bare, {}, CTRL_Z);
 	}

@@ -158,6 +158,26 @@ namespace STM32T
 			HAL_UART_Transmit(p_huart, reinterpret_cast<const uint8_t *>(&ch), 1, DEFAUL_TRANSMIT_TIMEOUT);
 		}
 		
+		void SendUCS2(strv data)
+		{
+			for (auto ch : data)
+			{
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
+			}
+		}
+		
+		void SendUCS2(u16strv data)
+		{
+			for (auto ch : data)
+			{
+				SendUART(STM32T::H2C(ch >> 12));
+				SendUART(STM32T::H2C(ch >> 8));
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
+			}
+		}
+		
 		int32_t ReceiveUART(char *buffer, uint16_t len, const uint32_t timeout, const uint32_t idle_timeout)
 		{
 			const auto start = HAL_GetTick();
@@ -653,8 +673,9 @@ namespace STM32T
 				//"+CSMP=49,167,0,8;+CSAS;"
 				"&W"sv;
 			
-			// The first time might fail due to echo still being enabled, but the next tries should succeed.
-			return ReceiveOK<DEFAULT_ARG_LEN, CMD.size() + 9>(timeout_ms, CommandType::Execute, CMD);
+			static_assert(CMD.size() + 9 < DEFAULT_RESPONSE_LEN);	// Echo might be enabled
+			
+			return ReceiveOK(timeout_ms, CommandType::Execute, CMD);
 		}
 		
 	public:
@@ -886,21 +907,15 @@ namespace STM32T
 		
 		ErrorCode SMSend(u16strv number, STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
 		{
-			//using STM32T::Log::LOG_D;
-			//using STM32T::Log::LOG_W;
+			using STM32T::Log::LOG_D;
+			using STM32T::Log::LOG_W;
 			
-			// todo: fix logging (c16rtomb ?)
-			//LOG_D<LG>("Sending SM to %.*s...", number.size(), number.data());
+			LOG_D<LG>("Sending SM...");		// todo: print last 3 digits of the number? (c16rtomb ?)
 			
-			const size_t number2_len = number.size() * 4;
-			const auto number2_buf = std::make_unique<char[]>(number2_len);
-			if (!number2_buf)
-				return FAIL;
+			SendUART("AT+CMGS=\""sv);
+			SendUCS2(number);
+			ErrorCode code = WaitForReady(1000, CommandType::Bare, ""sv, "\"\r"sv);
 			
-			STM32T::H2C(number.data(), number.size(), number2_buf.get());
-			
-			const uint32_t start = HAL_GetTick();
-			ErrorCode code = WaitForReady(1000, CommandType::Write, "+CMGS"sv, "\"%.*s\"", number2_len, number2_buf.get());
 			if (code != OK)
 			{
 				SendUART(ESC);
@@ -908,27 +923,19 @@ namespace STM32T
 			}
 			
 			for (auto msg : msgs)
-			{
-				for (auto ch : msg)
-				{
-					SendUART(STM32T::H2C(ch >> 12));
-					SendUART(STM32T::H2C(ch >> 8));
-					SendUART(STM32T::H2C(ch >> 4));
-					SendUART(STM32T::H2C(ch));
-				}
-			}
+				SendUCS2(msg);
 			
 			// \r\n+CMGS: 255\r\n\r\nOK\r\n
 			uint8_t n;
-			ErrorCode res = ResponseToken(STM32T::Time::Remaining_Tick(start, timeout), CommandType::Bare, "+CMGS"sv,
+			code = ResponseToken(timeout, CommandType::Bare, "+CMGS"sv,
 				[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
 			
-			//if (res == OK)
-			//	LOG_D<LG>("SM sent successfully (%hhu).", n);
-			//else
-			//	LOG_W<LG>("SM could not be sent (%hhu)!", res);
+			if (code == OK)
+				LOG_D<LG>("SM sent successfully (%hhu).", n);
+			else
+				LOG_W<LG>("SM could not be sent (%d)!", code);
 			
-			return res;
+			return code;
 		}
 		
 		
@@ -1063,6 +1070,18 @@ namespace STM32T
 			}
 			
 			return handled;
+		}
+		
+		/**
+		* @retval - The number of urcs handled.
+		*/
+		size_t HandleURCs(const func<void (strv, uint32_t ts)>& handler)
+		{
+			return HandleURCs(std::function<bool (strv, uint32_t)>([&handler](strv token, uint32_t ts) -> bool
+			{
+				handler(token, ts);
+				return true;
+			}));
 		}
 		#else
 	protected:

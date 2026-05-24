@@ -205,7 +205,7 @@ namespace STM32T
 		
 		bstrv& trim(base trimChars = WHITESPACE)
 		{
-			return ltrim(trimChars).rtrim(trimChars);
+			return rtrim(trimChars).ltrim(trimChars);
 		}
 		
 		bool remove_prefix(base prefix)

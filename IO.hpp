@@ -60,6 +60,18 @@ namespace STM32T
 			Set(!state);
 		}
 		
+		void Error(const uint8_t n = 3, const uint32_t time_high = 200, const uint32_t time_low = 200)
+		{
+			for (uint8_t i = 1; i < n ; ++i)
+			{
+				Timed(time_high);
+				HAL_Delay(time_low);
+			}
+			
+			if (n)
+				Timed(time_high);
+		}
+		
 		bool Wait(const bool desired_state, const uint32_t timeout) const
 		{
 			const uint32_t start = HAL_GetTick();
@@ -184,15 +196,6 @@ namespace STM32T
 		{
 			GPIO_InitTypeDef init{ .Pin = c_pin, .Mode = mode, .Pull = pull, .Speed = speed };
 			HAL_GPIO_Init(cp_port, &init);
-		}
-		
-		void Error(const uint8_t n = 3, const uint32_t time1 = 200, const uint32_t time2 = 200)
-		{
-			for (uint8_t i = 0; i < n ; i++)
-			{
-				Timed(time1);
-				HAL_Delay(time2);
-			}
 		}
 	};
 	

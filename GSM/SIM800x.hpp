@@ -23,18 +23,15 @@ namespace STM32T
 		ErrorCode Dial(const uint32_t number, const strv& prefix = "09"sv, const strv& postfix = ";"sv, const uint32_t timeout = 20000);	//number: last 9 digits; if longer, specify prefix
 		ErrorCode HangUp(const uint32_t timeout = 20000);*/
 		
-		void Init(const uint32_t power_on, const bool enable_urc, const bool initial = false)
+		void Init(const bool enable_urc, const bool initial, const uint32_t power_on = 0, const uint32_t setup_delay = 10'000)
 		{
 			HAL_UART_Init(p_huart);		// todo: necessary?
 			EnableURC(enable_urc);
 			
-			Time::WaitAfter_Tick(power_on, 3500);
-			
 			if (initial)
 			{
-				HAL_Delay(5000 + 1000);
-				
-				STM32T::Retry(3, 1000, std::bind(&SIM800x::Setup, this, 1000), OK, Error_Handler);
+				Time::WaitAfter_Tick(power_on, setup_delay);
+				STM32T::Retry(3, 1000, std::bind(&SIM800x::Setup, this, 2000), OK, Error_Handler);
 			}
 		}
 	};
