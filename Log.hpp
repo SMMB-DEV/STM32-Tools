@@ -212,6 +212,7 @@ namespace STM32T::Log
 	
 	using output_t = void (*)(strv data, bool last_chunk);
 	using timestamp_t = strv (*)();
+	using handler_t = void (*)();
 	
 	inline void default_output_stdout(strv data, bool last_chunk)
 	{
@@ -239,16 +240,23 @@ namespace STM32T::Log
 		strv name;
 		std::array<output_t, OUTPUT_COUNT> outputs;
 		timestamp_t timestamp = default_timestamp;
+		handler_t error_handler = nullptr, fatal_handler = nullptr;
 		
 		constexpr Logger(Level level, strv name) : level(level), name(name), outputs(std::array{default_output_stdout}) {}
 		constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs) : level(level), name(name), outputs(outputs) {}
+		
+		constexpr Logger(Level level, strv name, timestamp_t timestamp) :
+			level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
+		
 		constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs, timestamp_t timestamp) :
 			level(level), name(name), outputs(outputs), timestamp(timestamp) {}
-		constexpr Logger(Level level, strv name, timestamp_t timestamp) : level(level), name(name), outputs(std::array{default_output_stdout}), timestamp(timestamp) {}
 		
-		constexpr Logger Clone() const { return Logger(level, name, outputs, timestamp); }
-		constexpr Logger Clone(strv name) const { return Logger(level, name, outputs, timestamp); }
-		constexpr Logger Clone(Level level, strv name) const { return Logger(level, name, outputs, timestamp); }
+		constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs, timestamp_t timestamp, handler_t error_handler, handler_t fatal_handler) :
+			level(level), name(name), outputs(outputs), timestamp(timestamp), error_handler(error_handler), fatal_handler(fatal_handler) {}
+		
+		constexpr Logger Clone() const { return Logger(level, name, outputs, timestamp, error_handler, fatal_handler); }
+		constexpr Logger Clone(strv name) const { return Logger(level, name, outputs, timestamp, error_handler, fatal_handler); }
+		constexpr Logger Clone(Level level, strv name) const { return Logger(level, name, outputs, timestamp, error_handler, fatal_handler); }
 		
 		constexpr bool isEnabled() const { return level > Level::None; }
 		constexpr bool isEnabled(const Level level) const { return this->level >= level; }
@@ -477,6 +485,12 @@ namespace STM32T::Log
 			
 			if (!none)
 				dispatch_chunk("\n"sv, true);
+			
+			if (level == Level::Error && error_handler)
+				error_handler();
+			
+			if (level == Level::Fatal && fatal_handler)
+				fatal_handler();
 		}
 		
 		template <class... Args>
@@ -557,22 +571,31 @@ namespace STM32T::Log
 	};
 	
 	#ifndef STM32T_DEFAULT_LOG_LEVEL
-	#define	STM32T_DEFAULT_LOG_LEVEL		Level::None
+	#define	STM32T_DEFAULT_LOG_LEVEL			Level::None
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_NAME
-	#define	STM32T_DEFAULT_LOG_NAME			""sv
+	#define	STM32T_DEFAULT_LOG_NAME				""sv
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_OUTPUT
-	#define	STM32T_DEFAULT_LOG_OUTPUT		std::array{default_output_stdout}
+	#define	STM32T_DEFAULT_LOG_OUTPUT			std::array{default_output_stdout}
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_TIMESTAMP
-	#define	STM32T_DEFAULT_LOG_TIMESTAMP	default_timestamp
+	#define	STM32T_DEFAULT_LOG_TIMESTAMP		default_timestamp
 	#endif
 	
-	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP);
+	#ifndef STM32T_DEFAULT_LOG_ERROR_HANDLER
+	#define	STM32T_DEFAULT_LOG_ERROR_HANDLER	&Error_Handler
+	#endif
+	
+	#ifndef STM32T_DEFAULT_LOG_FATAL_HANDLER
+	#define	STM32T_DEFAULT_LOG_FATAL_HANDLER	nullptr
+	#endif
+	
+	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP,
+		STM32T_DEFAULT_LOG_ERROR_HANDLER, STM32T_DEFAULT_LOG_FATAL_HANDLER);
 	
 	constexpr inline bool IsEnabled()
 	{
