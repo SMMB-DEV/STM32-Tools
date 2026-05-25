@@ -3,6 +3,7 @@
 #include <string_view>
 #include <functional>
 #include <charconv>
+#include <cuchar>	// std::c16rtomb
 
 
 
@@ -255,26 +256,6 @@ namespace STM32T
 		
 		bool remove_suffix(const CharT *s) { return remove_suffix(bstrv(s)); }
 		
-		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 0.3.0.")]]
-		bool compare_remove_prefix(base remove)
-		{
-			return remove_prefix(remove);
-		}
-		
-		[[deprecated("Use remove_suffix(strv) instead. Will be removed in 0.3.0.")]]
-		bool compare_remove_suffix(base remove)
-		{
-			return remove_suffix(remove);
-		}
-		
-		[[deprecated("Use remove_prefix(strv) instead. Will be removed in 0.3.0.")]]
-		bool compare_remove(base remove)
-		{
-			return compare_remove_prefix(remove);
-		}
-		
-		
-		
 		/**
 		* @retval The number of digits of the number (not necessarily the number of characters used).
 		*/
@@ -315,4 +296,27 @@ namespace STM32T
 	using u8strv	= bstrv<std::u8string_view::value_type>;
 	constexpr u8strv	operator ""_sv(const char8_t* str, std::size_t len) noexcept 	{ return u8strv(str, len); }
 	#endif
+	
+	inline std::optional<std::string> U16toStr(u16strv u16, const size_t max_chars = SIZE_MAX)
+	{
+		std::string ret;
+		ret.reserve(std::min(u16.size(), max_chars));
+		
+		std::mbstate_t state = {};
+		char out[MB_LEN_MAX] = {};
+		
+		for (char16_t c : u16)
+		{
+			size_t rc = std::c16rtomb(out, c, &state);
+			if (rc == (size_t)-1)
+				return std::nullopt;
+			
+			if (ret.size() + rc > max_chars)
+				return ret;
+			
+			ret.append({out, rc});
+		}
+		
+		return ret;
+	}
 }
