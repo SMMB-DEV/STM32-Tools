@@ -907,10 +907,20 @@ namespace STM32T
 		
 		ErrorCode SMSend(u16strv number, STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
 		{
+			using STM32T::Log::IsEnabled;
 			using STM32T::Log::LOG_D;
 			using STM32T::Log::LOG_W;
 			
-			LOG_D<LG>("Sending SM...");		// todo: print last 3 digits of the number? (c16rtomb ?)
+			if constexpr (IsEnabled<LG>(Log::Level::Debug))
+			{
+				const auto end_opt = number.size() >= 4 ? U16toStr(number.substr(number.size() - 4)) : std::string();
+				std::string hidden(std::min(number.size(), number.size() - 4), 'x');
+				
+				if (end_opt && !hidden.empty())
+					LOG_D<LG>("Sending SM to %s%s...", hidden.data(), end_opt->data());
+				else
+					LOG_D<LG>("Sending SM...");
+			}
 			
 			SendUART("AT+CMGS=\""sv);
 			SendUCS2(number);

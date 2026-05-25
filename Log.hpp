@@ -597,14 +597,16 @@ namespace STM32T::Log
 	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP,
 		STM32T_DEFAULT_LOG_ERROR_HANDLER, STM32T_DEFAULT_LOG_FATAL_HANDLER);
 	
+	template <auto& logger = g_defaultLogger>
 	constexpr inline bool IsEnabled()
 	{
-		return g_defaultLogger.isEnabled();
+		return logger.isEnabled();
 	}
 	
+	template <auto& logger = g_defaultLogger>
 	constexpr inline bool IsEnabled(const Level level)
 	{
-		return g_defaultLogger.isEnabled(level);
+		return logger.isEnabled(level);
 	}
 	
 	template <auto& logger, const Level level, class... Args>
