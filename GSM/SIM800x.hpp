@@ -31,7 +31,7 @@ namespace STM32T
 			if (initial)
 			{
 				Time::WaitAfter_Tick(power_on, setup_delay);
-				STM32T::Retry(3, 1000, std::bind(&SIM800x::Setup, this, 3000), OK, Error_Handler);	// Answer delay tested on SIM800L
+				STM32T::Retry(3, 1000, std::bind(&SIM800x::Setup, this, 4000), OK, Error_Handler);	// Response delay tested on SIM800L
 			}
 		}
 	};

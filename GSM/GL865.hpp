@@ -47,8 +47,8 @@ class GL865 : public STM32T::GSM<130, 55, 50>
 		return ReceiveOK(timeout_ms, CommandType::Execute,
 			"&K;&P;+IPR=115200;"
 			"+CSDF=1,2;"	// Affects +CCLK and +CALA
-			"+CSMP=49,167,0,8;+CSAS;#DIALMODE=1;"
-			"&W"sv);
+			"#DIALMODE=1;"sv);
+			//"&W"sv);
 	}
 	
 	ErrorCode ConfigSocket(const uint8_t conn_id, const uint8_t cid, const uint32_t conn_to)

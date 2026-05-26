@@ -670,8 +670,8 @@ namespace STM32T
 		virtual ErrorCode Setup(const uint32_t timeout_ms = 1000)
 		{
 			static constexpr strv CMD = "E0;+CMEE=1;+CMGF=1;+CSCS=\"UCS2\";"
-				//"+CSMP=49,167,0,8;+CSAS;"
-				"&W"sv;
+				"+CSMP=49,167,0,8;"sv;
+				//"+CSAS;&W"sv;
 			
 			static_assert(CMD.size() + 9 < DEFAULT_RESPONSE_LEN);	// Echo might be enabled
 			
@@ -905,7 +905,7 @@ namespace STM32T
 		
 		// ****************************** 3GPP TS 27.005 ******************************
 		
-		ErrorCode SMSend(u16strv number, STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
+		ErrorCode SMSend(u16strv number, const STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
 		{
 			using STM32T::Log::IsEnabled;
 			using STM32T::Log::LOG_D;
