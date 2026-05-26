@@ -297,7 +297,7 @@ namespace STM32T
 	constexpr u8strv	operator ""_sv(const char8_t* str, std::size_t len) noexcept 	{ return u8strv(str, len); }
 	#endif
 	
-	inline std::optional<std::string> U16toStr(u16strv u16, const size_t max_chars = SIZE_MAX)
+	inline std::optional<std::string> U16ToU8(u16strv u16, const size_t max_chars = SIZE_MAX)
 	{
 		std::string ret;
 		ret.reserve(std::min(u16.size(), max_chars));
@@ -315,6 +315,32 @@ namespace STM32T
 				return ret;
 			
 			ret.append({out, rc});
+		}
+		
+		return ret;
+	}
+	
+	inline std::optional<std::u16string> U8ToU16(strv u8, const size_t max_chars = SIZE_MAX)
+	{
+		std::u16string ret;
+		ret.reserve(std::min(u8.size(), max_chars));
+		
+		std::mbstate_t state = {};
+		char16_t c16;
+		
+		while (!u8.empty())
+		{
+			size_t rc = std::mbrtoc16(&c16, u8.data(), u8.size(), &state);	// todo: check if passing n = 0 is ok.
+			
+			if (rc == (size_t)-2 || rc == (size_t)-1)
+				return std::nullopt;
+			else if (rc == (size_t)-3)	// second byte of surrogat pair
+				rc = 0;
+			else if (rc == 0)			// null
+				rc = 1;
+			
+			ret.push_back(c16);
+			u8.remove_prefix(rc);
 		}
 		
 		return ret;

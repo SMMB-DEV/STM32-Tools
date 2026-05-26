@@ -913,7 +913,7 @@ namespace STM32T
 			
 			if constexpr (IsEnabled<LG>(Log::Level::Debug))
 			{
-				const auto end_opt = number.size() >= 4 ? U16toStr(number.substr(number.size() - 4)) : std::string();
+				const auto end_opt = number.size() >= 4 ? U16ToU8(number.substr(number.size() - 4)) : std::string();
 				std::string hidden(std::min(number.size(), number.size() - 4), 'x');
 				
 				if (end_opt && !hidden.empty())
