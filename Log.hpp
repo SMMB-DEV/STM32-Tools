@@ -304,7 +304,7 @@ namespace STM32T::Log
 				
 				const char *const start = p++;
 				
-				char flags[5 + 1], field_width[2 + 1], precision[3 + 1], modifier[2 + 1],
+				char flags[5 + 1], field_width[2 + 1], precision[3 + 1] = {}, modifier[2 + 1],		// precision must be initialized
 					spec[std::size(flags) - 1 + std::size(field_width) - 1 + std::size(precision) - 1 + std::size(modifier) - 1 + 1 + 1];
 				
 				if (!extract_conv_spec("-+ #0", flags, sizeof(flags), p))
@@ -461,6 +461,122 @@ namespace STM32T::Log
 						break;
 					}
 					
+					case 'b': case 'B':	// custom - modifiers same as o, x, X, and u
+					{
+						int fw = 0, prec = 1;
+						
+						if (has_field_width)
+							fw = va_arg(args, int);
+						else
+							strv(field_width).to_num(fw);
+						
+						if (has_precision)
+							prec = va_arg(args, int);
+						else
+							strv(precision + 1).to_num(prec);
+						
+						uintmax_t val;
+						size_t size;
+						
+						if (strcmp(modifier, "l") == 0)
+						{
+							val = va_arg(args, unsigned long);
+							size = sizeof(unsigned long);
+						}
+						else if (strcmp(modifier, "ll") == 0)
+						{
+							val = va_arg(args, unsigned long long);
+							size = sizeof(unsigned long long);
+						}
+						else if (strcmp(modifier, "j") == 0)
+						{
+							val = va_arg(args, uintmax_t);
+							size = sizeof(uintmax_t);
+						}
+						else if (strcmp(modifier, "z") == 0)
+						{
+							val = va_arg(args, size_t);
+							size = sizeof(size_t);
+						}
+						else if (strcmp(modifier, "t") == 0)
+						{
+							val = va_arg(args, ptrdiff_t);		// should be unsigned
+							size = sizeof(ptrdiff_t);
+						}
+						else
+						{
+							val = va_arg(args, unsigned int);
+							
+							if (strcmp(modifier, "h") == 0)
+							{
+								val = (unsigned short)(val);
+								size = sizeof(unsigned short);
+							}
+							else if (strcmp(modifier, "hh") == 0)
+							{
+								val = (unsigned char)(val);
+								size = sizeof(unsigned char);
+							}
+							else
+								size = sizeof(unsigned int);
+						}
+						
+						size *= 8;
+						
+						const bool alt = std::strchr(flags, '#'), left = std::strchr(flags, '-');
+						const char pad = (!std::strchr(flags, '0') || left || precision[0]) ? ' ' : '0';
+						
+						bool found = false;
+						
+						size_t i = 0;
+						for (uintmax_t b = uintmax_t(1) << (size - 1); b && n < sizeof(var) - 1; b >>= 1, ++i)
+						{
+							if (!found)
+							{
+								if ((val & b) || size - i <= prec)
+								{
+									found = true;
+									
+									if (alt)
+									{
+										var[n++] = '0';
+										var[n++] = *p;
+									}
+									
+									while (prec > size && n < sizeof(var) - 1 - size)
+									{
+										var[n++] = '0';
+										--prec;
+									}
+								}
+								else
+									continue;
+							}
+							
+							var[n++] = (val & b) ? '1' : '0';
+						}
+						
+						if (!found && prec > 0)
+							var[n++] = '0';
+						
+						if (n < fw)
+						{
+							if (left)
+							{
+								while (n < fw && n < sizeof(var) - 1)
+									var[n++] = pad;
+							}
+							else
+							{
+								const size_t len = std::min(size_t(fw) - n, sizeof(var) - 1 - n);
+								std::fill_n(var + n, len, pad);
+								dispatch_chunk({var + n, len});
+							}
+						}
+						
+						break;
+					}
+					
 					default:
 						return;
 				}
@@ -512,13 +628,6 @@ namespace STM32T::Log
 		void d(const char *fmt, Args... args) const { log(Level::Debug, fmt, args...); }
 		
 	private:
-		void dispatch_chunk(const char *buf, size_t len, bool last = false) const
-		{
-			for (auto out : outputs)
-				if (out)
-					out({buf, len}, last);
-		}
-		
 		void dispatch_chunk(strv data, bool last = false) const
 		{
 			for (auto out : outputs)

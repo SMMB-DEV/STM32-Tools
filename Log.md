@@ -2,7 +2,7 @@
 
 Include "Log.h" to use the logging module. You can use the `Logger` class to create a "static" or "dynamic" logger.
 
-Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks). They also support printf-style formatting.
+Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks). They also support printf-style formatting (+ `"b"`/`"B"` for binary formatting).
 
 ## Dynamic logger
 
