@@ -926,20 +926,22 @@ namespace STM32T
 			SendUCS2(number);
 			ErrorCode code = WaitForReady(1000, CommandType::Bare, ""sv, "\"\r"sv);
 			
+			uint8_t n;
+			
 			if (code != OK)
 			{
 				SendUART(ESC);
-				return code;
+				goto ret;
 			}
 			
 			for (auto msg : msgs)
 				SendUCS2(msg);
 			
 			// \r\n+CMGS: 255\r\n\r\nOK\r\n
-			uint8_t n;
 			code = ResponseToken(timeout, CommandType::Bare, "+CMGS"sv,
 				[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
 			
+		ret:
 			if (code == OK)
 				LOG_D<LG>("SM sent successfully (%hhu).", n);
 			else
