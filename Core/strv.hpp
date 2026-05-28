@@ -276,10 +276,6 @@ namespace STM32T
 			
 			return 0;
 		}
-		
-		template <typename I>
-		[[deprecated("Use to_num() instead. Will be removed in 0.3.0.")]]
-		size_t ExtractInteger(I& integer, size_t from = 0, size_t count = npos) const { return to_num<I>(integer, from, count); }
 	};
 	
 	using strv		= bstrv<std::string_view::value_type>;

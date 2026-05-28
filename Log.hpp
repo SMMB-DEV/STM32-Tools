@@ -773,41 +773,6 @@ namespace STM32T::Log
 		LOG_N<level, logger>("--------------------------------------------------------------------------------\n");
 	}
 	
-	[[deprecated]]
-	inline void DoIfEnabled(void (*f)())
-	{
-		if constexpr (IsEnabled())
-			f();
-	}
-	
-	template <typename R>
-	[[deprecated]]
-	inline R DoIfEnabled(R (*f)())
-	{
-		if constexpr (IsEnabled())
-			return f();
-		else
-			return R();
-	}
-	
-	template <const Level level>
-	[[deprecated]]
-	inline void DoIfEnabled(void (*f)())
-	{
-		if constexpr (IsEnabled(level))
-			f();
-	}
-	
-	template <const Level level, typename R>
-	[[deprecated]]
-	inline R DoIfEnabled(R (*f)())
-	{
-		if constexpr (IsEnabled(level))
-			return f();
-		else
-			return R();
-	}
-	
 	template <const Level level = Level::None, auto& logger = g_defaultLogger>
 	inline void Startup()
 	{

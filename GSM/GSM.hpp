@@ -623,29 +623,7 @@ namespace STM32T
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		[[deprecated("Use StrToken2() instead. Will be removed before 1.0.0.")]]
-		ErrorCode StrToken(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
-		{
-			return NoToken<DEFAULT_ARG_LEN, LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str)
-			{
-				const strv orig = str;
-				
-				if (!str.remove_suffix("\r\n\r\nOK\r\n"sv) || !str.remove_prefix("\r\n"sv))
-				{
-					addURCFromBuf(orig);
-					return UNKNOWN;
-				}
-				
-				const size_t len = std::min(str.length(), max_len - 1);
-				memcpy(buf, str.data(), len);
-				buf[len] = 0;
-				
-				return OK;
-			}, args);
-		}
-		
-		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		int32_t StrToken2(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
+		int32_t StrToken(char * const buf, size_t max_len, const CommandType type, const strv cmd, const strv args = strv())
 		{
 			return NoToken<DEFAULT_ARG_LEN, LEN>(DEFAUL_RECEIVE_TIMEOUT, type, cmd, [&](strv str) -> ErrorCode
 			{
@@ -796,12 +774,12 @@ namespace STM32T
 		
 		int32_t GetBrand(char *const buf, const size_t max_len)
 		{
-			return StrToken2(buf, max_len, CommandType::Execute, "+CGMI"sv);
+			return StrToken(buf, max_len, CommandType::Execute, "+CGMI"sv);
 		}
 		
 		int32_t GetModel(char *const buf, const size_t max_len)
 		{
-			return StrToken2(buf, max_len, CommandType::Execute, "+CGMM"sv);
+			return StrToken(buf, max_len, CommandType::Execute, "+CGMM"sv);
 		}
 		
 		/**
@@ -809,7 +787,7 @@ namespace STM32T
 		*/
 		int32_t GetRevision(char *const rev, const size_t max_len)
 		{
-			return StrToken2(rev, max_len, CommandType::Execute, "+CGMR"sv);
+			return StrToken(rev, max_len, CommandType::Execute, "+CGMR"sv);
 		}
 		
 		/**
@@ -819,7 +797,7 @@ namespace STM32T
 		{
 			static_assert(IMEI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
 			
-			int32_t len = StrToken2(imei, IMEI_LEN + 1, CommandType::Execute, "+CGSN"sv);
+			int32_t len = StrToken(imei, IMEI_LEN + 1, CommandType::Execute, "+CGSN"sv);
 			if (len != IMEI_LEN)
 				return WRONG_FORMAT;
 			
@@ -853,7 +831,7 @@ namespace STM32T
 		{
 			static_assert(IMSI_LEN + 4 + 6 < DEFAULT_RESPONSE_LEN);
 			
-			const int32_t len = StrToken2(imsi, IMSI_LEN + 1, CommandType::Execute, "+CIMI"sv);
+			const int32_t len = StrToken(imsi, IMSI_LEN + 1, CommandType::Execute, "+CIMI"sv);
 			return len == IMSI_LEN ? OK : WRONG_FORMAT;
 		}
 		

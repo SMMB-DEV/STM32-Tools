@@ -193,15 +193,6 @@ namespace STM32T::Time
 		return Elapsed_Tick(start, now, ticks) ? 0 : (ticks - (now - start));
 	}
 	
-	template <typename T>
-	[[deprecated]]
-	inline void WaitAfter(const T start, const T wait, TickFuncPtr<T> get_tick = HAL_GetTick)
-	{
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T>);
-		
-		while (get_tick() - start < wait);
-	}
-	
 	inline void WaitAfter_Tick(const tick_t start, const tick_t wait)
 	{
 		while (HAL_GetTick() - start <= wait)
@@ -251,103 +242,6 @@ namespace STM32T::Time
 	inline uint32_t GetSecondFraction(RTC_HandleTypeDef *hrtc)
 	{
 		return hrtc->Instance->PRER & RTC_PRER_PREDIV_S;
-	}
-	
-	[[deprecated]]
-	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int32_t sec)
-	{
-		// 24-Hour/Binary Format
-		
-		if (sec == 0 || sec > 28 * 24 * 3600 || sec < -28 * 24 * 3600)	// Max. 28 days; don't want to deal with calculating number of months more than 1.
-			return;
-		
-		const uint8_t monthDays = MonthDays(date.Month - 1);
-		
-		int8_t mins = (sec / 60) % 60;
-		int8_t hours = (sec / (60 * 60)) % 24;
-		int8_t days = sec / (24 * 60 * 60);
-		
-		if (sec > 0)
-		{
-			sec %= 60;
-			
-			time.Seconds += sec;
-			if (time.Seconds >= 60)
-			{
-				time.Seconds -= 60;
-				time.Minutes++;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes >= 60)
-			{
-				time.Minutes -= 60;
-				time.Hours++;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours >= 24)
-			{
-				time.Hours -= 24;
-				days++;
-			}
-			
-			date.Date += days;
-			if (date.Date > monthDays)
-			{
-				date.Date -= monthDays;
-				date.Month++;
-				
-				if (date.Month > 12)
-				{
-					date.Month -= 12;
-					date.Year++;
-					date.Year %= 100;
-				}
-			}
-		}
-		else
-		{
-			sec %= 60;
-			
-			time.Seconds += sec;
-			if (time.Seconds > 60)	// underflow
-			{
-				time.Seconds += 60;
-				time.Minutes--;
-			}
-			
-			time.Minutes += mins;
-			if (time.Minutes > 60)	// underflow
-			{
-				time.Minutes += 60;
-				time.Hours--;
-			}
-			
-			time.Hours += hours;
-			if (time.Hours > 24)	// underflow
-			{
-				time.Hours += 24;
-				days--;
-			}
-			
-			const uint8_t prevMonth = date.Month == 1 ? 12 : date.Month - 1;
-			date.Date += days;
-			if (date.Date == 0 || date.Date > monthDays)	// underflow
-			{
-				date.Date =MonthDays(prevMonth - 1) - (UINT8_MAX - date.Date + 1);
-				date.Month = prevMonth;
-				
-				if (prevMonth == 12)
-				{
-					date.Year--;
-					if (date.Year > 100)	// underflow
-						date.Year += 100;
-				}
-			}
-		}
-		
-		date.WeekDay = ((date.WeekDay - 1) + 4 * 7 + days) % 7 + 1;	// 4 * 7: Doesn't change mod 7; just to ensure it's a positive number.
 	}
 	
 	/**

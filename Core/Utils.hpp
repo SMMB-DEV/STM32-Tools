@@ -26,12 +26,6 @@ namespace STM32T
 	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept { return x; }
 	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept { return x; }
 	
-	template<class T, size_t N>
-	[[deprecated("Use std::size() instead.")]] inline constexpr size_t _countof(const T (&arr)[N]) noexcept
-	{
-		return N;
-	}
-	
 	inline constexpr char H2C(uint8_t x)
 	{
 		constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
@@ -256,10 +250,6 @@ namespace STM32T
 		return (n + multiple - 1) / multiple * multiple;
 	}
 	
-	template <typename T>
-	[[deprecated("Use next_multiple() instead.")]]
-	inline constexpr T round_up(T n, T multiple) { return next_multiple<T>(n, multiple); }
-	
 	template<class T>
 	union shared_arr
 	{
@@ -338,12 +328,6 @@ namespace STM32T
 		T m_val;
 		
 	public:
-		[[deprecated("Use VAL_MIN and VAL_MAX instead.")]]
-		static constexpr T val_min = MIN, val_max = MAX;
-		
-		[[deprecated("Use IS_UNLIMITED instead.")]]
-		static constexpr bool is_unlimited = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
-		
 		static constexpr T VAL_MIN = MIN, VAL_MAX = MAX;
 		static constexpr uintmax_t RANGE = MAX - MIN;
 		static constexpr bool IS_UNLIMITED = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
@@ -1199,9 +1183,6 @@ namespace STM32T
 		}
 	};
 	
-	template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
-	using linked_list [[deprecated("Use LinkedList instead.")]] = LinkedList<T, MAX_SIZE>;
-	
 	template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
 	class StaticQueue
 	{
@@ -1591,5 +1572,3 @@ extern "C" void AssertFailed(const char *file, uint32_t line);
 #else
 #define ASSERT(cond)	((void)0U)
 #endif	// STM32T_ASSERT
-
-using STM32T::_countof;

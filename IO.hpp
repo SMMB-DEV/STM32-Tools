@@ -415,9 +415,6 @@ namespace STM32T
 		}
 	};
 	
-	template <size_t COUNT>
-	using IOs [[deprecated("Use IOArray instead.")]] = IOArray<COUNT>;
-	
 	struct ScopeIO
 	{
 		IO m_io;
