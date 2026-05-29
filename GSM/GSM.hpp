@@ -161,18 +161,6 @@ namespace STM32T
 			}
 		}
 		
-		[[deprecated]]
-		void SendUCS2(u16strv data)
-		{
-			for (auto ch : data)
-			{
-				SendUART(STM32T::H2C(ch >> 12));
-				SendUART(STM32T::H2C(ch >> 8));
-				SendUART(STM32T::H2C(ch >> 4));
-				SendUART(STM32T::H2C(ch));
-			}
-		}
-		
 		void SendUCS2(strv data)
 		{
 			for (auto ch : data)
@@ -185,7 +173,7 @@ namespace STM32T
 		
 		void SendUCS2(wstrv data)
 		{
-			static_assert(sizeof(wstrv::value_type) == 2);
+			static_assert(sizeof(wstrv::value_type) >= 2);
 			
 			for (auto ch : data)
 			{
@@ -923,52 +911,6 @@ namespace STM32T
 		
 		
 		// ****************************** 3GPP TS 27.005 ******************************
-		
-		[[deprecated]]
-		ErrorCode SMSend(u16strv number, const STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
-		{
-			using STM32T::Log::IsEnabled;
-			using STM32T::Log::LOG_D;
-			using STM32T::Log::LOG_W;
-			
-			if constexpr (IsEnabled<LG>(Log::Level::Debug))
-			{
-				const auto end_opt = number.size() >= 4 ? U16ToU8(number.substr(number.size() - 4)) : std::string();
-				std::string hidden(std::min(number.size(), number.size() - 4), 'x');
-				
-				if (end_opt && !hidden.empty())
-					LOG_D<LG>("Sending SM to %s%s...", hidden.data(), end_opt->data());
-				else
-					LOG_D<LG>("Sending SM...");
-			}
-			
-			SendUART("AT+CMGS=\""sv);
-			SendUCS2(number);
-			ErrorCode code = WaitForReady(1000, CommandType::Bare, ""sv, "\"\r"sv);
-			
-			uint8_t n;
-			
-			if (code != OK)
-			{
-				SendUART(ESC);
-				goto ret;
-			}
-			
-			for (auto msg : msgs)
-				SendUCS2(msg);
-			
-			// \r\n+CMGS: 255\r\n\r\nOK\r\n
-			code = ResponseToken(timeout, CommandType::Bare, "+CMGS"sv,
-				[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
-			
-		ret:
-			if (code == OK)
-				LOG_D<LG>("SM sent successfully (%hhu).", n);
-			else
-				LOG_W<LG>("SM could not be sent (%d)!", code);
-			
-			return code;
-		}
 		
 		ErrorCode SMSend(strv number, const STM32T::span<const wstrv> msgs, const uint32_t timeout = 60'000)
 		{
