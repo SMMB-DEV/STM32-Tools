@@ -14,9 +14,6 @@
 #include <variant>
 
 
-#ifdef STM32T_IWDG_TIMEOUT
-extern "C" IWDG_HandleTypeDef hiwdg;
-#endif	// STM32T_IWDG_TIMEOUT
 
 #if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 
@@ -209,7 +206,7 @@ namespace STM32T
 			#ifdef STM32T_IWDG_TIMEOUT
 			while (1)
 			{
-				HAL_IWDG_Refresh(&hiwdg);
+				HAL_IWDG_Refresh(&Time::hiwdg);
 				
 				if (stat == HAL_OK)
 					goto ok;
@@ -438,7 +435,7 @@ namespace STM32T
 				do
 				{
 					#ifdef STM32T_IWDG_TIMEOUT
-					HAL_IWDG_Refresh(&hiwdg);
+					HAL_IWDG_Refresh(&Time::hiwdg);
 					#endif	// STM32T_IWDG_TIMEOUT
 					
 					state = HAL_UART_GetState(p_huart);

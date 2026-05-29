@@ -60,7 +60,7 @@ namespace STM32T
 			Set(!state);
 		}
 		
-		void Error(const uint8_t n = 3, const uint32_t time_high = 200, const uint32_t time_low = 200)
+		void Error(const uint8_t n = 3, const Time::tick_t time_high = 200, const Time::tick_t time_low = 200)
 		{
 			for (uint8_t i = 1; i < n ; ++i)
 			{
@@ -72,34 +72,38 @@ namespace STM32T
 				Timed(time_high);
 		}
 		
-		bool Wait(const bool desired_state, const uint32_t timeout) const
+		bool Wait(const bool desired_state, const Time::tick_t timeout) const
 		{
-			const uint32_t start = HAL_GetTick();
+			const auto start = HAL_GetTick();
 			while (Read() != desired_state)
 			{
-				if (HAL_GetTick() - start > timeout)
+				#ifdef STM32T_IWDG_TIMEOUT
+				HAL_IWDG_Refresh(&Time::hiwdg);
+				#endif
+				
+				if (Time::Elapsed_Tick(start, timeout))
 					return false;
 			}
 			
 			return true;
 		}
 		
-		bool Wait_us(const bool desired_state, const uint16_t timeout_us) const
+		bool Wait_us(const bool desired_state, const Time::us_time_t timeout_us) const
 		{
-			const uint32_t start = Time::GetCycle(), timeoutCycles = Time::usToCycles(timeout_us);
+			const Time::cycle_t start = Time::GetCycle(), timeoutCycles = Time::usToCycles(timeout_us);
 			
 			while (Read() != desired_state)
 			{
-				if (Time::GetCycle() - start > timeoutCycles)
+				if (Time::Elapsed_us(start, timeout_us))
 					return false;
 			}
 			
 			return true;
 		}
 		
-		uint32_t CheckPulse(const bool desired_state, const uint32_t max, const uint32_t min = 0) const
+		uint32_t CheckPulse(const bool desired_state, const Time::tick_t max, const Time::tick_t min = 0) const
 		{
-			uint32_t elapsed = 0;
+			Time::tick_t elapsed = 0;
 			const uint32_t startTime = HAL_GetTick();
 			
 			while (Read() == desired_state)
@@ -114,10 +118,10 @@ namespace STM32T
 			return elapsed;
 		}
 		
-		uint16_t CheckPulse_us(const bool desired_state, const uint16_t max, const uint16_t min = 0) const
+		Time::us_time_t CheckPulse_us(const bool desired_state, const Time::us_time_t max, const Time::us_time_t min = 0) const
 		{
-			uint32_t elapsed = 0;
-			const uint32_t startCycle = Time::GetCycle(), minCycles = Time::usToCycles(min), maxCycles = Time::usToCycles(max);
+			Time::cycle_t elapsed = 0;
+			const Time::cycle_t startCycle = Time::GetCycle(), minCycles = Time::usToCycles(min), maxCycles = Time::usToCycles(max);
 			
 			while (Read() == desired_state)
 			{

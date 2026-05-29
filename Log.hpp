@@ -707,19 +707,22 @@ namespace STM32T::Log
 		STM32T_DEFAULT_LOG_ERROR_HANDLER, STM32T_DEFAULT_LOG_FATAL_HANDLER);
 	
 	template <auto& logger = g_defaultLogger>
+	[[gnu::always_inline]]
 	constexpr inline bool IsEnabled()
 	{
 		return logger.isEnabled();
 	}
 	
 	template <auto& logger = g_defaultLogger>
+	[[gnu::always_inline]]
 	constexpr inline bool IsEnabled(const Level level)
 	{
 		return logger.isEnabled(level);
 	}
 	
 	template <auto& logger, const Level level, class... Args>
-	[[gnu::always_inline]] void _LOG(const char *fmt, Args... args)
+	[[gnu::always_inline]]
+	void _LOG(const char *fmt, Args... args)
 	{
 		if constexpr (logger.isEnabled(level))
 			logger.log(level, fmt, args...);
