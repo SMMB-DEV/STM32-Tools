@@ -1,5 +1,7 @@
 #include "./GL865.hpp"
 
+using STM32T::GL865;
+
 GL865::ErrorCode GL865::FTPFileSize(strv file, size_t& size)
 {
 	return ResponseToken(15'000, CommandType::Write, "#FTPFSIZE"sv, [&](const std::vector<strv>& tokens) -> ErrorCode

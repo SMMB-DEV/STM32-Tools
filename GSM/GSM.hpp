@@ -85,8 +85,6 @@ namespace STM32T
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t DEF_O2C_TO = 1000>
 	class GSM
 	{
-		using This = GSM<DEF_RX_TO, DEF_IDLE_TO, DEF_O2C_TO>;
-		
 	public:
 		static constexpr size_t IMEI_LEN = 15, IMSI_LEN = 15, DEFAULT_RESPONSE_LEN = 64, DEFAULT_ARG_LEN = 64, RESPONSE_EXTRA = 12;		// \r\n+CME: xxx\r\n
 		static constexpr uint32_t
@@ -131,7 +129,6 @@ namespace STM32T
 			Bare		// ARGS
 		};
 		
-		uint32_t m_lastSend = 0;
 		UART_HandleTypeDef* const p_huart;
 		bool m_urcEnabled = false;
 		
@@ -158,7 +155,7 @@ namespace STM32T
 			HAL_UART_Transmit(p_huart, reinterpret_cast<const uint8_t *>(&ch), 1, DEFAUL_TRANSMIT_TIMEOUT);
 		}
 		
-		void SendUCS2(strv data)
+		void SendHEX(strv data)
 		{
 			for (auto ch : data)
 			{
@@ -167,8 +164,32 @@ namespace STM32T
 			}
 		}
 		
+		[[deprecated]]
 		void SendUCS2(u16strv data)
 		{
+			for (auto ch : data)
+			{
+				SendUART(STM32T::H2C(ch >> 12));
+				SendUART(STM32T::H2C(ch >> 8));
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
+			}
+		}
+		
+		void SendUCS2(strv data)
+		{
+			for (auto ch : data)
+			{
+				SendUART("00"sv);
+				SendUART(STM32T::H2C(ch >> 4));
+				SendUART(STM32T::H2C(ch));
+			}
+		}
+		
+		void SendUCS2(wstrv data)
+		{
+			static_assert(sizeof(wstrv::value_type) == 2);
+			
 			for (auto ch : data)
 			{
 				SendUART(STM32T::H2C(ch >> 12));
@@ -669,17 +690,20 @@ namespace STM32T
 				
 				size_t s1 = 0, s2 = 0;
 				
-				int n = sscanf(view.data(), "\"%4hu/%2hhu/%2hhu,%2hhu:%2hhu:%2hhu%zn%3hhd%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz, &s1, &s2);
+				int n = sscanf(view.data(), "\"%4hu/%2hhu/%2hhu%*1c%2hhu:%2hhu:%2hhu%zn%3hhd%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &s1, &dt.zz, &s2);
 				if (n >= 6 && s1 > 0)
 				{
-					if (s1 == 17 && dt.yyyy < 100)
+					if (s1 == 18 && dt.yyyy < 100)
 						dt.yyyy = (dt.yyyy < 70 ? 2000 : 1900) + dt.yyyy;
-					else if (s1 != 19)
+					else if (s1 != 20)
 						return std::nullopt;
 					
 					view.remove_prefix(std::max(s1, s2));
 					if (!view.starts_with('"'))
 						return std::nullopt;
+					
+					if (n != 7)
+						dt.zz = 0;
 					
 					if (dt.IsSet())
 						return dt;
@@ -688,7 +712,7 @@ namespace STM32T
 				return std::nullopt;
 			}
 			
-			static std::optional<DateTime> ParseNTP(strv view)
+			/*static std::optional<DateTime> ParseNTP(strv view)
 			{
 				DateTime dt;
 				
@@ -710,7 +734,7 @@ namespace STM32T
 				}
 				
 				return std::nullopt;
-			}
+			}*/
 			
 			static std::optional<DateTime> ParseSMS(strv view)
 			{
@@ -718,11 +742,11 @@ namespace STM32T
 				
 				size_t s = 0;
 				
-				if (7 == sscanf(view.data(), "\"%4hhu/%2hhu/%2hhu %2hhu:%2hhu:%2hhu%3hhd\"%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz, &s) && s > 0)
+				if (7 == sscanf(view.data(), "\"%4hhu/%2hhu/%2hhu%*1c%2hhu:%2hhu:%2hhu%3hhd\"%zn", &dt.yyyy, &dt.MM, &dt.dd, &dt.hh, &dt.mm, &dt.ss, &dt.zz, &s) && s > 0)
 				{
-					if (s == 21 && dt.yyyy < 100)
+					if (s == 22 && dt.yyyy < 100)
 						dt.yyyy = (dt.yyyy < 70 ? 2000 : 1900) + dt.yyyy;
-					else if (s != 23)
+					else if (s != 24)
 						return std::nullopt;
 					
 					if (dt.IsSet())
@@ -763,7 +787,27 @@ namespace STM32T
 		}
 		
 		
-		// ********************************* V.25TER **********************************
+		// ****************************** V.25TER / Hayes *****************************
+		
+		ErrorCode Call(strv number, const uint32_t timeout = 30'000)	// GL865: 30s, SIM800: 20s
+		{
+			using STM32T::Log::IsEnabled;
+			using STM32T::Log::LOG_D;
+			using STM32T::Log::LOG_W;
+			
+			if constexpr (IsEnabled<LG>(Log::Level::Debug))
+			{
+				std::string hidden(std::min(number.size(), number.size() - 4), 'x');
+				
+				if (!hidden.empty())
+					LOG_D<LG>("Calling %s%.*s...", hidden.data(), number.size() >= 4 ? number.size() - 4 : 0, number.data() + number.size() - 4);
+				else
+					LOG_D<LG>("Calling...");
+			}
+			
+			return SingleToken(timeout, CommandType::Execute, "D"sv, {{"OK"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "%.*s;", number.size(), number.data());
+		}
+		
 		ErrorCode FactoryReset()
 		{
 			return ReceiveOK(DEFAUL_RECEIVE_TIMEOUT, CommandType::Execute, "&F"sv);
@@ -883,6 +927,7 @@ namespace STM32T
 		
 		// ****************************** 3GPP TS 27.005 ******************************
 		
+		[[deprecated]]
 		ErrorCode SMSend(u16strv number, const STM32T::span<const u16strv> msgs, const uint32_t timeout = 60'000)
 		{
 			using STM32T::Log::IsEnabled;
@@ -928,12 +973,56 @@ namespace STM32T
 			return code;
 		}
 		
+		ErrorCode SMSend(strv number, const STM32T::span<const wstrv> msgs, const uint32_t timeout = 60'000)
+		{
+			using STM32T::Log::IsEnabled;
+			using STM32T::Log::LOG_D;
+			using STM32T::Log::LOG_W;
+			
+			if constexpr (IsEnabled<LG>(Log::Level::Debug))
+			{
+				std::string hidden(std::min(number.size(), number.size() - 4), 'x');
+				
+				if (!hidden.empty())
+					LOG_D<LG>("Sending SM to %s%.*s...", hidden.data(), number.size() >= 4 ? number.size() - 4 : 0, number.data() + number.size() - 4);
+				else
+					LOG_D<LG>("Sending SM...");
+			}
+			
+			SendUART("AT+CMGS=\""sv);
+			SendUCS2(number);
+			ErrorCode code = WaitForReady(1000, CommandType::Bare, ""sv, "\"\r"sv);
+			
+			uint8_t n;
+			
+			if (code != OK)
+			{
+				SendUART(ESC);
+				goto ret;
+			}
+			
+			for (auto msg : msgs)
+				SendUCS2(msg);
+			
+			// \r\n+CMGS: 255\r\n\r\nOK\r\n
+			code = ResponseToken(timeout, CommandType::Bare, "+CMGS"sv,
+				[&n](const std::vector<strv>& tokens) -> ErrorCode { return sscanf(tokens[0].data(), "%3hhu", &n) == 1 ? OK : WRONG_FORMAT; }, 1, 2, CTRL_Z);
+			
+		ret:
+			if (code == OK)
+				LOG_D<LG>("SM sent successfully (%hhu).", n);
+			else
+				LOG_W<LG>("SM could not be sent (%d)!", code);
+			
+			return code;
+		}
+		
 		
 		#ifdef STM32T_GSM_URC_ENABLED
 	private:
 		class URC
 		{
-			friend class GSM<DEF_RX_TO, DEF_IDLE_TO>;
+			friend class GSM;
 			friend class LinkedList<URC, 32>;
 			
 			char *m_buf;
@@ -967,7 +1056,7 @@ namespace STM32T
 		uint8_t m_buf[(STM32T_GSM_URC_BUF_SIZE)];
 		LinkedList<URC, 32> m_urcs;
 		
-		static inline This *s_this = nullptr;
+		static inline GSM *s_this = nullptr;
 		
 		void startURC()
 		{
@@ -1060,18 +1149,6 @@ namespace STM32T
 			}
 			
 			return handled;
-		}
-		
-		/**
-		* @retval - The number of urcs handled.
-		*/
-		size_t HandleURCs(const func<void (strv, uint32_t ts)>& handler)
-		{
-			return HandleURCs(std::function<bool (strv, uint32_t)>([&handler](strv token, uint32_t ts) -> bool
-			{
-				handler(token, ts);
-				return true;
-			}));
 		}
 		#else
 	protected:
