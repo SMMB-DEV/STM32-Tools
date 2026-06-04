@@ -14,9 +14,9 @@ namespace STM32T
 	class ILCD
 	{
 	public:
-		using coord_t = uint16_t;
-		using coordx_t = coord_t;
-		using coordy_t = coord_t;
+		//using coord_t = uint16_t;
+		//using coordx_t = coord_t;
+		//using coordy_t = coord_t;
 		using line_t = uint8_t;
 	
 		virtual ~ILCD() {}
