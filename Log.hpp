@@ -211,7 +211,7 @@ namespace STM32T::Log
 	}
 	
 	using output_t = void (*)(strv data, bool last_chunk);
-	using timestamp_t = strv (*)();
+	using timestamp_t = const char * (*)();
 	using handler_t = void (*)();
 	
 	inline void default_output_stdout(strv data, bool last_chunk)
@@ -222,14 +222,12 @@ namespace STM32T::Log
 			fflush(stdout);
 	}
 	
-	inline strv default_timestamp()
+	inline const char * default_timestamp()
 	{
 		static char str[16];
 		
-		const uint32_t now = HAL_GetTick();
-		int len = sprintf(str, "%10u", now);
-		
-		return strv(str, len);
+		sprintf(str, "%10u", HAL_GetTick());
+		return str;
 	}
 	
 	template <size_t OUTPUT_COUNT = 1>
