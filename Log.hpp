@@ -18,7 +18,7 @@
 extern "C" int stdout_putchar(int ch) { return ch; } \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
-	static constexpr uint32_t BIT_TIME = (STM32T_DELAY_CLK) / (BAUD); \
+	static constexpr uint32_t BIT_TIME = (STM32T_TIME_CLK) / (BAUD); \
 	\
 	using namespace STM32T::Time; \
 	\
@@ -124,12 +124,12 @@ extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 
 
 #if __has_include("usbd_cdc_if.h")
-#include "usbd_cdc_if.h"
-
-extern "C" USBD_HandleTypeDef hUsbDeviceFS;
-
 namespace STM32T::Log
 {
+	#include "usbd_cdc_if.h"
+	
+	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
+	
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
 		static constexpr uint32_t TIMEOUT = 50;
@@ -190,7 +190,6 @@ namespace STM32T::Log
 
 namespace STM32T::Log
 {
-	// todo: add Fatal handler
 	enum class Level : uint8_t
 	{
 		None, Fatal, Error, Warning, Info, Debug, Max = 255
@@ -694,11 +693,11 @@ namespace STM32T::Log
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_ERROR_HANDLER
-	#define	STM32T_DEFAULT_LOG_ERROR_HANDLER	&Error_Handler
+	#define	STM32T_DEFAULT_LOG_ERROR_HANDLER	nullptr
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_FATAL_HANDLER
-	#define	STM32T_DEFAULT_LOG_FATAL_HANDLER	nullptr
+	#define	STM32T_DEFAULT_LOG_FATAL_HANDLER	&Error_Handler
 	#endif
 	
 	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP,
