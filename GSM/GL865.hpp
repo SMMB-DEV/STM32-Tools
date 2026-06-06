@@ -6,12 +6,6 @@
 
 
 
-using STM32T::strv;
-using STM32T::wstrv;
-using std::operator"" sv;
-
-
-
 namespace STM32T
 {
 	class GL865 : public GSM<130, 55, 50>
@@ -20,7 +14,17 @@ namespace STM32T
 		
 		IO m_pwr;
 		const IO c_pwrMon;
-		uint32_t m_lastPowerOff = 0, m_ftpTimeout = DEFAULT_FTP_TIMEOUT;
+		
+		uint32_t
+			m_lastPowerOff = 0,
+			m_ftpTimeout = DEFAULT_FTP_TIMEOUT,
+			
+			/**
+			* The retarded module apparently adds the DNS resolution time to FTP socket commands even when it makes no fucking sense like closing a connection.
+			* It's not just that I might have to wait longer. It actually takes longer to close a connection that was opened with a domain instead
+			* of an IP address. Truly fucking retarded!
+			*/
+			m_ftpSockTimeout = DEFAULT_FTP_TIMEOUT;
 		
 		static bool IsIPAddress(strv host)
 		{
@@ -308,16 +312,18 @@ namespace STM32T
 		*/
 		ErrorCode FTPOpen(strv host, uint16_t port, strv user, strv pass, const bool passive = true)
 		{
-			if (host.size() + user.size() + pass.size() > 256 - 6)
+			if (host.size() + user.size() + pass.size() > 256 - 12)
 				return BIG_PARAM;
 			
-			return ReceiveOK<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "%.*s:%hu,%.*s,%.*s,%hhu",
+			m_ftpSockTimeout = m_ftpTimeout + (!IsIPAddress(host) ? MAX_DNS_TIME : 0);
+			
+			return ReceiveOK<256>(100'000, CommandType::Write, "#FTPOPEN"sv, "\"%.*s:%hu\",\"%.*s\",\"%.*s\",%hhu",
 				host.length(), host.data(), port, user.length(), user.data(), pass.length(), pass.data(), passive);
 		}
 		
 		ErrorCode FTPClose()
 		{
-			return ReceiveOK(m_ftpTimeout, CommandType::Execute, "#FTPCLOSE"sv);
+			return ReceiveOK(m_ftpSockTimeout, CommandType::Execute, "#FTPCLOSE"sv);
 		}
 		
 		#ifdef STM32T_GSM_URC_ENABLED
@@ -330,7 +336,7 @@ namespace STM32T
 			if (m_ftpPutOTimeout)
 				return NOT_ALLOWED;
 			
-			ErrorCode code = EnterOnline(m_ftpTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\"", file.size(), file.data());
+			ErrorCode code = EnterOnline(m_ftpSockTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\"", file.size(), file.data());
 			
 			if (code == OK)
 			{
@@ -341,7 +347,7 @@ namespace STM32T
 			return code;
 		}
 		
-		ErrorCode FTPPutO_Chunk(strv chunk)
+		ErrorCode FTPPutO_Chunk(strv chunk, const uint32_t delay = 1800)
 		{
 			if (!m_ftpPutOTimeout)
 				return NOT_ALLOWED;
@@ -358,15 +364,16 @@ namespace STM32T
 				return TIMEOUT;
 			
 			SendUART(chunk);
+			HAL_Delay(delay);	// It's slow and retarded.
 			
 			return OK;
 		}
 		
-		ErrorCode FTPPutO_End(const uint32_t wait = 15'000)
+		ErrorCode FTPPutO_End(const uint32_t wait = 10'000)
 		{
 			Time::Delay_Tick(wait);
 			m_ftpPutOTimeout = 0;
-			return ExitOnline(m_ftpTimeout);
+			return ExitOnline(m_ftpSockTimeout);
 		}
 		#endif	// STM32T_GSM_URC_ENABLED
 		
@@ -374,23 +381,18 @@ namespace STM32T
 		GL865::ErrorCode FTPPut(const std::variant<const char *, const strv> file, ...)
 		{
 			_GET_ARGS(file);
-			return ReceiveOK(m_ftpTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", args.length(), args.data());
+			return ReceiveOK(m_ftpSockTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", args.length(), args.data());
 		}
 		
 		int32_t FTPGetO(strv file, const std::function<void (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
 		{
-			return ReceiveOnline(m_ftpTimeout, dl_to, CommandType::Write, "#FTPGET"sv, [&](strv chunk, size_t handled) -> ErrorCode
+			return ReceiveOnline(m_ftpSockTimeout, dl_to, CommandType::Write, "#FTPGET"sv, [&](strv chunk, size_t handled) -> ErrorCode
 			{
 				if (chunk_handler)
 					chunk_handler(chunk, handled);
 				
 				return OK;
 			}, "\"%.*s\"", file.size(), file.data());
-			
-			ErrorCode code = SingleToken(m_ftpTimeout, CommandType::Write, "#FTPGET"sv, {{"CONNECT"sv, OK}, {"NO CARRIER"sv, FAIL}}, false, "\"%.*s\"",
-				file.size(), file.data());
-			
-			return code;
 		}
 		
 		ErrorCode FTPType(bool ascii)
