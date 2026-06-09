@@ -1566,9 +1566,15 @@ namespace STM32T
 
 #ifdef STM32T_ASSERT
 
-extern "C" void AssertFailed(const char *file, uint32_t line);
+extern "C" void AssertFailed(const char *file, uint32_t line, const char *msg);
 
-#define ASSERT(cond)	((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__))
+#define _STM32T_ASSERT1(cond)				((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__, nullptr))
+#define _STM32T_ASSERT2(cond, msg)			((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__, msg))
+
+#define _STM32T_ASSERT(_1, _2, name, ...)	name
+
+#define ASSERT(...)							_STM32T_ASSERT(__VA_ARGS__, _STM32T_ASSERT2, _STM32T_ASSERT1)(__VA_ARGS__)
+//#define ASSERT(cond)						((cond) ? (void)0U : AssertFailed(__FILE__, __LINE__, nullptr))
 #else
-#define ASSERT(cond)	((void)0U)
+#define ASSERT(...)			((void)0U)
 #endif	// STM32T_ASSERT
