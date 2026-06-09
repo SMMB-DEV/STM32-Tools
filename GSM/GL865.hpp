@@ -22,7 +22,7 @@ namespace STM32T
 			/**
 			* The retarded module apparently adds the DNS resolution time to FTP socket commands even when it makes no fucking sense like closing a connection.
 			* It's not just that I might have to wait longer. It actually takes longer to close a connection that was opened with a domain instead
-			* of an IP address. Truly fucking retarded!
+			* of an IP address. Or maybe it just ignores the FTP timeout and takes as long as it wants. Truly fucking retarded!
 			*/
 			m_ftpSockTimeout = DEFAULT_FTP_TIMEOUT;
 		
@@ -156,6 +156,18 @@ namespace STM32T
 		ErrorCode HangUp(const uint32_t timeout = 30'000)
 		{
 			return ReceiveOK(timeout, CommandType::Execute, "H"sv);
+		}
+		
+		int32_t SIMStatus()
+		{
+			return ResponseToken(DEFAUL_RECEIVE_TIMEOUT, CommandType::Read, "#QSS"sv, [&](const std::vector<strv>& tokens) -> ErrorCode
+			{
+				uint8_t mode, status;
+				if (sscanf(tokens[0].data(), "%hhu,%hhu", &mode, &status) == 2)
+					return ErrorCode(status);
+				
+				return ERR;
+			});
 		}
 		
 		ErrorCode ContextActivate(const uint8_t cid, const bool enable = true, const uint32_t timeout_ms = 150'000)
@@ -427,8 +439,30 @@ namespace STM32T
 				}, name);
 		}
 		
-		ErrorCode FTPFileSize(strv file, size_t& size);
-		ErrorCode FTPAppend(strv data, bool final = false);
+		ErrorCode FTPFileSize(strv file, uint64_t size)
+		{
+			return ResponseToken(m_ftpTimeout, CommandType::Write, "#FTPFSIZE"sv, [&](const std::vector<strv>& tokens) -> ErrorCode
+			{
+				return sscanf(tokens[0].data(), "%llu", &size) == 1 ? OK : WRONG_FORMAT;
+			}, 1, 2, file);
+		}
+		
+		ErrorCode FTPPut_Chunk(strv data, bool final = false)
+		{
+			ErrorCode code = WaitForReady(DEFAUL_RECEIVE_TIMEOUT, CommandType::Write, "#FTPAPPEXT"sv, "%hu,%hhu", std::min(data.size(), 1500u), final);
+			
+			if (code != OK)
+			{
+				SendUART(data);		// Send in case that it works and so that it doesn't get stuck.
+				return code;
+			}
+			
+			// \r\n#FTPAPPEXT: 1500\r\n\r\nOK\r\n
+			return ResponseToken(m_ftpSockTimeout, CommandType::Bare, "#FTPAPPEXT"sv, [](const std::vector<strv>& tokens) -> ErrorCode
+			{
+				return sscanf(tokens[0].data(), "%*hu") == 0 ? OK : WRONG_FORMAT;
+			}, 1, 2, data);
+		}
 		
 		ErrorCode SIMCheck(uint8_t& status);
 		
