@@ -717,7 +717,7 @@ namespace STM32T::Log
 		return logger.isEnabled(level);
 	}
 	
-	template <auto& logger, const Level level, class... Args>
+	template <const Level level, auto& logger = g_defaultLogger, class... Args>
 	[[gnu::always_inline]]
 	void _LOG(const char *fmt, Args... args)
 	{
@@ -726,7 +726,7 @@ namespace STM32T::Log
 	}
 	
 	
-	
+	// todo: Use macros for default logger
 	template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
 	[[gnu::always_inline]]
 	inline void LOG_N(const char *fmt, Args... args)
@@ -738,19 +738,19 @@ namespace STM32T::Log
 	
 	
 	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_F(const char *fmt, Args... args) { _LOG<logger, Level::Fatal>(fmt, args...); }
+	void LOG_F(const char *fmt, Args... args) { _LOG<Level::Fatal, logger>(fmt, args...); }
 	
 	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_E(const char *fmt, Args... args) { _LOG<logger, Level::Error>(fmt, args...); }
+	void LOG_E(const char *fmt, Args... args) { _LOG<Level::Error, logger>(fmt, args...); }
 	
 	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_W(const char *fmt, Args... args) { _LOG<logger, Level::Warning>(fmt, args...); }
+	void LOG_W(const char *fmt, Args... args) { _LOG<Level::Warning, logger>(fmt, args...); }
 	
 	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_I(const char *fmt, Args... args) { _LOG<logger, Level::Info>(fmt, args...); }
+	void LOG_I(const char *fmt, Args... args) { _LOG<Level::Info, logger>(fmt, args...); }
 	
 	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_D(const char *fmt, Args... args) { _LOG<logger, Level::Debug>(fmt, args...); }
+	void LOG_D(const char *fmt, Args... args) { _LOG<Level::Debug, logger>(fmt, args...); }
 	
 	template <const Level level = Level::None, auto& logger = g_defaultLogger>
 	inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
