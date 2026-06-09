@@ -347,7 +347,7 @@ namespace STM32T
 			return code;
 		}
 		
-		ErrorCode FTPPutO_Chunk(strv chunk, const uint32_t delay = 1800)
+		ErrorCode FTPPutO_Chunk(strv chunk, const uint32_t delay = 5000)
 		{
 			if (!m_ftpPutOTimeout)
 				return NOT_ALLOWED;
@@ -369,7 +369,7 @@ namespace STM32T
 			return OK;
 		}
 		
-		ErrorCode FTPPutO_End(const uint32_t wait = 10'000)
+		ErrorCode FTPPutO_End(const uint32_t wait = 15'000)
 		{
 			Time::Delay_Tick(wait);
 			m_ftpPutOTimeout = 0;

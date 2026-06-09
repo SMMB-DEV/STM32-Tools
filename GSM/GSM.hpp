@@ -377,7 +377,7 @@ namespace STM32T
 		
 		ErrorCode ExitOnline(const uint32_t timeout = DEFAULT_ONLINE_TO_CMD_TIMEOUT)
 		{
-			HAL_Delay(timeout);	// Set with S12 - todo: check the last tranmisson/reception (CONNECT) time
+			HAL_Delay(DEFAULT_ONLINE_TO_CMD_TIMEOUT);	// Set with S12 - todo: check the last tranmisson/reception (CONNECT) time
 			return SingleToken(timeout, CommandType::Bare, strv(), CMD_MODE, {{"NO CARRIER"sv, OK}}, false);
 		}
 		
