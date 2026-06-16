@@ -40,7 +40,7 @@ namespace STM32T
 		virtual ~_IO() {}
 		
 		virtual bool Read() const = 0;
-		virtual bool Check() const = 0;
+		__attribute__((pure)) virtual bool Check() const = 0;
 		virtual bool Set(bool state = true) = 0;
 		
 		[[gnu::always_inline]] bool Reset()
@@ -172,7 +172,7 @@ namespace STM32T
 			return (cp_port->IDR & c_pin) ? !active_low : active_low;
 		}
 		
-		[[gnu::always_inline]] bool Check() const override
+		[[gnu::always_inline]] __attribute__((pure)) bool Check() const override
 		{
 			return (cp_port->ODR & c_pin) ? !active_low : active_low;
 		}
@@ -224,7 +224,7 @@ namespace STM32T
 				return m_ios.ReadBit(c_pin);
 			}
 			
-			bool Check() const override
+			__attribute__((pure)) bool Check() const override
 			{
 				return m_ios.CheckBit(c_pin);
 			}
@@ -258,9 +258,9 @@ namespace STM32T
 			return (Read() >> bit_number) & 1u;
 		}
 		
-		virtual uint32_t Check() const = 0;
+		__attribute__((pure)) virtual uint32_t Check() const = 0;
 		
-		virtual bool CheckBit(uint8_t bit_number)
+		__attribute__((pure)) virtual bool CheckBit(uint8_t bit_number)
 		{
 			return (Check() >> bit_number) & 1u;
 		}
@@ -348,7 +348,7 @@ namespace STM32T
 			return m_pins[bit_number].Read();
 		}
 		
-		uint32_t Check() const override
+		__attribute__((pure)) uint32_t Check() const override
 		{
 			uint32_t bits = 0;
 			for (size_t i = 0; i < COUNT; i++)
@@ -357,7 +357,7 @@ namespace STM32T
 			return bits;
 		}
 		
-		bool CheckBit(uint8_t bit_number) override
+		__attribute__((pure)) bool CheckBit(uint8_t bit_number) override
 		{
 			return m_pins[bit_number].Check();
 		}
