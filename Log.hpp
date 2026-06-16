@@ -3,129 +3,243 @@
 #include "./Core/strv.hpp"
 #include "./Core/Time.hpp"
 #include "./Versioning.hpp"
+#include "./IO.hpp"
 
 #include <cstdio>
 
 
 
-#define FH_STDIN    0x8001
-#define FH_STDOUT   0x8002
-#define FH_STDERR   0x8003
-
-
-
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
-extern "C" int stdout_putchar(int ch) { return ch; } \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	static constexpr uint32_t BIT_TIME = (STM32T_TIME_CLK) / (BAUD); \
-	\
-	using namespace STM32T::Time; \
-	\
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
-	\
-	volatile uint32_t start = GetCycle(); \
-	for (; len; len--) \
-	{ \
-		const uint8_t ch = *buf++; \
-		\
-		/* Start bit */ \
-		(PORT)->BRR = (PIN); \
-		WaitAfter(start, BIT_TIME, GetCycle); \
-		start += BIT_TIME; \
-		\
-		/* Data */ \
-		for (uint8_t i = 1; i; i <<= 1) \
-		{ \
-			(PORT)->BSRR = (PIN) << (16 * ((ch & i) == 0)); \
-			WaitAfter(start, BIT_TIME, GetCycle); \
-			start += BIT_TIME; \
-		} \
-		\
-		/*Odd parity*/ \
-		(PORT)->BSRR = (PIN) << (16 * (STM32T::bit_count(ch) % 2)); \
-		WaitAfter(start, BIT_TIME, GetCycle); \
-		start += BIT_TIME; \
-		\
-		/* Stop bit */ \
-		(PORT)->BSRR = (PIN); \
-		WaitAfter(start, BIT_TIME, GetCycle); \
-		start += BIT_TIME; \
-	} \
-	\
-	return 0; \
-}
+static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect." \
+	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
 
 #define STM32T_SYS_WRITE_ITM \
-extern "C" int stdout_putchar(int ch) { return ch; } \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
-	\
-	if ((ITM_TCR & ITM_TCR_ITMENA_Msk) && /* ITM enabled */ (ITM_TER & (1UL << 0))) /* ITM Port #0 enabled */\
-	{\
-		for (uint32_t i = 0; i < len; i++)\
-		{\
-			while (ITM_PORT0_U32 != 0);\
-			ITM_PORT0_U8 = buf[i];\
-		}\
-		return 0;\
-	}\
-	return -2;\
-}
+#error "STM32T_SYS_WRITE_ITM is obsolete and has no effect. Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm)."
 
 #define STM32T_SYS_WRITE_UART(PHUART) \
-extern "C" int stdout_putchar(int ch) { return ch; } \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
-	\
-	return HAL_UART_Transmit((PHUART), buf, len, HAL_MAX_DELAY) == HAL_OK ? 0 : -1; \
-}
+static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect." \
+	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
+
+#define STM32T_SYS_WRITE_UART_DMA(PHUART) \
+static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect." \
+	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
 
 #define STM32T_SYS_WRITE_USB \
-extern "C" USBD_HandleTypeDef hUsbDeviceFS; \
-extern "C" int stdout_putchar(int ch) { return ch; } \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
-	\
-	uint8_t res = USBD_OK; \
-	uint32_t start = HAL_GetTick(); \
-	while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && (res = CDC_Transmit_FS((uint8_t*)buf, len)) == USBD_BUSY && HAL_GetTick() - start < 50); \
-	return 0;	/* If non-zero is returned once, it stops working. */ \
-}
+#error "STM32T_SYS_WRITE_USB is obsolete and has no effect. Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp)."
 
 #define STM32T_SYS_WRITE_DYN \
-namespace STM32T::Log \
-{ \
-	inline bool (*_g_dynLog)(const uint8_t *buf, uint32_t len) = nullptr; \
-	inline void RedirectStdout(bool (*logger)(const uint8_t *buf, uint32_t len)) \
-	{ \
-		_g_dynLog = logger; \
-	} \
-} \
-extern "C" int stdout_putchar(int ch) { return ch; } \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
-	\
-	if (STM32T::Log::_g_dynLog) \
-		return STM32T::Log::_g_dynLog(buf, len) ? 0 : -1; \
-	else \
-		return 0; \
-}
+#error "STM32T_SYS_WRITE_DYN is obsolete and has no effect."
 
 
 
-#if __has_include("usbd_cdc_if.h")
 namespace STM32T::Log
 {
+	enum class Level : uint8_t
+	{
+		None, Fatal, Error, Warning, Info, Debug, Max = 255
+	};
+	
+	inline strv LevelStr(Level level)
+	{
+		switch (level)
+		{
+			case Level::None:		return "None "sv;
+			case Level::Fatal:		return "Fatal"sv;
+			case Level::Error:		return "Error"sv;
+			case Level::Warning:	return "Warn "sv;
+			case Level::Info:		return "Info "sv;
+			case Level::Debug:		return "Debug"sv;
+			default:				return " ??? "sv;
+		}
+	}
+	
+	using timestamp_t = const char * (*)();
+	using handler_t = void (*)();
+	using output_t = void (*)(strv data, bool last_chunk);
+	
+	inline const char * default_timestamp()
+	{
+		static char str[10 + 1];
+		
+		sprintf(str, "%10u", HAL_GetTick());
+		return str;
+	}
+	
+	inline void default_output_stdout(strv data, bool last_chunk)
+	{
+		fwrite(data.data(), 1, data.size(), stdout);
+		
+		if (last_chunk)
+			fflush(stdout);
+	}
+	
+	#if __has_include("RTE_Components.h")
+	#include "RTE_Components.h"
+	
+	#ifdef RTE_Compiler_IO_STDOUT_User
+	inline output_t _g_stdout = nullptr;
+	
+	/**
+	* @note The logger must not call fflush().
+	*/
+	inline void RedirectStdout(const output_t logger)
+	{
+		if (logger != default_output_stdout)
+			_g_stdout = logger;
+	}
+	
+	extern "C" int stdout_putchar(int ch) { return ch; }
+	extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode)
+	{
+		static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003;
+		
+		if (fh != FH_STDOUT)
+			return fh == FH_STDERR ? 0 : -1;
+		
+		if (_g_stdout)
+			_g_stdout({reinterpret_cast<const char *>(buf), len}, true);
+		
+		return 0;
+	}
+	#endif	// RTE_Compiler_IO_STDOUT_User
+	#endif	// __has_include("RTE_Componetns.h")
+	
+	struct GPIOConfig
+	{
+		enum Parity : uint8_t {None, Even, Odd, Mark, Space};
+		
+		GPIO_TypeDef *port;
+		uint16_t pin;
+		uint32_t baud;
+		uint8_t data_bits;
+		Parity parity;
+	} inline _g_stdout_gpio;
+	
+	inline void SetGPIOConfig(GPIO_TypeDef *port, uint16_t pin, uint32_t baud, uint8_t data_bits = 8, GPIOConfig::Parity parity = GPIOConfig::None)
+	{
+		_g_stdout_gpio.port = port;
+		_g_stdout_gpio.pin = pin;
+		_g_stdout_gpio.baud = baud;
+		_g_stdout_gpio.data_bits = data_bits;
+		_g_stdout_gpio.parity = parity;
+	}
+	
+	inline void default_output_gpio(strv data, bool last_chunk)
+	{
+		static volatile uint32_t s_start = 0;
+		
+		GPIO_TypeDef *const port = _g_stdout_gpio.port;
+		const uint16_t pin = _g_stdout_gpio.pin;
+		const Time::cycle_t BIT_TIME = (STM32T_TIME_CLK) / _g_stdout_gpio.baud;
+		const uint8_t bits = _g_stdout_gpio.data_bits;
+		
+		for (auto ch : data)
+		{
+			// Start bit
+			Time::WaitAfter(s_start, BIT_TIME);
+			s_start += BIT_TIME;
+			port->BSRR = pin << 16;
+			
+			// Data
+			const uint8_t byte = ch & (0xFF >> (8 - bits));
+			for (uint8_t i = 0; i < bits; ++i)
+			{
+				Time::WaitAfter(s_start, BIT_TIME);
+				s_start += BIT_TIME;
+				port->BSRR = pin << 16 * !(ch & 1);
+				ch >>= 1;
+			}
+			
+			// Parity
+			Time::WaitAfter(s_start, BIT_TIME);
+			s_start += BIT_TIME;
+			
+			switch (_g_stdout_gpio.parity)
+			{
+				case GPIOConfig::Even:
+				{
+					port->BSRR = pin << 16 * !parity(byte);
+					break;
+				}
+				
+				case GPIOConfig::Odd:
+				{
+					port->BSRR = pin << 16 * parity(byte);
+					break;
+				}
+				
+				case GPIOConfig::Mark:
+				{
+					port->BSRR = pin;
+					break;
+				}
+				
+				case GPIOConfig::Space:
+				{
+					port->BSRR = pin << 16;
+					break;
+				}
+				
+				default:
+					goto stop;
+			}
+			
+			// Stop bit
+			Time::WaitAfter(s_start, BIT_TIME);
+			s_start += BIT_TIME;
+			
+		stop:
+			port->BSRR = pin;
+		}
+	}
+	
+	#ifdef ITM
+	inline void default_output_itm(strv data, bool last_chunk)	// todo: Rewrite (Unlock and enable ITM, check DWT status if necessary)
+	{
+		// ITM enabled & ITM port #0 enabled
+		if (READ_BIT(ITM->TCR, ITM_TCR_ITMENA_Msk) &&  READ_BIT(ITM->TER, (1UL << 0)))
+		{
+			for (uint32_t i = 0; i < len; i++)
+			{
+				while (ITM->PORT[0].u32 != 0);
+				ITM->PORT[0].u8 = buf[i];
+			}
+		}
+	}
+	#endif	// ITM
+	
+	#ifdef HAL_UART_MODULE_ENABLED
+	inline UART_HandleTypeDef *_g_huart = nullptr;
+	
+	inline void SetUARTHandle(UART_HandleTypeDef *huart) { _g_huart = huart; }
+	
+	inline void default_output_uart(strv data, bool last_chunk)
+	{
+		if (_g_huart)
+			HAL_UART_Transmit(_g_huart, reinterpret_cast<const uint8_t *>(data.data()), data.size(), HAL_MAX_DELAY);
+	}
+	
+	inline void default_output_uart_dma(strv data, bool last_chunk)
+	{
+		static uint8_t s_buf[1024];
+		
+		if (!_g_huart)
+			return;
+		
+		while (!data.empty())
+		{
+			while (HAL_DMA_GetState(_g_huart->hdmatx) == HAL_DMA_STATE_BUSY);
+			const size_t len = std::min(data.size(), sizeof(s_buf));
+			memcpy(s_buf, data.data(), len);
+			if (HAL_UART_Transmit_DMA(_g_huart, s_buf, len) != HAL_OK)
+				return;
+			
+			data.remove_prefix(len);
+		}
+	}
+	#endif	// HAL_UART_MODULE_ENABLED
+	
+	#if __has_include("usbd_cdc_if.h")
 	#include "usbd_cdc_if.h"
 	
 	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
@@ -171,6 +285,7 @@ namespace STM32T::Log
 			data.remove_prefix(copied);
 		}
 		
+		// todo: Send all at once for last_chunk?
 		while (data.size() >= std::size(s_buf))
 		{
 			send(data.data(), std::size(s_buf));
@@ -185,49 +300,7 @@ namespace STM32T::Log
 		else
 			send(data.data(), data.size());
 	}
-}
-#endif	// __has_include("usbd_cdc_if.h")
-
-namespace STM32T::Log
-{
-	enum class Level : uint8_t
-	{
-		None, Fatal, Error, Warning, Info, Debug, Max = 255
-	};
-	
-	inline strv LevelStr(Level level)
-	{
-		switch (level)
-		{
-			case Level::None:		return "None "sv;
-			case Level::Fatal:		return "Fatal"sv;
-			case Level::Error:		return "Error"sv;
-			case Level::Warning:	return "Warn "sv;
-			case Level::Info:		return "Info "sv;
-			case Level::Debug:		return "Debug"sv;
-			default:				return " ??? "sv;
-		}
-	}
-	
-	using output_t = void (*)(strv data, bool last_chunk);
-	using timestamp_t = const char * (*)();
-	using handler_t = void (*)();
-	
-	inline void default_output_stdout(strv data, bool last_chunk)
-	{
-		fwrite(data.data(), 1, data.size(), stdout);
-		
-		if (last_chunk)
-			fflush(stdout);
-	}
-	
-	inline const char * default_timestamp()
-	{
-		static char str[16];
-		
-		sprintf(str, "%10u", HAL_GetTick());
-		return str;
-	}
+	#endif	// __has_include("usbd_cdc_if.h")
 	
 	template <size_t OUTPUT_COUNT = 1>
 	class Logger
