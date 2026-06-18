@@ -14,7 +14,8 @@ static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect." \
 	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
 
 #define STM32T_SYS_WRITE_ITM \
-#error "STM32T_SYS_WRITE_ITM is obsolete and has no effect. Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm)."
+static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect." \
+	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm).");
 
 #define STM32T_SYS_WRITE_UART(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect." \
@@ -25,10 +26,12 @@ static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect." \
 	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
 
 #define STM32T_SYS_WRITE_USB \
-#error "STM32T_SYS_WRITE_USB is obsolete and has no effect. Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp)."
+static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect." \
+	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp).");
 
-#define STM32T_SYS_WRITE_DYN \
-#error "STM32T_SYS_WRITE_DYN is obsolete and has no effect."
+#define STM32T_LOG_SYS_WRITE \
+static_assert(0, "STM32T_SYS_WRITE_DYN is obsolete and has no effect." \
+	" Just enable and set \"STDOUT\" mode to \"User\" in Manage Run-Time Environment -> Compiler -> I/O.");
 
 
 
@@ -72,37 +75,6 @@ namespace STM32T::Log
 		if (last_chunk)
 			fflush(stdout);
 	}
-	
-	#if __has_include("RTE_Components.h")
-	#include "RTE_Components.h"
-	
-	#ifdef RTE_Compiler_IO_STDOUT_User
-	inline output_t _g_stdout = nullptr;
-	
-	/**
-	* @note The logger must not call fflush().
-	*/
-	inline void RedirectStdout(const output_t logger)
-	{
-		if (logger != default_output_stdout)
-			_g_stdout = logger;
-	}
-	
-	extern "C" int stdout_putchar(int ch) { return ch; }
-	extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode)
-	{
-		static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003;
-		
-		if (fh != FH_STDOUT)
-			return fh == FH_STDERR ? 0 : -1;
-		
-		if (_g_stdout)
-			_g_stdout({reinterpret_cast<const char *>(buf), len}, true);
-		
-		return 0;
-	}
-	#endif	// RTE_Compiler_IO_STDOUT_User
-	#endif	// __has_include("RTE_Componetns.h")
 	
 	struct GPIOConfig
 	{
@@ -199,10 +171,10 @@ namespace STM32T::Log
 		// ITM enabled & ITM port #0 enabled
 		if (READ_BIT(ITM->TCR, ITM_TCR_ITMENA_Msk) &&  READ_BIT(ITM->TER, (1UL << 0)))
 		{
-			for (uint32_t i = 0; i < len; i++)
+			for (auto ch : data)
 			{
-				while (ITM->PORT[0].u32 != 0);
-				ITM->PORT[0].u8 = buf[i];
+				while (ITM->PORT[0].u32);
+				ITM->PORT[0].u8 = ch;
 			}
 		}
 	}
@@ -798,8 +770,6 @@ namespace STM32T::Log
 			logger.log(level, fmt, args...);
 	}
 	
-	
-	// todo: Use macros for default logger
 	template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
 	[[gnu::always_inline]]
 	inline void LOG_N(const char *fmt, Args... args)
@@ -909,3 +879,39 @@ namespace STM32T::Log
 		}
 	}
 }
+
+#if __has_include("RTE_Components.h")
+namespace STM32T::Log
+{
+	#include "RTE_Components.h"
+	
+	#ifdef RTE_Compiler_IO_STDOUT_User
+	
+	inline output_t _g_stdout = nullptr;
+	
+	/**
+	* @note The logger must not call fflush().
+	*/
+	inline void RedirectStdout(const output_t logger)
+	{
+		if (logger != default_output_stdout)
+			_g_stdout = logger;
+	}
+	
+	extern "C" [[gnu::used]] inline int stdout_putchar(int ch) { return ch; }
+	extern "C" [[gnu::used]] inline int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode)
+	{
+		static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003;
+		
+		if (fh != FH_STDOUT)
+			return fh == FH_STDERR ? 0 : -1;
+		
+		if (STM32T::Log::_g_stdout)
+			STM32T::Log::_g_stdout({reinterpret_cast<const char *>(buf), len}, true);
+		
+		return 0;
+	}
+	
+	#endif	// RTE_Compiler_IO_STDOUT_User
+}
+#endif	// __has_include("RTE_Componetns.h")
