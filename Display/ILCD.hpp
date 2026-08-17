@@ -18,7 +18,7 @@ namespace STM32T
 		//using coordx_t = coord_t;
 		//using coordy_t = coord_t;
 		using line_t = uint8_t;
-	
+		
 		virtual ~ILCD() {}
 		
 		virtual ILCD& NextLine(const line_t lines = 1) = 0;

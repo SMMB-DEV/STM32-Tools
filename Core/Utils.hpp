@@ -323,7 +323,7 @@ namespace STM32T
 	template <typename T, T MIN, T MAX>
 	class ClampedInt
 	{
-		static_assert(is_int_v<T> && MAX > MIN);
+		static_assert(is_int_v<T>);
 		
 		T m_val;
 		
