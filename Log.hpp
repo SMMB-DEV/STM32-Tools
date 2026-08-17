@@ -2,6 +2,7 @@
 
 #include "./Core/strv.hpp"
 #include "./Core/Time.hpp"
+#include "./Core/Utils.hpp"
 #include "./Versioning.hpp"
 #include "./IO.hpp"
 
@@ -11,27 +12,37 @@
 
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
 static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect." \
-	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
+	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
 
 #define STM32T_SYS_WRITE_ITM \
 static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect." \
-	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm).");
+	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm).");
 
 #define STM32T_SYS_WRITE_UART(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect." \
-	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
+	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
 
 #define STM32T_SYS_WRITE_UART_DMA(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect." \
-	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
+	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
 
 #define STM32T_SYS_WRITE_USB \
 static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect." \
-	" Call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp).");
+	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp).");
 
 #define STM32T_LOG_SYS_WRITE \
-static_assert(0, "STM32T_SYS_WRITE_DYN is obsolete and has no effect." \
-	" Just enable and set \"STDOUT\" mode to \"User\" in Manage Run-Time Environment -> Compiler -> I/O.");
+extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
+{ \
+	static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003; \
+	\
+	if (fh != FH_STDOUT) \
+		return fh == FH_STDERR ? 0 : -1; \
+	\
+	if (STM32T::Log::_g_stdout) \
+		STM32T::Log::_g_stdout({reinterpret_cast<const char *>(buf), len}, true); \
+	\
+	return 0; \
+}
 
 
 
@@ -76,6 +87,61 @@ namespace STM32T::Log
 			fflush(stdout);
 	}
 	
+	template <size_t SIZE, size_t COUNT = 1>
+	struct Buffer
+	{
+		char data[COUNT][SIZE];
+		size_t index = 0;
+		ClampedInt<size_t, 0, COUNT - 1> current = 0;
+	};
+	
+	template <size_t SIZE, size_t COUNT>
+	inline void default_output_buffer(strv data, bool last_chunk, Buffer<SIZE, COUNT> *buf, void (*send)(const char *buf, size_t len))
+	{
+		// todo: Keep adding to the current buffer after a last chunk if the previous buffer hasn't been completely sent yet.
+		
+		if (buf->index)
+		{
+			if (buf->index + data.size() < SIZE)
+			{
+				std::memcpy(buf->data[buf->current] + buf->index, data.data(), data.size());
+				buf->index += data.size();
+				
+				if (last_chunk)
+				{
+					send(buf->data[buf->current], buf->index);
+					buf->index = 0;
+					buf->current++;
+				}
+				
+				return;
+			}
+			
+			const size_t copied = SIZE - buf->index;
+			std::memcpy(buf->data[buf->current] + buf->index, data.data(), copied);
+			
+			send(buf->data[buf->current], SIZE);
+			buf->index = 0;
+			buf->current++;
+			data.remove_prefix(copied);
+		}
+		
+		// todo: Send all at once for last_chunk?
+		while (data.size() >= SIZE)
+		{
+			send(data.data(), SIZE);
+			data.remove_prefix(SIZE);
+		}
+		
+		if (!last_chunk)
+		{
+			std::memcpy(buf->data[buf->current], data.data(), data.size());
+			buf->index = data.size();
+		}
+		else
+			send(data.data(), data.size());
+	}
+	
 	struct GPIOConfig
 	{
 		enum Parity : uint8_t {None, Even, Odd, Mark, Space};
@@ -98,7 +164,7 @@ namespace STM32T::Log
 	
 	inline void default_output_gpio(strv data, bool last_chunk)
 	{
-		static volatile uint32_t s_start = 0;
+		static volatile Time::cycle_t s_start = 0;	// fixme: this doesn't work
 		
 		GPIO_TypeDef *const port = _g_stdout_gpio.port;
 		const uint16_t pin = _g_stdout_gpio.pin;
@@ -193,21 +259,17 @@ namespace STM32T::Log
 	
 	inline void default_output_uart_dma(strv data, bool last_chunk)
 	{
-		static uint8_t s_buf[1024];
+		static Buffer<1024, 2> s_buf;
+		
 		
 		if (!_g_huart)
 			return;
 		
-		while (!data.empty())
+		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
 		{
 			while (HAL_DMA_GetState(_g_huart->hdmatx) == HAL_DMA_STATE_BUSY);
-			const size_t len = std::min(data.size(), sizeof(s_buf));
-			memcpy(s_buf, data.data(), len);
-			if (HAL_UART_Transmit_DMA(_g_huart, s_buf, len) != HAL_OK)
-				return;
-			
-			data.remove_prefix(len);
-		}
+			HAL_UART_Transmit_DMA(_g_huart, reinterpret_cast<const uint8_t *>(buf), len);
+		});
 	}
 	#endif	// HAL_UART_MODULE_ENABLED
 	
@@ -218,59 +280,18 @@ namespace STM32T::Log
 	
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
-		static constexpr uint32_t TIMEOUT = 50;
+		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
-		static char s_buf[CDC_DATA_FS_MAX_PACKET_SIZE];
-		static size_t s_index = 0;
-		
-		static auto send = [](const char *buf, uint16_t len)
+		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, uint16_t len)
 		{
+			static constexpr uint32_t TIMEOUT = 50;
+			
 			const uint32_t start = HAL_GetTick();
 			
 			while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED
 				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
 				&& HAL_GetTick() - start < TIMEOUT);
-		};
-		
-		
-		if (s_index)
-		{
-			if (s_index + data.size() < std::size(s_buf))
-			{
-				std::memcpy(s_buf + s_index, data.data(), data.size());
-				s_index += data.size();
-				
-				if (last_chunk)
-				{
-					send(s_buf, s_index);
-					s_index = 0;
-				}
-				
-				return;
-			}
-			
-			const size_t copied = std::size(s_buf) - s_index;
-			std::memcpy(s_buf + s_index, data.data(), copied);
-			
-			send(s_buf, std::size(s_buf));
-			s_index = 0;
-			data.remove_prefix(copied);
-		}
-		
-		// todo: Send all at once for last_chunk?
-		while (data.size() >= std::size(s_buf))
-		{
-			send(data.data(), std::size(s_buf));
-			data.remove_prefix(std::size(s_buf));
-		}
-		
-		if (!last_chunk)
-		{
-			std::memcpy(s_buf, data.data(), data.size());
-			s_index = data.size();
-		}
-		else
-			send(data.data(), data.size());
+		});
 	}
 	#endif	// __has_include("usbd_cdc_if.h")
 	
@@ -867,7 +888,7 @@ namespace STM32T::Log
 				LOG_N<level, logger>(" Reset Pin |");
 			
 			// b25
-			#ifdef RCC_CSR_PORRSTF
+			#ifdef RCC_CSR_BORRSTF
 			if (reset_flags & RCC_CSR_BORRSTF)
 				LOG_N<level, logger>(" BOR |");
 			#else
@@ -899,18 +920,6 @@ namespace STM32T::Log
 	}
 	
 	extern "C" [[gnu::used]] inline int stdout_putchar(int ch) { return ch; }
-	extern "C" [[gnu::used]] inline int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode)
-	{
-		static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003;
-		
-		if (fh != FH_STDOUT)
-			return fh == FH_STDERR ? 0 : -1;
-		
-		if (STM32T::Log::_g_stdout)
-			STM32T::Log::_g_stdout({reinterpret_cast<const char *>(buf), len}, true);
-		
-		return 0;
-	}
 	
 	#endif	// RTE_Compiler_IO_STDOUT_User
 }
