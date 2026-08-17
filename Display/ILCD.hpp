@@ -100,7 +100,7 @@ namespace STM32T
 			const int len = vsnprintf(buf, sizeof(buf), fmt, args);
 			va_end(args);
 			
-			return PutStrCtr(field_width, {buf, len});
+			return PutStrCtr(field_width, {buf, size_t(len)});
 		}
 		
 		[[deprecated("Use PutStrCtr() instead.")]]

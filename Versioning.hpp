@@ -179,16 +179,32 @@ namespace STM32T
 			
 			const uint8_t pr = PreRelease();
 			
-			if ((pr > 0 && pr < Alpha0) || (pr > RC31 && pr < Normal))
+			if ((pr > 0 && pr < Alpha) || (pr > RC31 && pr < Normal))
 				len += sprintf(s_buf_strv + len, "-inv");
 			else if (pr == Normal)
 				len += 0;
-			else if (pr >= RC0)
-				len += sprintf(s_buf_strv + len, "-rc%hhu", pr - RC0);
-			else if (pr >= Beta0)
-				len += sprintf(s_buf_strv + len, "-beta%hhu", pr - Beta0);
-			else if (pr >= Alpha0)
-				len += sprintf(s_buf_strv + len, "-alpha%hhu", pr - Alpha0);
+			else if (pr >= Alpha)
+			{
+				uint8_t n;
+				if (pr >= RC)
+				{
+					len += sprintf(s_buf_strv + len, "-rc");
+					n = pr - RC0;
+				}
+				else if (pr >= Beta)
+				{
+					len += sprintf(s_buf_strv + len, "-beta");
+					n = pr - Beta0;
+				}
+				else
+				{
+					len += sprintf(s_buf_strv + len, "-alpha");
+					n = pr - Alpha0;
+				}
+				
+				if (n)
+					len += sprintf(s_buf_strv + len, "%hhu", n);
+			}
 			else
 				len += sprintf(s_buf_strv + len, "-x");
 			
@@ -259,19 +275,12 @@ namespace STM32T
 				ver.remove_prefix(std::min(sep_idx + 1, ver.size()));
 			}
 			
-			bool gamma_delta = false;
-			
 			if (ver.remove_prefix("alpha"sv))
 				data.arr[0] = Alpha0;
 			else if (ver.remove_prefix("beta"sv))
 				data.arr[0] = Beta0;
 			else if (ver.remove_prefix("rc"sv))
 				data.arr[0] = RC0;
-			else if (ver.remove_prefix("gamma"sv) || ver.remove_prefix("delta"sv))
-			{
-				gamma_delta = true;
-				data.arr[0] = RC0;
-			}
 			else if (ver == "x"sv)
 				data.arr[0] = Unspecified;
 			else if (ver.empty())
@@ -281,13 +290,8 @@ namespace STM32T
 			
 			if (!ver.empty() && data.arr[0] != Unspecified && data.arr[0] != Normal)
 			{
-				if (gamma_delta)
-					return Version();
-				
 				uint8_t val;
-				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + ver.size(), val);
-				
-				if (result.ec != std::errc() || val > 31)
+				if (!ver.to_num_raw(val) || val > 31)
 					return Version();
 				
 				data.arr[0] += val;
@@ -332,6 +336,6 @@ namespace STM32T
 		}
 	};
 	
-	// todo: check what need to be removed (deprecated) for each version.
-	constexpr Version VER(0, 3, 0, Version::Normal);		// Current version of the framework
+	// todo: check what needs to be removed (deprecated) for each version.
+	constexpr Version VER(0, 3, 1, Version::Normal);	// Current version of the framework
 }

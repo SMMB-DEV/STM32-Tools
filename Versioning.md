@@ -18,16 +18,16 @@ This makes comparing two versions as easy as comparing two 32-bit numbers while 
 
 These are the **only** valid pre-release identifiers and their associated number:
 
-|	Number	|	Text Form					|	Description							|
-|-----------|-------------------------------|---------------------------------------|
-|	255		|								|	Normal version (not pre-release)	|
-|	97-127	|	-rc*x*						|	Release candidate - x from 1 to 31	|
-|	96		|	-rc, -rc0, -gamma, -delta	|	Release candidate					|
-|	65-95	|	-beta*x*					|	Beta version - x from 1 to 31		|
-|	64		|	-beta, -beta0				|	Beta version						|
-|	33-63	|	-alpha*x*					|	Alpha version - x from 1 to 31		|
-|	32		|	-alpha, -alpha0				|	Alpha version						|
-|	0		|	-x							|	Unspecified (not a valid pre-release but when comparing versions, it means that pre-release is not considered)	|
+|	Number	|	Text Form		|	Description							|
+|-----------|-------------------|---------------------------------------|
+|	255		|					|	Normal version (not pre-release)	|
+|	97-127	|	-rc*x*			|	Release candidate - x from 1 to 31	|
+|	96		|	-rc, -rc0		|	Release candidate					|
+|	65-95	|	-beta*x*		|	Beta version - x from 1 to 31		|
+|	64		|	-beta, -beta0	|	Beta version						|
+|	33-63	|	-alpha*x*		|	Alpha version - x from 1 to 31		|
+|	32		|	-alpha, -alpha0	|	Alpha version						|
+|	0		|	-x				|	Unspecified (not a valid pre-release but when comparing versions, it means that pre-release is not considered)	|
 
 The pre-release usually goes from -alpha to -beta and then to -rc and finally to a normal version but **it can *skip* any of these states**.
 
