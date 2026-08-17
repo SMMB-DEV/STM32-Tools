@@ -9,7 +9,7 @@ namespace STM32T
 {
 	class HD44780 : public ILCD
 	{
-		static constexpr Time::us_time_t DEFAULT_TIMEOUT_US = 53;
+		static constexpr Time::us_time_t DEFAULT_TIMEOUT_US = 80;	// 37 * 270 / 125
 		
 		uint8_t (* const cf_rw)(bool rw, bool rs, uint8_t data);
 		uint8_t m_addr = 0;
@@ -59,7 +59,7 @@ namespace STM32T
 			return true;
 		}
 		
-		bool AddressWait(const uint8_t expectedAddr, Time::us_time_t timeout_us = 6)
+		bool AddressWait(const uint8_t expectedAddr, Time::us_time_t timeout_us = 12)	// 1.5 / 125k
 		{
 			Time::cycle_t start = Time::GetCycle();
 			
