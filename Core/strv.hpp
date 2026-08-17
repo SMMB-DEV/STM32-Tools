@@ -257,6 +257,26 @@ namespace STM32T
 		bool remove_suffix(const CharT *s) { return remove_suffix(bstrv(s)); }
 		
 		/**
+		* @retval The number of characters used.
+		*/
+		template <typename N>
+		size_t to_num_raw(N& num, size_t from = 0, size_t count = npos) const
+		{
+			static_assert(std::is_arithmetic_v<N> && std::is_same_v<CharT, char>);
+			
+			bstrv sub = substr(from, count);
+			
+			if (!sub.empty())
+			{
+				const std::from_chars_result result = std::from_chars(sub.data(), sub.data() + sub.size(), num);
+				if (result.ec == std::errc())
+					return result.ptr - sub.data();
+			}
+			
+			return 0;
+		}
+		
+		/**
 		* @retval The number of digits of the number (not necessarily the number of characters used).
 		*/
 		template <typename N>
@@ -267,14 +287,7 @@ namespace STM32T
 			bstrv sub = substr(from, count).trim();
 			sub.remove_prefix('+');
 			
-			if (!sub.empty())
-			{
-				const std::from_chars_result result = std::from_chars(sub.data(), sub.data() + sub.size(), num);
-				if (result.ec == std::errc())
-					return result.ptr - sub.data();
-			}
-			
-			return 0;
+			return sub.to_num_raw(num);
 		}
 	};
 	
