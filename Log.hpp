@@ -282,7 +282,7 @@ namespace STM32T::Log
 	{
 		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
-		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, uint16_t len)
+		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
 		{
 			static constexpr uint32_t TIMEOUT = 50;
 			
