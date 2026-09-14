@@ -854,49 +854,7 @@ namespace STM32T::Log
 				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
 				HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
 			
-			// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
-			const uint32_t reset_flags = RCC->CSR;
-			
-			LOG_N<level, logger>("Cause of reset: |");
-			
-			// b31
-			if (reset_flags & RCC_CSR_LPWRRSTF)
-				LOG_N<level, logger>(" Low Power |");
-			
-			// b30
-			if (reset_flags & RCC_CSR_WWDGRSTF)
-				LOG_N<level, logger>(" WWDG |");
-			
-			// b29
-			if (reset_flags & RCC_CSR_IWDGRSTF)
-				LOG_N<level, logger>(" IWDG |");
-			
-			// b28
-			if (reset_flags & RCC_CSR_SFTRSTF)
-				LOG_N<level, logger>(" Software |");
-			
-			// b27
-			#ifdef RCC_CSR_PORRSTF
-			if (reset_flags & RCC_CSR_PORRSTF)
-			#else
-			if (reset_flags & RCC_CSR_PWRRSTF)
-			#endif
-				LOG_N<level, logger>(" POR/PDR |");
-			
-			// b26
-			if (reset_flags & RCC_CSR_PINRSTF)
-				LOG_N<level, logger>(" Reset Pin |");
-			
-			// b25
-			#ifdef RCC_CSR_BORRSTF
-			if (reset_flags & RCC_CSR_BORRSTF)
-				LOG_N<level, logger>(" BOR |");
-			#else
-			if (reset_flags & RCC_CSR_OBLRSTF)
-				LOG_N<level, logger>(" OBL |");
-			#endif
-			
-			LOG_N<level, logger>("\n\n");
+			LOG_N<level, logger>("Cause of reset: %s\n\n", GetResetCause());
 		}
 	}
 }

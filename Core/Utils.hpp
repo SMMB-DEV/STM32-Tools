@@ -5,6 +5,7 @@
 #include <vector>
 #include <functional>
 #include <type_traits>
+#include <cstdio>
 
 
 
@@ -25,6 +26,53 @@ namespace STM32T
 	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept { return x; }
 	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept { return x; }
 	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept { return x; }
+	
+	/**
+	* @retval Max. 63 characters.
+	*/
+	inline const char * GetResetCause()
+	{
+		static constexpr const char * BIT_NAMES[] =
+		{
+			#ifdef RCC_CSR_BORRSTF	// b25
+			"BOR",
+			#else
+			" OBL",
+			#endif
+			
+			"Reset Pin",			// b26
+			"POR/PDR",				// b27
+			"Software",				// b28
+			"IWDG",					// b29
+			"WWDG",					// b30
+			"LPWR",					// b31
+		};
+		
+		
+		static char s_buf[64];
+		
+		int len = 0;
+		
+		// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
+		const uint32_t reset_flags = RCC->CSR;
+		bool first = true;
+		
+		for (uint32_t b = 31; b >= 25; --b)
+		{
+			if (reset_flags & 1 << b)
+			{
+				if (first)
+				{
+					len += sprintf(s_buf + len, "%s", BIT_NAMES[b - 25]);
+					first = false;
+				}
+				else
+					len += sprintf(s_buf + len, " | %s", BIT_NAMES[b - 25]);
+			}
+		}
+		
+		return s_buf;
+	}
 	
 	inline constexpr char H2C(uint8_t x)
 	{
