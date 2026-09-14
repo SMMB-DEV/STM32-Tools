@@ -1,8 +1,8 @@
-# Simplified Semantic Versioning 0.2.0
+# Simplified Semantic Versioning 1.0.0
 
 This versioning scheme is mostly identical to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) with limited major, minor, and patch versions (each max. 255) and fewer and more strict [pre-release identifiers](https://semver.org/spec/v2.0.0.html#spec-item-9). [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10) cannot be displayed using this format.
 
-If a patch version reaches 255, the next version will increment the minor version and reset the patch to 0 even if it's not actually a minor release. Similarly, after a minor version of 255, the major version is incremented and the minor and patch versions are reset to 0. If the major version reaches 255 you are probably doing something wrong because no one needs 256 major versions.
+If a patch version reaches 255, the next version will increment the minor version and reset the patch to 0 even if it's not actually a minor release. Similarly, after a minor version of 255, the major version is incremented and the minor and patch versions are reset to 0. If the major version reaches 255, maybe contemplate why you need 256 major versions.
 
 ## Storage
 
@@ -16,9 +16,9 @@ This makes comparing two versions as easy as comparing two 32-bit numbers while 
 
 ## Pre-release identifiers
 
-These are the **only** valid pre-release identifiers and their associated number:
+These are the **only** valid pre-release identifiers and their associated numeric value:
 
-|	Number	|	Text Form		|	Description							|
+|	Value	|	Text Form		|	Description							|
 |-----------|-------------------|---------------------------------------|
 |	255		|					|	Normal version (not pre-release)	|
 |	97-127	|	-rc*x*			|	Release candidate - x from 1 to 31	|

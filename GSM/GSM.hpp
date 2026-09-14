@@ -15,7 +15,8 @@
 
 
 
-#if defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
+#if defined(STM32T_GSM_URC_SUPPORT)
+#if USE_HAL_UART_REGISTER_CALLBACKS == 1
 
 #define STM32T_GSM_URC_ENABLED
 
@@ -23,6 +24,9 @@
 #define STM32T_GSM_URC_BUF_SIZE		512
 #endif	// STM32T_GSM_URC_BUF_SIZE
 
+#else
+#warn USE_HAL_UART_REGISTER_CALLBACKS must be 1 to use GSM URC.
+#endif	// USE_HAL_UART_REGISTER_CALLBACKS == 1
 #endif	// defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
 
 
@@ -36,6 +40,10 @@ CM_CODE(name##6, (code) * 10 + 6), CM_CODE(name##7, (code) * 10 + 7), CM_CODE(na
 #define CM_CODE_100(name, code)		CM_CODE_10(name##0, (code) * 10 + 0), CM_CODE_10(name##1, (code) * 10 + 1), \
 CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_CODE_10(name##4, (code) * 10 + 4), CM_CODE_10(name##5, (code) * 10 + 5), \
 CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
+
+#define CM_CODE_1000(name, code)	CM_CODE_100(name##0, (code) * 10 + 0), CM_CODE_100(name##1, (code) * 10 + 1), \
+CM_CODE_100(name##2, (code) * 10 + 2), CM_CODE_100(name##3, (code) * 10 + 3), CM_CODE_100(name##4, (code) * 10 + 4), CM_CODE_100(name##5, (code) * 10 + 5), \
+CM_CODE_100(name##6, (code) * 10 + 6), CM_CODE_100(name##7, (code) * 10 + 7), CM_CODE_100(name##8, (code) * 10 + 8), CM_CODE_100(name##9, (code) * 10 + 9)
 
 
 
@@ -92,6 +100,7 @@ namespace STM32T
 		
 		enum ErrorCode : int32_t
 		{
+			// Generic: [-9999, 0]
 			OK				= +0,
 			NOT_ALLOWED		= -1,
 			INVALID			= -2,
@@ -104,16 +113,18 @@ namespace STM32T
 			BUF_FULL		= -8,	// User's buffer
 			UNKNOWN			= -9,
 			
-			// GL865
-			CM_CODE_100(CME_0, 10), CM_CODE_100(CME_1, 11),
-			CM_CODE_100(CME_5, 15), CM_CODE_100(CME_6, 16), CM_CODE_100(CME_7, 17), CM_CODE_100(CME_8, 18), CM_CODE_100(CME_9, 19),
+			// CME: [-19999, -10000]
+			CM_CODE_100(CME_, 100), CM_CODE_100(CME_1, 101),
+			CM_CODE_100(CME_5, 105), CM_CODE_100(CME_6, 106), CM_CODE_100(CME_7, 107), CM_CODE_100(CME_8, 108), CM_CODE_100(CME_9, 109),
+			CM_CODE_100(CME_35, 135), CM_CODE_100(CME_37, 137),
 			
-			CM_CODE_100(CMS_0, 20), CM_CODE_100(CMS_1, 21), CM_CODE_100(CMS_2, 22), CM_CODE_100(CMS_3, 23),
-			CM_CODE(CMS_500, 2500), CM_CODE(CMS_512, 2512),
+			// CMS: [-29999, -20000]
+			CM_CODE_100(CMS_, 200), CM_CODE_100(CMS_1, 201), CM_CODE_100(CMS_2, 202), CM_CODE_100(CMS_3, 203),
+			CM_CODE(CMS_500, 20500), CM_CODE(CMS_512, 20512),
 		};
 		
 	protected:
-		static constexpr STM32T::Log::Logger LG = STM32T::Log::g_defaultLogger.Clone(STM32T::Log::Level::Debug, "GSM"sv);
+		static constexpr Log::Logger LG = Log::g_defaultLogger.Clone(std::min(Log::Level::Debug, Log::g_defaultLogger.level), "GSM"sv);
 		
 		static constexpr strv ESC = "\x1B"sv, CTRL_Z = "\x1A"sv, CMD_MODE = "+++"sv;
 		
@@ -298,17 +309,17 @@ namespace STM32T
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
 				uint16_t code;
-				if (1 == std::sscanf(tokens[i].data(), "+CME ERROR: %3hu", &code))
+				if (1 == std::sscanf(tokens[i].data(), "+CME ERROR: %4hu", &code))
 				{
 					tokens.erase(tokens.begin() + i);
-					ret = ErrorCode(-1000 - code);
+					ret = ErrorCode(-10000 - code);
 					break;
 				}
 				
-				if (1 == std::sscanf(tokens[i].data(), "+CMS ERROR: %3hu", &code))
+				if (1 == std::sscanf(tokens[i].data(), "+CMS ERROR: %4hu", &code))
 				{
 					tokens.erase(tokens.begin() + i);
-					ret = ErrorCode(-2000 - code);
+					ret = ErrorCode(-20000 - code);
 					break;
 				}
 				

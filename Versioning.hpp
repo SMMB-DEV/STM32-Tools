@@ -228,12 +228,29 @@ namespace STM32T
 				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-inv");
 			else if (pr == Normal)
 				len += 0;
-			else if (pr >= RC0)
-				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-rc%hhu", pr - RC0);
-			else if (pr >= Beta0)
-				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-beta%hhu", pr - Beta0);
-			else if (pr >= Alpha0)
-				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-alpha%hhu", pr - Alpha0);
+			else if (pr >= Alpha)
+			{
+				uint8_t n;
+				if (pr >= RC)
+				{
+					len += swprintf(s_buf + len, std::size(s_buf) - len, L"-rc");
+					n = pr - RC0;
+				}
+				else if (pr >= Beta)
+				{
+					len += swprintf(s_buf + len, std::size(s_buf) - len, L"-beta");
+					n = pr - Beta0;
+				}
+				else
+				{
+					len += swprintf(s_buf + len, std::size(s_buf) - len, L"-alpha");
+					n = pr - Alpha0;
+				}
+				
+				if (n)
+					len += swprintf(s_buf + len, std::size(s_buf) - len, L"%hhu", n);
+				
+			}
 			else
 				len += swprintf(s_buf + len, std::size(s_buf) - len, L"-x");
 			
@@ -308,12 +325,7 @@ namespace STM32T
 			{
 				m_data.arr[0] = Alpha0;
 				
-				for (uint8_t i = 1; i < 4; i++)
-				{
-					m_data.arr[i]++;
-					if (m_data.arr[i] != 0)
-						break;
-				}
+				for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; i++);
 			}
 			else if (pr >= Alpha0 && pr < RC31)
 				m_data.arr[0]++;
@@ -326,13 +338,7 @@ namespace STM32T
 		void NextNormal()
 		{
 			m_data.arr[0] = Normal;
-			
-			for (uint8_t i = 1; i < 4; i++)
-			{
-				m_data.arr[i]++;
-				if (m_data.arr[i] != 0)
-					break;
-			}
+			for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; i++);
 		}
 	};
 	

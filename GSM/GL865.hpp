@@ -22,7 +22,8 @@ namespace STM32T
 			/**
 			* The retarded module apparently adds the DNS resolution time to FTP socket commands even when it makes no fucking sense like closing a connection.
 			* It's not just that I might have to wait longer. It actually takes longer to close a connection that was opened with a domain instead
-			* of an IP address. Or maybe it just ignores the FTP timeout and takes as long as it wants. Truly fucking retarded!
+			* of an IP address (well, this is based on ONE test result but I've seen so many stupid things from this piece of shit).
+			* Or maybe it just ignores the FTP timeout and takes as long as it wants. Either way, truly fucking retarded!
 			*/
 			m_ftpSockTimeout = DEFAULT_FTP_TIMEOUT;
 		
