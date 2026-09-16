@@ -10,39 +10,50 @@
 
 
 
+// [[deprecated]]
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
 static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect." \
-	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
+	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
 
+// [[deprecated]]
 #define STM32T_SYS_WRITE_ITM \
 static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect." \
-	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_itm).");
+	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_itm).");
 
+// [[deprecated]]
 #define STM32T_SYS_WRITE_UART(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect." \
-	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
+	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
 
+// [[deprecated]]
 #define STM32T_SYS_WRITE_UART_DMA(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect." \
-	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
+	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
 
+// [[deprecated]]
 #define STM32T_SYS_WRITE_USB \
 static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect." \
-	" Use STM32T_LOG_SYS_WRITE and call STM32T::Log::RedirectStdout(STM32T::Log::default_output_vcp).");
+	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_vcp).");
 
-#define STM32T_LOG_SYS_WRITE \
+#define STM32T_SYS_WRITE \
 extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
 { \
 	static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003; \
 	\
-	if (fh != FH_STDOUT) \
-		return fh == FH_STDERR ? 0 : -1; \
+	if (fh != FH_STDOUT && fh != FH_STDERR) \
+		return -1; \
 	\
-	if (STM32T::Log::_g_stdout) \
-		STM32T::Log::_g_stdout({reinterpret_cast<const char *>(buf), len}, true); \
+	for (auto h : STM32T::Stdout::_g_handlers) \
+		h({reinterpret_cast<const char *>(buf), len}, true); \
 	\
 	return 0; \
-}
+} \
+\
+extern "C" [[gnu::used]] [[gnu::weak]] int stdout_putchar(int ch) { return ch; } \
+extern "C" [[gnu::used]] [[gnu::weak]] int stderr_putchar(int ch) { return ch; }
+
+// [[deprecated]]
+#define STM32T_LOG_SYS_WRITE	static_assert(0, "Use STM32T_SYS_WRITE.");
 
 
 
@@ -278,17 +289,16 @@ namespace STM32T::Log
 	
 	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 	
+	template <size_t TIMEOUT = 100>
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
 		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
 		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
 		{
-			static constexpr uint32_t TIMEOUT = 50;
-			
 			const uint32_t start = HAL_GetTick();
 			
-			while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED
+			while ((hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)// || hUsbDeviceFS.dev_state == USBD_STATE_SUSPENDED)
 				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
 				&& HAL_GetTick() - start < TIMEOUT);
 		});
@@ -860,24 +870,33 @@ namespace STM32T::Log
 }
 
 #if __has_include("RTE_Components.h")
-namespace STM32T::Log
+#include <vector>
+namespace STM32T::Stdout
 {
 	#include "RTE_Components.h"
 	
 	#ifdef RTE_Compiler_IO_STDOUT_User
 	
-	inline output_t _g_stdout = nullptr;
+	inline std::vector<Log::output_t> _g_handlers;
 	
 	/**
 	* @note The logger must not call fflush().
 	*/
-	inline void RedirectStdout(const output_t logger)
+	inline void AddHandler(const Log::output_t logger)
 	{
-		if (logger != default_output_stdout)
-			_g_stdout = logger;
+		if (logger != Log::default_output_stdout)
+		{
+			auto it = std::find(_g_handlers.begin(), _g_handlers.end(), logger);
+			if (it == _g_handlers.end())
+				_g_handlers.push_back(logger);
+		}
 	}
 	
-	extern "C" [[gnu::used]] inline int stdout_putchar(int ch) { return ch; }
+	inline void RemoveHandler(const Log::output_t logger)
+	{
+		auto it = std::remove(_g_handlers.begin(), _g_handlers.end(), logger);
+		_g_handlers.erase(it, _g_handlers.end());
+	}
 	
 	#endif	// RTE_Compiler_IO_STDOUT_User
 }
