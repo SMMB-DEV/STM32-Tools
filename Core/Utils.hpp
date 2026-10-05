@@ -298,20 +298,53 @@ namespace STM32T
 		return (n + multiple - 1) / multiple * multiple;
 	}
 	
-	template<class T>
-	union shared_arr
+	inline void JumpToApp(const volatile uint32_t app_addr)
+	{
+#ifdef STM32F407xx
+		RCC_ClkInitTypeDef rcc =
+		{
+			.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
+			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
+			.AHBCLKDivider = RCC_SYSCLK_DIV1,
+			.APB1CLKDivider = RCC_HCLK_DIV1,
+			.APB2CLKDivider = RCC_HCLK_DIV1
+		};
+		
+		// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
+		if (HAL_RCC_ClockConfig(&rcc, FLASH_LATENCY_0) != HAL_OK)
+			Error_Handler();
+#else
+#error "Clock configuration code not available for this family!"
+#endif
+		
+		using fp = void (*)();
+		
+		fp app = (fp)(*(__IO uint32_t*)(app_addr + 4));
+		
+		// Jump to user application
+		// Initialize user application's Stack Pointer
+		SCB->VTOR = app_addr;
+		__set_MSP(*(__IO uint32_t*)app_addr);
+		app();
+	}
+	
+	template <class T>
+	union SharedArray
 	{
 		static_assert(sizeof(T) > sizeof(uint8_t));
 		
 		uint8_t arr[sizeof(T)];
 		T val;
 		
-		shared_arr<T>& operator=(const shared_arr<T>& other)
+		SharedArray<T>& operator=(const SharedArray<T>& other)
 		{
 			val = other.val;
 			return *this;
 		}
 	};
+	
+	template <class T>
+	using shared_arr [[deprecated("Use SharedArray<T> instead.")]] = SharedArray<T>;
 	
 	class ScopeAction
 	{
@@ -1563,7 +1596,7 @@ namespace STM32T
 	{
 		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
 		
-		shared_arr<T> _t {.val = t};
+		SharedArray<T> _t {.val = t};
 		
 		for (uint8_t i = 0; i < sizeof(T) / 2; i++)
 			std::swap(_t.arr[i], _t.arr[sizeof(T) - 1 - i]);

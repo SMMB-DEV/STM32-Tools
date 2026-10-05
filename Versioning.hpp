@@ -13,9 +13,9 @@ namespace STM32T
 	{
 		static inline char s_buf_strv[20];
 		
-		shared_arr<uint32_t> m_data;
+		SharedArray<uint32_t> m_data;
 		
-		Version(shared_arr<uint32_t> data) : m_data(data) {}
+		Version(SharedArray<uint32_t> data) : m_data(data) {}
 		
 	public:
 		enum PreRelease : uint8_t
@@ -51,11 +51,12 @@ namespace STM32T
 		/**
 		* @brief Constructs an invald Version.
 		*/
-		constexpr Version() : m_data{ 0 } {}
+		constexpr Version() : m_data{ .val = 0 } {}
 		constexpr Version(const uint32_t val) : m_data{.val = val} {}
 		constexpr Version(const uint8_t major, const uint8_t minor, const uint8_t patch, const PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
 		
-		constexpr Version(const Version& other) = default;
+		constexpr Version(const Version& other) : m_data(other.m_data) {}
+		
 		Version(const Version& other, PreRelease new_pr) : m_data(other.m_data)
 		{
 			m_data.arr[0] = new_pr;
@@ -266,7 +267,7 @@ namespace STM32T
 		
 		static Version from_strv(strv ver)
 		{
-			shared_arr<uint32_t> data;
+			SharedArray<uint32_t> data;
 			
 			constexpr char SEP[] = { '.', '.', '-' };
 			
@@ -332,16 +333,16 @@ namespace STM32T
 			else if (pr == RC31)
 				m_data.arr[0] = Normal;
 			else
-				m_data.arr[0] = Alpha;
+				m_data.arr[0] = Alpha0;
 		}
 		
 		void NextNormal()
 		{
 			m_data.arr[0] = Normal;
-			for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; i++);
+			for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; ++i);
 		}
 	};
 	
 	// todo: check what needs to be removed (deprecated) for each version.
-	constexpr Version VER(0, 3, 1, Version::Normal);	// Current version of the framework
+	constexpr Version VER(0, 3, 2, Version::Normal);	// Current version of the framework
 }
