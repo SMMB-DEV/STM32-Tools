@@ -4,14 +4,21 @@
 
 namespace STM32T
 {
+	/**
+	* @copyright This is mostly taken from the <a href="https://github.com/miguelbalboa/rfid">Arduino RFID library</a>
+	*		which uses the <a href="https://unlicense.org/">"Unlicense"</a>.
+	*		I'm not sure what that means when I'm using the MIT license.
+	*/
 	class MFRC522
 	{
 		// todo: adjust all SPI timeouts
 	public:
 		struct UID
 		{
-			uint8_t size, sak;
-			uint8_t id[10];
+			uint8_t
+				size,		// Number of bytes in the UID. 4, 7 or 10.
+				id[10],
+				sak;		// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
 		};
 		
 	private:
@@ -203,9 +210,15 @@ namespace STM32T
 		
 		//------------------------------------------------------------------------------------------------------------------------------------------------------
 		
-		Status PCD_CalculateCRC(	uint8_t *data,		///< In: Pointer to the data to transfer to the FIFO for CRC calculation.
-									uint8_t length,		///< In: The number of bytes to transfer.
-									uint8_t *result)	///< Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
+		/**
+		* Use the CRC coprocessor in the MFRC522 to calculate a CRC_A.
+		* 
+		* @param data - In: Pointer to the data to transfer to the FIFO for CRC calculation.
+		* @param length - In: The number of bytes to transfer.
+		* @param result - Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
+		* @return STATUS_OK on success, STATUS_??? otherwise.
+		*/
+		Status PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
 		{
 			Command(Cmd::Idle);						// Stop any active command.
 			Write(Reg::DivIrq, 0x04);				// Clear the CRCIRq interrupt request bit
@@ -237,15 +250,23 @@ namespace STM32T
 			return Status::TIMEOUT;
 		}
 		
-		Status PCD_CommunicateWithPICC(	Cmd command,		///< The command to execute. One of the PCD_Command enums.
-										uint8_t waitIRq,		///< The bits in the ComIrqReg register that signals successful completion of the command.
-										uint8_t *sendData,		///< Pointer to the data to transfer to the FIFO.
-										uint8_t sendLen,		///< Number of bytes to transfer to the FIFO.
-										uint8_t *backData,		///< nullptr or pointer to buffer if data should be read back after executing the command.
-										uint8_t *backLen,		///< In: Max number of bytes to write to *backData. Out: The number of bytes returned.
-										uint8_t *validBits,		///< In/Out: The number of valid bits in the last byte. 0 for 8 valid bits.
-										uint8_t rxAlign,		///< In: Defines the bit position in backData[0] for the first bit received. Default 0.
-										bool checkCRC)			///< In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+		/**
+		* Transfers data to the MFRC522 FIFO, executes a command, waits for completion and transfers data back from the FIFO.
+		* CRC validation can only be done if backData and backLen are specified.
+		*
+		* @param command	- The command to execute. One of the PCD_Command enums.
+		* @param waitIRq	- The bits in the ComIrqReg register that signals successful completion of the command.
+		* @param sendData	- Pointer to the data to transfer to the FIFO.
+		* @param sendLen	- Number of bytes to transfer to the FIFO.
+		* @param backData	- nullptr or pointer to buffer if data should be read back after executing the command.
+		* @param backLen	- In: Max number of bytes to write to *backData. Out: The number of bytes returned.
+		* @param validBits	- In/Out: The number of valid bits in the last byte. 0 for 8 valid bits.
+		* @param rxAlign	- In: Defines the bit position in backData[0] for the first bit received. Default 0.
+		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+		* @return STATUS_OK on success, STATUS_??? otherwise.
+		*/
+		Status PCD_CommunicateWithPICC(Cmd command, uint8_t waitIRq, uint8_t *sendData, uint8_t sendLen,
+			uint8_t *backData, uint8_t *backLen, uint8_t *validBits, uint8_t rxAlign, bool checkCRC)		
 		{
 			// Prepare values for BitFramingReg
 			uint8_t txLastBits = validBits ? *validBits : 0;
@@ -336,20 +357,32 @@ namespace STM32T
 			return Status::OK;
 		}
 		
-		Status PCD_TransceiveData(	uint8_t *sendData,				///< Pointer to the data to transfer to the FIFO.
-									uint8_t sendLen,				///< Number of bytes to transfer to the FIFO.
-									uint8_t *backData,				///< nullptr or pointer to buffer if data should be read back after executing the command.
-									uint8_t *backLen,				///< In: Max number of bytes to write to *backData. Out: The number of bytes returned.
-									uint8_t *validBits = nullptr,	///< In/Out: The number of valid bits in the last byte. 0 for 8 valid bits. Default nullptr.
-									uint8_t rxAlign = 0,			///< In: Defines the bit position in backData[0] for the first bit received. Default 0.
-									bool checkCRC = false)			///< In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+		/**
+		* Executes the Transceive command.
+		* CRC validation can only be done if backData and backLen are specified.
+		* 
+		* @param sendData	- Pointer to the data to transfer to the FIFO.
+		* @param sendLen	- Number of bytes to transfer to the FIFO.
+		* @param backData	- nullptr or pointer to buffer if data should be read back after executing the command.
+		* @param backLen	- In: Max number of bytes to write to *backData. Out: The number of bytes returned.
+		* @param validBits	- In/Out: The number of valid bits in the last byte. 0 for 8 valid bits. Default nullptr.
+		* @param rxAlign	- In: Defines the bit position in backData[0] for the first bit received. Default 0.
+		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+		* @return STATUS_OK on success, STATUS_??? otherwise.
+		*/
+		Status PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen,
+			uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false)
 		{
 			uint8_t waitIRq = 0x30;		// RxIRq and IdleIRq
 			return PCD_CommunicateWithPICC(Cmd::Transceive, waitIRq, sendData, sendLen, backData, backLen, validBits, rxAlign, checkCRC);
 		}
 		
 		/**
-		* @param command - PICC_CMD_REQA or PICC_CMD_WUPA
+		* Transmits REQA or WUPA commands.
+		* Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
+		* 
+		* @param command - The command to send - PICC_CMD_REQA or PICC_CMD_WUPA
+		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
 		Status PICC_REQA_or_WUPA(uint8_t command)
 		{
@@ -369,17 +402,39 @@ namespace STM32T
 		}
 		
 		
+		/**
+		* Transmits a REQuest command, Type A. Invites PICCs in state IDLE to go to READY and prepare for anticollision or selection. 7 bit frame.
+		* Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
+		* 
+		* @return STATUS_OK on success, STATUS_??? otherwise.
+		*/
 		Status PICC_REQA()
 		{
 			return PICC_REQA_or_WUPA(CmdPICC::REQA);
 		}
 		
-		Status PICC_Select(	UID *uid,				///< Pointer to Uid struct. Normally output, but can also be used to supply a known UID.
-							uint8_t validBits = 0)	///< The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
+		/**
+		* Transmits SELECT/ANTICOLLISION commands to select a single PICC.
+		* Before calling this function the PICCs must be placed in the READY(*) state by calling PICC_RequestA() or PICC_WakeupA().
+		* On success:
+		* 		- The chosen PICC is in state ACTIVE(*) and all other PICCs have returned to state IDLE/HALT. (Figure 7 of the ISO/IEC 14443-3 draft.)
+		* 		- The UID size and value of the chosen PICC is returned in *uid along with the SAK.
+		* 
+		* A PICC UID consists of 4, 7 or 10 bytes.
+		* Only 4 bytes can be specified in a SELECT command, so for the longer UIDs two or three iterations are used:
+		* 		UID size	Number of UID bytes		Cascade levels		Example of PICC
+		* 		========	===================		==============		===============
+		* 		single				 4						1				MIFARE Classic
+		* 		double				 7						2				MIFARE Ultralight
+		* 		triple				10						3				Not currently in use?
+		* 
+		* @param uid		- Pointer to Uid struct. Normally output, but can also be used to supply a known UID.
+		* @param validBits	- The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
+		* @return STATUS_OK on success, STATUS_??? otherwise.
+		*/
+		Status PICC_Select(UID *uid, uint8_t validBits = 0)
 		{
-			bool uidComplete;
-			bool selectDone;
-			bool useCascadeTag;
+			bool uidComplete, selectDone, useCascadeTag;
 			uint8_t cascadeLevel = 1;
 			Status result;
 			uint8_t count;
