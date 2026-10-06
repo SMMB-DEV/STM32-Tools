@@ -300,22 +300,27 @@ namespace STM32T
 	
 	inline void JumpToApp(const volatile uint32_t app_addr)
 	{
-#ifdef STM32F407xx
 		RCC_ClkInitTypeDef rcc =
 		{
+#ifdef STM32F4
 			.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
 			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 			.AHBCLKDivider = RCC_SYSCLK_DIV1,
 			.APB1CLKDivider = RCC_HCLK_DIV1,
 			.APB2CLKDivider = RCC_HCLK_DIV1
+#elifdef STM32G0
+			.ClockType = RCC_CLOCKTYPE_ALL,
+			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
+			.AHBCLKDivider = RCC_SYSCLK_DIV1,
+			.APB1CLKDivider = RCC_HCLK_DIV1
+#else
+#error "Clock configuration code not available for this family!"
+#endif
 		};
 		
 		// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
 		if (HAL_RCC_ClockConfig(&rcc, FLASH_LATENCY_0) != HAL_OK)
 			Error_Handler();
-#else
-#error "Clock configuration code not available for this family!"
-#endif
 		
 		using fp = void (*)();
 		
