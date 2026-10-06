@@ -1,3 +1,7 @@
+##### [Go Back](./README.md)
+
+---
+
 # strv.hpp
 
 STM32T::bstrv is a subclass of std::basic_string_view with the following typedefs:
@@ -15,7 +19,7 @@ STM32T::bstrv is a subclass of std::basic_string_view with the following typedef
 - Tokenizing
 - Trimming
 - Conditionally removing prefixes and suffixes if they match an exact view
-- Converting view to an integer
+- Parsing numbers from a view
 
 ---
 

@@ -1,3 +1,7 @@
+##### [Go Back](./README.md)
+
+---
+
 # Logging
 
 Include "Log.h" to use the logging module. You can use the `Logger` class to create a "static" or "dynamic" logger.
@@ -61,28 +65,22 @@ int main()
 
 ## Default outputs
 
-The outputs must be of type `STM32T::Log::output_t` aka `void (*)(strv data, bool last_chunk)`. The default loggers defined in STM32T::Log are:
+The outputs must be of type `STM32T::Log::output_t` aka `void (*)(strv data, bool last_chunk)`. The default outputs defined in STM32T::Log are:
 
 + default_output_stdout
-+ default_output_vcp (for now only if USB_FS is enabled)
++ default_output_vcp (For now only if USB_FS is enabled)
++ default_output_gpio (Emulates UART using GPIO. Use `SetGPIOConfig(...)` to define the pin.)
++ default_output_itm
++ default_output_uart, default_output_uart_dma (Use `SetUARTHandle(...)` to set the UART used.)
 
 By default all loggers use `default_output_stdout` as their only sink.
 
 You can of course use your own custom output (e.g. to log to an SD card).
 
-## Redirecting stdout
+## Redirecting stdout and stderr
 
-You can redirect your logs to many different sinks but the default sink (`stdout`) itself can be redirected.
-Use one of the `STM32T_SYS_WRITE_XXX` macros to redirect `stdout`.
-
-### Available macros:
-
-- `STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD)`: Bit-banged UART
-- `STM32T_SYS_WRITE_ITM`
-- `STM32T_SYS_WRITE_UART(PHUART)`
-- `STM32T_SYS_WRITE_UART_DMA(PHUART)`
-- `STM32T_SYS_WRITE_USB`: USB VCP
-- `STM32T_SYS_WRITE_DYN`: Dynamically redirected (`STM32T::Log::RedirectStdout()`)
+You can redirect your logs to many different sinks including `stdout`. `stdout` and `stderr` themselves can be redirected.
+Use the `STM32T_SYS_WRITE` macro as well as the `AddHandler(...)` and `RemoveHandler(...)` functions in `STM32T::Stdout` and `STM32T::Stderr`.
 
 ---
 

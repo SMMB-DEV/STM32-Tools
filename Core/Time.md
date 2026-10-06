@@ -1,3 +1,7 @@
+##### [Go Back](./README.md)
+
+---
+
 # Time.hpp
 
 This file contains timing utilities and introduces the `STM32T::Time` namespace.
@@ -11,7 +15,7 @@ The module also has functions for working with the conventional tick provided by
 
 ### Features:
 
-- Conversion between cycles and ms, μs, and ns.
+- Conversion between CPU cycles and ms, μs, and ns.
 - Delay functions
 - Checking if a certain amount of time has passed since a specific cycle or tick.
 - Add or subtract an amount of time to a pair of `RTC_DateTypeDef` and `RTC_TimeTypeDef`

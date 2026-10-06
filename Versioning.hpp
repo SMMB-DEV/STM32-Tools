@@ -343,6 +343,6 @@ namespace STM32T
 		}
 	};
 	
-	// todo: check what needs to be removed (deprecated) for each version.
+	// todo: Check what needs to be removed (deprecated) for each version. Search for "vx.y.z". Also update README.md.
 	constexpr Version VER(0, 3, 2, Version::Normal);	// Current version of the framework
 }

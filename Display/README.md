@@ -1,3 +1,7 @@
+##### [Go Back](../README.md)
+
+---
+
 # Display Module
 
 This module contains headers for using different types of display (currently only alphanumeric and simple graphical LCDs).

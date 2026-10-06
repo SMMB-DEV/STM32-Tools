@@ -1,3 +1,7 @@
+##### [Go Back](./README.md)
+
+---
+
 # Simplified Semantic Versioning 1.0.0
 
 This versioning scheme is mostly identical to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) with limited major, minor, and patch versions (each max. 255) and fewer and more strict [pre-release identifiers](https://semver.org/spec/v2.0.0.html#spec-item-9). [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10) cannot be displayed using this format.

@@ -1,3 +1,7 @@
+##### [Go Back](../README.md)
+
+---
+
 # Core Module
 
 The Core module contains core utilities and header files that are not dependent on other modules or headers in this framework.

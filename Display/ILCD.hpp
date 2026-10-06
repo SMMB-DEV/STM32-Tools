@@ -103,7 +103,7 @@ namespace STM32T
 			return PutStrCtr(field_width, {buf, size_t(len)});
 		}
 		
-		[[deprecated("Use PutStrCtr() instead.")]]
+		[[deprecated("Use PutStrCtr() instead. Will be removed in v0.4.0")]]
 		ILCD& PutStrMid(const strv str, const size_t field_width)
 		{
 			return PutStrCtr(field_width, str);
