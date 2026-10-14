@@ -67,7 +67,7 @@ namespace STM32T
 				return std::nullopt;
 			
 			// Data: 16 bits humidity + 16 bits temperature + 8 bits parity
-			shared_arr<int16_t> humidity, temperature;
+			SharedArray<int16_t> humidity, temperature;
 			uint8_t parity;
 			
 			if (!ReceiveByte(humidity.arr + 1) || !ReceiveByte(humidity.arr + 0) || !ReceiveByte(temperature.arr + 1) || !ReceiveByte(temperature.arr + 0) || !ReceiveByte(&parity))

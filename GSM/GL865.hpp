@@ -397,15 +397,9 @@ namespace STM32T
 			return ReceiveOK(m_ftpSockTimeout, CommandType::Write, "#FTPPUT"sv, "\"%.*s\",1", args.length(), args.data());
 		}
 		
-		int32_t FTPGetO(strv file, const std::function<void (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
+		int32_t FTPGetO(strv file, const std::function<ErrorCode (strv chunk, size_t handled_before)>& chunk_handler, const uint32_t dl_to)
 		{
-			return ReceiveOnline(m_ftpSockTimeout, dl_to, CommandType::Write, "#FTPGET"sv, [&](strv chunk, size_t handled) -> ErrorCode
-			{
-				if (chunk_handler)
-					chunk_handler(chunk, handled);
-				
-				return OK;
-			}, "\"%.*s\"", file.size(), file.data());
+			return ReceiveOnline(m_ftpSockTimeout, dl_to, CommandType::Write, "#FTPGET"sv, chunk_handler, "\"%.*s\"", file.size(), file.data());
 		}
 		
 		ErrorCode FTPType(bool ascii)
