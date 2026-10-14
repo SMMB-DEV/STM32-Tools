@@ -9,7 +9,11 @@ namespace STM32T
 {
 	class HD44780 : public ILCD
 	{
-		static constexpr Time::us_time_t DEFAULT_TIMEOUT_US = 80;	// 37 * 270 / 125
+		static constexpr uint32_t FREQ_DEFAULT = 270, FREQ_MIN = 125;
+		static constexpr Time::us_time_t
+			DEFAULT_EXEC_TIME_US = 37,
+			DEFAULT_TIMEOUT_US = ceil(DEFAULT_EXEC_TIME_US * FREQ_DEFAULT, FREQ_MIN),
+			DEFAULT_ADDR_TIMEOUT_US = 1500 / FREQ_MIN;
 		
 		uint8_t (* const cf_rw)(bool rw, bool rs, uint8_t data);
 		uint8_t m_addr = 0;
@@ -59,7 +63,7 @@ namespace STM32T
 			return true;
 		}
 		
-		bool AddressWait(const uint8_t expectedAddr, Time::us_time_t timeout_us = 12)	// 1.5 / 125k
+		bool AddressWait(const uint8_t expectedAddr, Time::us_time_t timeout_us = DEFAULT_ADDR_TIMEOUT_US)
 		{
 			Time::cycle_t start = Time::GetCycle();
 			
@@ -98,9 +102,8 @@ namespace STM32T
 		*				The E pin must also be cycled according to the datasheet.
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
-		* @deprecated
 		*/
-		[[deprecated]]
+		[[deprecated("Will be removed in v0.4.0.")]]
 		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const line_t line_count, const uint8_t col_count, bool _4_bit = true)
 			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
 		
@@ -141,8 +144,8 @@ namespace STM32T
 		
 		HD44780& Clear()
 		{
-			Write(0, 0b0000'0001, 4260);	// Display clear
-			AddressWait(0, 1000);			// todo: Adjust according to a valid datasheet.
+			Write(0, 0b0000'0001, ceil((37 * 80 + 1520) * FREQ_DEFAULT, FREQ_MIN));		// Display clear - todo: Determine the actual timeout.
+			AddressWait(0, 1000);	// todo: Adjust according to a valid datasheet. The default (1.5 clock cycles) doesn't seem to be working.
 			
 			return *this;
 		}

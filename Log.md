@@ -8,6 +8,12 @@ Include "Log.h" to use the logging module. You can use the `Logger` class to cre
 
 Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks). They also support printf-style formatting (+ `"b"`/`"B"` for binary formatting).
 
+The output format of loggers is currently fixed:
+
+```log
+[Timestamp][Level][Module name (if present)]: Log message
+```
+
 ## Dynamic logger
 
 A dynamic logger is simply an object of type `Logger`. The attributes of this logger (level, name, etc.) can be modified during runtime.
@@ -79,8 +85,14 @@ You can of course use your own custom output (e.g. to log to an SD card).
 
 ## Redirecting stdout and stderr
 
-You can redirect your logs to many different sinks including `stdout`. `stdout` and `stderr` themselves can be redirected.
+You can redirect your logs to many different sinks including `stdout`. `stdout` and `stderr`
+can also be independently redirected to multiple sinks (except `stdout` itself).
 Use the `STM32T_SYS_WRITE` macro as well as the `AddHandler(...)` and `RemoveHandler(...)` functions in `STM32T::Stdout` and `STM32T::Stderr`.
+
+Other libraries and frameworks might simply use `printf(...)` for logging. Or for example,
+the `<cassert>` library writes an error message to `stderr` when an assert fails.
+This way you can redirect logs and error messages from other libraries to the same (non-`stdout`) sinks as your normal logs.
+Otherwise they will be handled separately by your default `stdout` handler.
 
 ---
 

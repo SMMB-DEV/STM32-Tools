@@ -302,6 +302,9 @@ namespace STM32T
 	{
 		RCC_ClkInitTypeDef rcc =
 		{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++23-extensions"
+
 #ifdef STM32F4
 			.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
 			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
@@ -316,6 +319,8 @@ namespace STM32T
 #else
 #error "Clock configuration code not available for this family!"
 #endif
+
+#pragma GCC diagnostic pop
 		};
 		
 		// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
@@ -349,7 +354,7 @@ namespace STM32T
 	};
 	
 	template <class T>
-	using shared_arr [[deprecated("Use SharedArray<T> instead.")]] = SharedArray<T>;
+	using shared_arr [[deprecated("Use SharedArray<T> instead. Will bre removed in v0.5.0.")]] = SharedArray<T>;
 	
 	class ScopeAction
 	{

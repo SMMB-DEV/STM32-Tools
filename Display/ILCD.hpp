@@ -51,7 +51,7 @@ namespace STM32T
 			return *this;
 		}
 		
-		[[deprecated("Use PutStr().")]]
+		[[deprecated("Use PutStr(). Will be removed in v0.4.0")]]
 		ILCD& PutStrn(const char* str, size_t n)
 		{
 			return PutStr(n, str);

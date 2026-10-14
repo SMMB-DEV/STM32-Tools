@@ -12,31 +12,31 @@
 
 // [[deprecated]]
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
-static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect." \
+static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect. It will be removed in v0.5.0." \
 	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
 
 // [[deprecated]]
 #define STM32T_SYS_WRITE_ITM \
-static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect." \
+static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect. It will be removed in v0.5.0." \
 	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_itm).");
 
 // [[deprecated]]
 #define STM32T_SYS_WRITE_UART(PHUART) \
-static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect." \
+static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect. It will be removed in v0.5.0." \
 	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
 
 // [[deprecated]]
 #define STM32T_SYS_WRITE_UART_DMA(PHUART) \
-static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect." \
+static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect. It will be removed in v0.5.0." \
 	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
 
 // [[deprecated]]
 #define STM32T_SYS_WRITE_USB \
-static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect." \
+static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect. It will be removed in v0.5.0." \
 	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_vcp).");
 
 // [[deprecated]]
-#define STM32T_LOG_SYS_WRITE	static_assert(0, "Use STM32T_SYS_WRITE.");
+#define STM32T_LOG_SYS_WRITE	static_assert(0, "STM32T_LOG_SYS_WRITE is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T_SYS_WRITE.");
 
 
 
@@ -253,11 +253,10 @@ namespace STM32T::Log
 	
 	inline void default_output_uart_dma(strv data, bool last_chunk)
 	{
-		static Buffer<1024, 2> s_buf;
-		
-		
 		if (!_g_huart)
 			return;
+		
+		static Buffer<1024, 2> s_buf;
 		
 		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
 		{
@@ -841,11 +840,15 @@ namespace STM32T::Log
 			LOG_N<level, logger>("\nSTM32T v%.*s\n", ver.size(), ver.data());
 			
 			const uint32_t version = HAL_GetHalVersion();	// major.minor.patch-rc
+			const uint8_t major = version >> 24, minor = (version >> 16) & 0xFF, patch = (version >> 8) & 0xFF, rc = version & 0xFF;
 			
-			LOG_N<level, logger>("HAL v%hhu.%hhu.%hhu-rc%hhu\nRevID: 0x%04X, DevID: 0x%03X, UID: 0x%08X%08X%08X\nHCLK: %.1f MHz\n",
-				version >> 24, (version >> 16) & 0xFF, (version >> 8) & 0xFF, version & 0xFF,
-				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(),
-				HAL_RCC_GetHCLKFreq() / 1'000'000.0f);
+			if (rc)
+				LOG_N<level, logger>("HAL v%hhu.%hhu.%hhu-rc%hhu\n", major, minor, patch, rc);
+			else
+				LOG_N<level, logger>("HAL v%hhu.%hhu.%hhu\n", major, minor, patch);
+			
+			LOG_N<level, logger>("RevID: 0x%04X, DevID: 0x%03X, UID: 0x%08X%08X%08X\nHCLK: %.1f MHz\n",
+				HAL_GetREVID(), HAL_GetDEVID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(), HAL_RCC_GetHCLKFreq() / 1'000'000.0);
 			
 			LOG_N<level, logger>("Cause of reset: %s\n\n", GetResetCause());
 		}

@@ -19,7 +19,7 @@ namespace STM32T
 		const char *c_name;
 		
 		Runnable(callable_t callable, uint32_t interval, uint32_t last_time, bool repeat, const char *name)
-			: p_callable(callable), c_interval(interval), m_lastTime(last_time), c_repeat(repeat), c_name(name) {}
+			: p_callable(callable), c_interval(interval), m_lastTime(last_time), c_repeat(repeat), c_name(name ? name : "") {}
 		
 		#ifdef STM32T_LOG_RUNNABLE
 		static constexpr Log::Logger LG = Log::g_defaultLogger.Clone(std::min(Log::Level::Debug, Log::g_defaultLogger.level), "Runnable"sv);
@@ -46,7 +46,7 @@ namespace STM32T
 			Do(callable, nullptr, delay);
 		}
 		
-		[[deprecated("Use Do().")]]
+		[[deprecated("Use Do(). Will be removed in v0.4.0.")]]
 		static void DoAfter(callable_t callable, uint32_t interval)
 		{
 			s_list.push_back({callable, interval, HAL_GetTick(), false, nullptr});
@@ -124,7 +124,7 @@ namespace STM32T
 				const auto &item = s_list[s_lastIndex];
 				if (const uint32_t now  = HAL_GetTick(); now - item.m_lastTime >= item.c_interval)
 				{
-					Log::LOG_D<LG>("now: %10u, last: %10u, interval: %8u, name: %s", now, item.m_lastTime, item.c_interval, item.c_name ? item.c_name : "");
+					Log::LOG_D<LG>("now: %10u, last: %10u, interval: %8u, name: %s", now, item.m_lastTime, item.c_interval, item.c_name);
 					
 					item.p_callable();
 					
