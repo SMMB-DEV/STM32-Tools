@@ -271,18 +271,26 @@ namespace STM32T::Log
 	
 	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 	
-	template <size_t TIMEOUT = 100>
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
 		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
 		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
 		{
-			const uint32_t start = HAL_GetTick();
+			const USBD_CDC_HandleTypeDef *const hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
 			
-			while ((hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)// || hUsbDeviceFS.dev_state == USBD_STATE_SUSPENDED)
+			uint32_t start = HAL_GetTick();
+			while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED
+				&& hcdc->TxState
+				&& HAL_GetTick() - start < 10);
+			
+			if (hcdc->TxState)
+				return;
+			
+			start = HAL_GetTick();
+			while (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED
 				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
-				&& HAL_GetTick() - start < TIMEOUT);
+				&& HAL_GetTick() - start < 10);
 		});
 	}
 	#endif	// __has_include("usbd_cdc_if.h")
