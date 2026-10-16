@@ -247,7 +247,7 @@ namespace STM32T
 			// swap odd and even bits
 			v = ((v >> 1) & 0x5555'5555) | ((v & 0x5555'5555) << 1);
 		}
-		else if (sizeof(T) == 8)
+		else if constexpr (sizeof(T) == 8)
 		{
 			// swap 4-byte long pairs
 			v = (v >> 32) | (v << 32);

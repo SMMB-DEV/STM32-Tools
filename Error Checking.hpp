@@ -8,25 +8,74 @@
 namespace STM32T
 {
 	/**
-	* @param TYPE - The integer type used for calculating CRC. Determines the size of the CRC.
+	* @param T - The integer type used for calculating CRC. Determines the size of the CRC.
 	* @param table - Must have 256 values.
 	* @note Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
 	*/
-	template <typename TYPE>
-	inline TYPE CRCx(const uint8_t * const data, const size_t len, const TYPE *table, TYPE crc_init = 0)
+	template <typename T>
+	inline T TableCRC(const uint8_t *const data, const size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
 	{
-		static_assert(is_int_v<TYPE>);
+		static_assert(is_int_v<T>);
 		
 		for (size_t i = 0; i < len; i++)
 		{
-			const uint8_t pos = (crc_init >> (sizeof(TYPE) - 1) * 8) ^ data[i];
+			const uint8_t curByte = (inputReflected ? reverse(data[i]) : data[i]);
+			const uint8_t pos = (crc_init >> (sizeof(T) - 1) * 8) ^ curByte;
 			
-			if constexpr (sizeof(TYPE) > 1)
+			if constexpr (sizeof(T) > 1)
 				crc_init = (crc_init << 8) ^ table[pos];
 			else
 				crc_init = table[pos];
 		}
 
+		return crc_init;
+	}
+	
+	template <typename T>
+	[[deprecated("Use TableCRC() instead. Will be removed in v0.5.0.")]]
+	inline T CRCx(const uint8_t *const data, const size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
+	{
+		return TableCRC<T>(data, len, table, crc_init, inputReflected);
+	}
+	
+	/**
+	* Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch43
+	*/
+	template <typename T, uint8_t WIDTH = sizeof(T) * 8>
+	inline T SimpleCRC(const uint8_t *const data, const size_t len, T poly, T crc_init = 0, const bool inputReflected = false)
+	{
+		static_assert(is_int_v<T>);
+		static_assert(WIDTH <= sizeof(T) * 8 && WIDTH > (sizeof(T) - 1) * 8);
+		
+		constexpr uint8_t
+			bitsToShift = (WIDTH >= 8) ? WIDTH - 8 : 0,	// example CRC-11: 3
+			bitOffsetTo8 = (WIDTH < 8) ? 8 - WIDTH : 0;
+		
+		constexpr T
+			bitmask = (WIDTH >= 8) ? 1 << (WIDTH - 1) : 0x80,		// example CRC-11: 0x0400
+			finalmask = (WIDTH >= 8) ? (1 << WIDTH) - 1 : 0xFF;		// example CRC-11: 0x07FF
+		
+		poly <<= bitOffsetTo8;
+		crc_init <<= bitOffsetTo8;
+		
+		for (size_t i = 0; i < len; ++i)
+		{
+			const uint8_t curByte = inputReflected ? reverse(data[i]) : data[i];
+			crc_init ^= curByte << bitsToShift;		// move byte into MSB of CRC
+			
+			for (int j = 0; j < 8; ++j)
+			{
+				if (crc_init & bitmask)
+					crc_init = (crc_init << 1) ^ poly;
+				else
+					crc_init <<= 1;
+			}
+			
+			crc_init &= finalmask;
+		}
+		
+		crc_init >>= bitOffsetTo8;
+		
 		return crc_init;
 	}
 }
@@ -36,6 +85,7 @@ namespace STM32T::HC
 	// todo: Optimize for 32-bit calculations.
 	// todo: Move helper functions to a .cpp file so that they're not accessible.
 	
+	// todo: remove this table
 	static constexpr inline uint32_t POW_2[24] =
 	{
 		1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7,

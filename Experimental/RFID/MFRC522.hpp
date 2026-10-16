@@ -2,6 +2,7 @@
 
 #include "../../IO.hpp"
 #include "../../Core/strv.hpp"
+#include "../../Error Checking.hpp"
 
 #include <optional>
 
@@ -256,7 +257,7 @@ namespace STM32T
 		* @param result - Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
 		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
-		Status PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
+		/*Status PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
 		{
 			Command(Cmd::Idle);						// Stop any active command.
 			Write(Reg::DivIrq, 0x04);				// Clear the CRCIRq interrupt request bit
@@ -286,6 +287,15 @@ namespace STM32T
 
 			// 89ms passed and nothing happened. Communication with the MFRC522 might be down.
 			return Status::TIMEOUT;
+		}*/
+		
+		/**
+		* @param result - Must be at least 2 bytes long.
+		*/
+		Status CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
+		{
+			unpack_le(result, reverse(SimpleCRC<uint16_t>(data, length, 0x1021, 0xC6C6, true)));
+			return Status::OK;
 		}
 		
 		/**
@@ -385,7 +395,7 @@ namespace STM32T
 				
 				// Verify CRC_A - do our own calculation and store the control in controlBuffer.
 				uint8_t controlBuffer[2];
-				Status status = PCD_CalculateCRC(&backData[0], *backLen - 2, &controlBuffer[0]);
+				Status status = CalculateCRC(&backData[0], *backLen - 2, &controlBuffer[0]);
 				if (status != Status::OK)
 					return status;
 				
@@ -572,7 +582,7 @@ namespace STM32T
 						// Calculate BCC - Block Check Character
 						buffer[6] = buffer[2] ^ buffer[3] ^ buffer[4] ^ buffer[5];
 						// Calculate CRC_A
-						result = PCD_CalculateCRC(buffer, 7, &buffer[7]);
+						result = CalculateCRC(buffer, 7, &buffer[7]);
 						if (result != Status::OK)
 							return result;
 						
@@ -647,7 +657,7 @@ namespace STM32T
 					return Status::ERROR;
 				
 				// Verify CRC_A - do our own calculation and store the control in buffer[2..3] - those bytes are not needed anymore.
-				result = PCD_CalculateCRC(responseBuffer, 1, &buffer[2]);
+				result = CalculateCRC(responseBuffer, 1, &buffer[2]);
 				if (result != Status::OK)
 					return result;
 				
