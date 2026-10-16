@@ -1,6 +1,11 @@
 #pragma once
 
 #include "../../IO.hpp"
+#include "../../Core/strv.hpp"
+
+#include <optional>
+
+
 
 namespace STM32T
 {
@@ -11,14 +16,38 @@ namespace STM32T
 	*/
 	class MFRC522
 	{
+		static constexpr uint8_t
+			b1 = 0b0000'0001, b2 = 0b0000'0010, b3 = 0b0000'0100, b4 = 0b0000'1000, b5 = 0b0001'0000, b6 = 0b0010'0000, b7 = 0b0100'0000, b8 = 0b1000'0000;
+		
 		// todo: adjust all SPI timeouts
 	public:
-		struct UID
+		enum class Type : uint8_t
+		{
+			UNKNOWN,
+			INCOMPLETE,
+			MF_CL_2K,
+			MF_CL_1K_SMX,
+			MF_CL_4K_SMX,
+			MF_PL_2K_SL2,
+			MF_PL_4K_SL2,
+			MF_MINI,
+			TNP,					// TagNPlay (TNP3xxx)
+		};
+		
+		struct PICC
 		{
 			uint8_t
-				size,		// Number of bytes in the UID. 4, 7 or 10.
-				id[10],
-				sak;		// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
+				sak = b3,	// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
+				idLen = 0,	// Number of bytes in the UID. 4, 7 or 10.
+				id[10];
+			
+			bool operator==(const PICC &other)
+			{
+				return sak == other.sak && idLen == other.idLen && memcmp(id, other.id, idLen) == 0;
+			}
+			
+			bool operator!=(const PICC &other) { return !operator==(other); }
+			constexpr bool isISO_14443_4() const { return sak & b6; }
 		};
 		
 	private:
@@ -85,8 +114,8 @@ namespace STM32T
 			MIFARE_NACK		= 0xff	// A MIFARE PICC responded with NAK.
 		};
 		
-		uint8_t Addr4Read(const Reg reg) { return static_cast<uint8_t>(0b1000'0000 | (static_cast<uint8_t>(reg) << 1)); }
-		uint8_t Addr4Write(const Reg reg) { return static_cast<uint8_t>(reg) << 1; }
+		static constexpr uint8_t Addr4Read(const Reg reg) { return static_cast<uint8_t>(0b1000'0000 | (static_cast<uint8_t>(reg) << 1)); }
+		static constexpr uint8_t Addr4Write(const Reg reg) { return static_cast<uint8_t>(reg) << 1; }
 		
 		uint8_t Read(const Reg reg)
 		{
@@ -382,35 +411,23 @@ namespace STM32T
 		* Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
 		* 
 		* @param command - The command to send - PICC_CMD_REQA or PICC_CMD_WUPA
-		* @return STATUS_OK on success, STATUS_??? otherwise.
+		* @return A pair of {STATUS_OK on success, STATUS_??? otherwise, The ATQA returned or 0 in case of error}.
 		*/
-		Status PICC_REQA_or_WUPA(uint8_t command)
+		std::pair<Status, uint16_t> PICC_REQA_or_WUPA(uint8_t command)
 		{
-			uint8_t bufferATQA[2];
-			uint8_t bufferSize = sizeof(bufferATQA);
+			uint16_t atqa;
+			uint8_t bufferSize = sizeof(atqa);
 			
 			ClearBits(Reg::Coll, 0x80);					// ValuesAfterColl=1 => Bits received after collision are cleared.
 			uint8_t validBits = 7;						// For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte. TxLastBits = BitFramingReg[2..0]
-			Status status = PCD_TransceiveData(&command, 1, bufferATQA, &bufferSize, &validBits);
+			const Status status = PCD_TransceiveData(&command, 1, reinterpret_cast<uint8_t *>(&atqa), &bufferSize, &validBits);
 			if (status != Status::OK)
-				return status;
+				return std::make_pair(status, 0);
 			
 			if (bufferSize != 2 || validBits != 0)		// ATQA must be exactly 16 bits.
-				return Status::ERROR;
+				return std::make_pair(Status::ERROR, 0);
 			
-			return Status::OK;
-		}
-		
-		
-		/**
-		* Transmits a REQuest command, Type A. Invites PICCs in state IDLE to go to READY and prepare for anticollision or selection. 7 bit frame.
-		* Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
-		* 
-		* @return STATUS_OK on success, STATUS_??? otherwise.
-		*/
-		Status PICC_REQA()
-		{
-			return PICC_REQA_or_WUPA(CmdPICC::REQA);
+			return std::make_pair(Status::OK, atqa);
 		}
 		
 		/**
@@ -432,7 +449,7 @@ namespace STM32T
 		* @param validBits	- The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
 		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
-		Status PICC_Select(UID *uid, uint8_t validBits = 0)
+		Status PICC_Select(PICC *uid, uint8_t validBits = 0)
 		{
 			bool uidComplete, selectDone, useCascadeTag;
 			uint8_t cascadeLevel = 1;
@@ -487,13 +504,13 @@ namespace STM32T
 					case 1:
 						buffer[0] = CmdPICC::SEL_CL1;
 						uidIndex = 0;
-						useCascadeTag = validBits && uid->size > 4;	// When we know that the UID has more than 4 bytes
+						useCascadeTag = validBits && uid->idLen > 4;	// When we know that the UID has more than 4 bytes
 						break;
 					
 					case 2:
 						buffer[0] = CmdPICC::SEL_CL2;
 						uidIndex = 3;
-						useCascadeTag = validBits && uid->size > 7;	// When we know that the UID has more than 7 bytes
+						useCascadeTag = validBits && uid->idLen > 7;	// When we know that the UID has more than 7 bytes
 						break;
 					
 					case 3:
@@ -636,7 +653,7 @@ namespace STM32T
 			} // End of while (!uidComplete)
 			
 			// Set correct uid->size
-			uid->size = 3 * cascadeLevel + 1;
+			uid->idLen = 3 * cascadeLevel + 1;
 
 			return Status::OK;
 		}
@@ -692,23 +709,94 @@ namespace STM32T
 			return Read(Reg::Version);
 		}
 		
-		bool IsIdlePICC()
+		/**
+		* @retval The ATQA if there are any new (IDLE state) PICCs in the field.
+		*/
+		std::optional<uint16_t> IsIdlePICC()
 		{
 			// Reset baud rates
 			Write(Reg::TxMode, 0);
 			Write(Reg::RxMode, 0);
 			// Reset ModWidthReg
 			Write(Reg::ModWidth, 0x26);
-
-			Status result = PICC_REQA();
-			return (result == Status::OK || result == Status::COLLISION);
+			
+			const auto [stat, atqa] = PICC_REQA_or_WUPA(CmdPICC::REQA);
+			return (stat == Status::OK || stat == Status::COLLISION) ? std::make_optional(atqa) : std::nullopt;
 		}
 		
-		UID SelectPICC()
+		PICC SelectPICC()
 		{
-			UID uid;
+			PICC picc;
+			return PICC_Select(&picc) == Status::OK ? picc : PICC{};
+		}
+		
+		/**
+		* Based on NXP AN10833 Fig. 1.
+		* 
+		* @note The type of the PICC is determined partly based on the SAK returned after selecting it.
+		*	The SAK contains proprietary information and the actual type of the PICC cannot be guaranteed in some cases.
+		*/
+		Type GetType(const PICC &picc)
+		{
+			const auto sak = picc.sak;
 			
-			return PICC_Select(&uid) == Status::OK ? uid : UID{.size = 0};
+			if (sak & b3 || !picc.idLen)
+				return Type::INCOMPLETE;
+			
+			if (sak & b2)
+				return Type::UNKNOWN;	// non-MIFARE
+			
+			if (sak & b4)							// 0bxxxx'100x
+			{
+				if (sak & b5)						// 0bxxx1'100x
+				{
+					if (sak & b1)					// 0bxxx1'1001
+						return Type::MF_CL_2K;
+					else							// 0bxxx1'1000
+					{
+						if (sak & b6)				// 0bxx11'1000
+							return Type::MF_CL_4K_SMX;
+						else						// 0bxx01'1000
+							return Type::UNKNOWN;	// todo: RATS
+					}
+				}
+				else								// 0bxxx0'100x
+				{
+					if (sak & b1)					// 0bxxx0'1001
+						return Type::MF_MINI;
+					else							// 0bxxx0'1000
+					{
+						if (sak & b6)				// 0bxx10'1000
+							return Type::MF_CL_1K_SMX;
+						else						// 0bxx00'1000 
+							return Type::UNKNOWN;	// todo: RATS
+					}
+				}
+			}
+			else									// 0bxxxx'000x
+			{
+				if (sak & b5)						// 0bxxx1'000x
+				{
+					if (sak & b1)					// 0bxxx1'0001
+						return Type::MF_PL_4K_SL2;
+					else							// 0bxxx1'0000
+						return Type::MF_PL_2K_SL2;
+				}
+				else								// 0bxxx0'000x
+				{
+					if (sak & b1)					// 0bxxx0'0001
+						return Type::TNP;
+					else							// 0bxxx0'0000
+					{
+						if (sak & b6)				// 0bxx10'0000
+							return Type::UNKNOWN;	// todo: RATS
+						else
+							return Type::UNKNOWN;	// todo: GetVersion L3
+					}
+				}
+			}
+			
+			return Type::UNKNOWN;
 		}
 	};
 }
