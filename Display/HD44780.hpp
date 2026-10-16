@@ -221,7 +221,7 @@ namespace STM32T
 		void Test() override
 		{
 			Clear();
-			PutStr("123456789O123456""1234");
+			PutStr("123456789O123456" "1234");
 			HAL_Delay(2000);
 			
 			Clear();
