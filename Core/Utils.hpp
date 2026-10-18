@@ -1533,7 +1533,7 @@ namespace STM32T
 	#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
 	
 	template<typename T>
-	inline T pack_be(const void *buf)
+	constexpr T pack_be(const void *buf)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -1550,7 +1550,7 @@ namespace STM32T
 	}
 	
 	template<typename T>
-	inline T pack_le(const void *buf)
+	constexpr T pack_le(const void *buf)
 	{
 		static_assert(is_int_v<T>);
 		

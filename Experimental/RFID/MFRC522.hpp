@@ -29,9 +29,13 @@ namespace STM32T
 			MF_CL_2K,
 			MF_CL_1K_SMX,
 			MF_CL_4K_SMX,
+			MF_UL_EV1,
+			MF_UL_AES,
 			MF_PL_2K_SL2,
 			MF_PL_4K_SL2,
 			MF_MINI,
+			NTAG2xx,
+			NTAG_I2C_PL,
 			TNP,					// TagNPlay (TNP3xxx)
 		};
 		
@@ -58,6 +62,11 @@ namespace STM32T
 			
 			bool operator!=(const PICC &other) { return !operator==(other); }
 			constexpr bool isISO_14443_4() const { return sak & b6; }
+		};
+		
+		struct VersionInfo
+		{
+			uint8_t productType, productSubType, majorProductVersion, minorProductVersion, storageSize;
 		};
 		
 	private:
@@ -189,7 +198,7 @@ namespace STM32T
 			m_cs.Set();
 		}
 		
-		void Write(const Reg reg, uint8_t *const vals, const size_t count)
+		void Write(const Reg reg, const uint8_t *const vals, const size_t count)
 		{
 			uint8_t addr = Addr4Write(reg);
 			
@@ -292,7 +301,7 @@ namespace STM32T
 		/**
 		* @param result - Must be at least 2 bytes long.
 		*/
-		Status CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
+		static constexpr Status CalculateCRC(const uint8_t *const data, const uint8_t length, uint8_t *result)
 		{
 			unpack_le(result, reverse(SimpleCRC<uint16_t>(data, length, 0x1021, 0xC6C6, true)));
 			return Status::OK;
@@ -313,7 +322,7 @@ namespace STM32T
 		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
 		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
-		Status PCD_CommunicateWithPICC(Cmd command, uint8_t waitIRq, uint8_t *sendData, uint8_t sendLen,
+		Status PCD_CommunicateWithPICC(Cmd command, uint8_t waitIRq, const uint8_t *sendData, uint8_t sendLen,
 			uint8_t *backData, uint8_t *backLen, uint8_t *validBits, uint8_t rxAlign, bool checkCRC)		
 		{
 			// Prepare values for BitFramingReg
@@ -419,7 +428,7 @@ namespace STM32T
 		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
 		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
-		Status PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen,
+		Status PCD_TransceiveData(const uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen,
 			uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false)
 		{
 			uint8_t waitIRq = 0x30;		// RxIRq and IdleIRq
@@ -433,21 +442,20 @@ namespace STM32T
 		* @param command - The command to send - PICC_CMD_REQA or PICC_CMD_WUPA
 		* @return A pair of {STATUS_OK on success, STATUS_??? otherwise, The ATQA returned or 0 in case of error}.
 		*/
-		std::pair<Status, uint16_t> PICC_REQA_or_WUPA(uint8_t command)
+		Status PICC_REQA_or_WUPA(uint8_t command, uint16_t *atqa)
 		{
-			uint16_t atqa;
-			uint8_t bufferSize = sizeof(atqa);
+			uint8_t bufferSize = sizeof(*atqa);
 			
 			ClearBits(Reg::Coll, 0x80);					// ValuesAfterColl=1 => Bits received after collision are cleared.
 			uint8_t validBits = 7;						// For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte. TxLastBits = BitFramingReg[2..0]
 			const Status status = PCD_TransceiveData(&command, 1, reinterpret_cast<uint8_t *>(&atqa), &bufferSize, &validBits);
 			if (status != Status::OK)
-				return std::make_pair(status, 0);
+				return status;
 			
 			if (bufferSize != 2 || validBits != 0)		// ATQA must be exactly 16 bits.
-				return std::make_pair(Status::ERROR, 0);
+				return Status::ERROR;
 			
-			return std::make_pair(Status::OK, atqa);
+			return Status::OK;
 		}
 		
 		/**
@@ -679,6 +687,23 @@ namespace STM32T
 			return Status::OK;
 		}
 		
+		Status NXP_GET_VERSION_L3(VersionInfo *info)
+		{
+			constexpr uint8_t cmd[3] = { 0x60, 0xF8, 0x32 };
+			
+			uint8_t resp[10], respLen = sizeof(resp);
+			
+			if (const Status stat = PCD_TransceiveData(cmd, sizeof(cmd), resp, &respLen, nullptr, 0, true); stat != Status::OK)
+				return stat;
+			
+			if (respLen != sizeof(resp) || resp[0] != 0x0 || resp[1] != 0x4 || resp[7] != 0x3)
+				return Status::ERROR;
+			
+			memcpy(info, resp + 2, sizeof(*info));
+			
+			return Status::OK;
+		}
+		
 	public:
 		static constexpr size_t SELF_TEST_RESULT_SIZE = 64;
 		
@@ -741,14 +766,15 @@ namespace STM32T
 			// Reset ModWidthReg
 			Write(Reg::ModWidth, 0x26);
 			
-			const auto [stat, atqa] = PICC_REQA_or_WUPA(CmdPICC::REQA);
+			uint16_t atqa;
+			const Status stat = PICC_REQA_or_WUPA(CmdPICC::REQA, &atqa);
 			return (stat == Status::OK || stat == Status::COLLISION) ? std::make_optional(atqa) : std::nullopt;
 		}
 		
-		PICC SelectPICC()
+		std::optional<PICC> SelectPICC()
 		{
 			PICC picc;
-			return PICC_Select(&picc) == Status::OK ? picc : PICC{};
+			return PICC_Select(&picc) == Status::OK ? std::make_optional(std::move(picc)) : std::nullopt;
 		}
 		
 		/**
@@ -812,7 +838,41 @@ namespace STM32T
 						if (sak & b6)				// 0bxx10'0000
 							return Type::UNKNOWN;	// todo: RATS
 						else
-							return Type::UNKNOWN;	// todo: GetVersion L3
+						{
+							VersionInfo info;
+							if (NXP_GET_VERSION_L3(&info) != Status::OK)
+							{
+								return Type::UNKNOWN;	// todo: Auth L3
+							}
+							else
+							{
+								switch (info.productType)
+								{
+									case 0x03:
+									{
+										switch (info.majorProductVersion)
+										{
+											case 0x01:	return Type::MF_UL_EV1;
+											case 0x04:	return Type::MF_UL_AES;
+											default:	return Type::UNKNOWN;
+										}
+									}
+									
+									case 0x04:
+									{
+										switch (info.productSubType)
+										{
+											case 0x02:	return Type::NTAG2xx;
+											case 0x05:	return Type::NTAG_I2C_PL;
+											default:	return Type::UNKNOWN;
+										}
+									}
+									
+									default:
+										return Type::UNKNOWN;
+								}
+							}
+						}
 					}
 				}
 			}
