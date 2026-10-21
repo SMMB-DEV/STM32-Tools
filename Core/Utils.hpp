@@ -74,15 +74,15 @@ namespace STM32T
 		return s_buf;
 	}
 	
-	inline constexpr char H2C(uint8_t x)
+	constexpr char H2C(const uint8_t x)
 	{
-		constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+		static constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 		
 		return CHARS[x & 0x0F];
 	}
 	
 	template <typename T>
-	inline constexpr void H2C(T val, char *buf)
+	constexpr void H2C(const T val, char *const buf)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -91,7 +91,7 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr void H2C(T *conv, size_t conv_count, char *buf)
+	constexpr void H2C(const T *conv, size_t conv_count, char *buf)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -102,9 +102,13 @@ namespace STM32T
 		}
 	}
 	
-	inline constexpr uint8_t C2H(char ch)
+	/**
+	* Converts a hexadecimal character (0-9, A-F, a-f) to a number.
+	* @retval A number in the range [0, 15] or 0xFF for invalid characters.
+	*/
+	constexpr uint8_t C2H(const uint8_t ch)
 	{
-		constexpr uint8_t HEX[256] =
+		static constexpr uint8_t HEX[256] =
 		{
 			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  15
 			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  31
@@ -128,8 +132,12 @@ namespace STM32T
 		return HEX[ch];
 	}
 	
+	/**
+	* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to a number consuming at most `sizeof(T) * 2` characters.
+	* @retval The converted value or std::nullopt in case an invalid character is found.
+	*/
 	template <typename T>
-	inline constexpr std::optional<T> C2H(const char *str)
+	constexpr std::optional<T> C2H(const char *str)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -147,25 +155,33 @@ namespace STM32T
 		return ret;
 	}
 	
+	/**
+	* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to an array of numbers consuming at most `conv_count * sizeof(T) * 2` characters.
+	* @retval Number of numbers successfully converted.
+	*/
 	template <typename T>
-	inline constexpr bool C2H(const char *str, T *conv, size_t conv_count)
+	constexpr size_t C2H(const char *str, T *conv, size_t conv_count)
 	{
 		static_assert(is_int_v<T>);
 		
+		size_t converted = 0;
+		
 		while (conv_count--)
 		{
-			const auto v = C2H<T>(str);
-			if (!v)
-				return false;
-			
-			*conv++ = *v;
-			str += sizeof(T) * 2;
+			if (const auto v = C2H<T>(str))
+			{
+				*conv++ = *v;
+				str += sizeof(T) * 2;
+				++converted;
+			}
+			else
+				return converted;
 		}
 		
-		return true;
+		return converted;
 	}
 	
-	inline constexpr uint32_t pow10(uint8_t pow)
+	constexpr uint32_t exp10(const uint8_t pow)
 	{
 		uint32_t val = 1;
 		for (uint8_t i = 0; i < pow; i++)
@@ -174,10 +190,13 @@ namespace STM32T
 		return val;
 	}
 	
+	[[deprecated("Use exp10() instead. Will be removed in v0.5.0.")]]
+	constexpr uint32_t pow10(const uint8_t pow) { return exp10(pow); }
+	
 	/**
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
 	*/
-	inline bool is_power_2(uint32_t val)
+	constexpr bool is_power_2(const uint32_t val)
 	{
 		return val && !(val & (val - 1));
 	}
@@ -185,10 +204,10 @@ namespace STM32T
 	/**
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 	*/
-	inline uint8_t bit_count(uint32_t val)
+	constexpr uint8_t bit_count(uint32_t val)
 	{
-		uint8_t c;
-		for (c = 0; val; c++)
+		uint8_t c = 0;
+		for (; val; c++)
 			val &= val - 1;		//clear the least significant bit set
 		
 		return c;
@@ -199,7 +218,7 @@ namespace STM32T
 	* @retval True if val has odd parity.
 	*/
 	template <typename T>
-	inline bool parity(T val)
+	constexpr bool parity(T val)
 	{
 		static_assert(std::is_integral_v<T>);
 		
@@ -224,7 +243,7 @@ namespace STM32T
 	* @brief https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
 	*/
 	template <typename T>
-	inline T reverse(T v)
+	constexpr T reverse(T v)
 	{
 		static_assert(std::is_integral_v<T>);
 		
@@ -268,13 +287,13 @@ namespace STM32T
 			v = ((v >> 1) & 0x5555'5555'5555'5555) | ((v & 0x5555'5555'5555'5555) << 1);
 		}
 		else
-			return 0;
+			static_assert(false, "Undefined integer type!");
 		
 		return v;
 	}
 	
 	template <typename T>
-	inline constexpr T ceil(T p, T q)
+	constexpr T ceil(const T p, const T q)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -282,7 +301,7 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr T prev_multiple(T n, T multiple)
+	constexpr T prev_multiple(const T n, const T multiple)
 	{
 		static_assert(is_int_v<T>);
 		
@@ -290,7 +309,7 @@ namespace STM32T
 	}
 	
 	template <typename T>
-	inline constexpr T next_multiple(T n, T multiple)
+	constexpr T next_multiple(const T n, const T multiple)
 	{
 		static_assert(is_int_v<T>);
 		

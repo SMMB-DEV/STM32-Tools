@@ -8,18 +8,20 @@
 namespace STM32T
 {
 	/**
-	* @param T - The integer type used for calculating CRC. Determines the size of the CRC.
+	* @tparam T - The integer type used for calculating CRC. Determines the size of the CRC.
 	* @param table - Must have 256 values.
-	* @note Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
+	* @copyright Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
 	*/
 	template <typename T>
-	inline T TableCRC(const uint8_t *const data, const size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
+	constexpr T TableCRC(const uint8_t *data, size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
 	{
 		static_assert(is_int_v<T>);
 		
-		for (size_t i = 0; i < len; i++)
+		while (len--)
 		{
-			const uint8_t curByte = (inputReflected ? reverse(data[i]) : data[i]);
+			const uint8_t curByte = (inputReflected ? reverse(*data) : *data);
+			++data;
+			
 			const uint8_t pos = (crc_init >> (sizeof(T) - 1) * 8) ^ curByte;
 			
 			if constexpr (sizeof(T) > 1)
@@ -33,16 +35,16 @@ namespace STM32T
 	
 	template <typename T>
 	[[deprecated("Use TableCRC() instead. Will be removed in v0.5.0.")]]
-	inline T CRCx(const uint8_t *const data, const size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
+	inline T CRCx(const uint8_t *data, size_t len, const T table[256], T crc_init = 0, const bool inputReflected = false)
 	{
 		return TableCRC<T>(data, len, table, crc_init, inputReflected);
 	}
 	
 	/**
-	* Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch43
+	* @copyright Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch43
 	*/
 	template <typename T, uint8_t WIDTH = sizeof(T) * 8>
-	inline T SimpleCRC(const uint8_t *const data, const size_t len, T poly, T crc_init = 0, const bool inputReflected = false)
+	constexpr T SimpleCRC(const uint8_t *data, size_t len, T poly, T crc_init = 0, const bool inputReflected = false)
 	{
 		static_assert(is_int_v<T>);
 		static_assert(WIDTH <= sizeof(T) * 8 && WIDTH > (sizeof(T) - 1) * 8);
@@ -58,9 +60,11 @@ namespace STM32T
 		poly <<= bitOffsetTo8;
 		crc_init <<= bitOffsetTo8;
 		
-		for (size_t i = 0; i < len; ++i)
+		while (len--)
 		{
-			const uint8_t curByte = inputReflected ? reverse(data[i]) : data[i];
+			const uint8_t curByte = inputReflected ? reverse(*data) : *data;
+			++data;
+			
 			crc_init ^= curByte << bitsToShift;		// move byte into MSB of CRC
 			
 			for (int j = 0; j < 8; ++j)

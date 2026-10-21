@@ -791,50 +791,53 @@ namespace STM32T::Log
 			logger.log(level, fmt, args...);
 	}
 	
-	template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
-	[[gnu::always_inline]]
-	inline void LOG_N(const char *fmt, Args... args)
+	inline namespace DefLog
 	{
-		if constexpr (logger.isEnabled() && logger.isEnabled(level))
-			logger.log(Level::None, fmt, args...);
-	}
-	
-	
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_F(const char *fmt, Args... args) { _LOG<Level::Fatal, logger>(fmt, args...); }
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_E(const char *fmt, Args... args) { _LOG<Level::Error, logger>(fmt, args...); }
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_W(const char *fmt, Args... args) { _LOG<Level::Warning, logger>(fmt, args...); }
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_I(const char *fmt, Args... args) { _LOG<Level::Info, logger>(fmt, args...); }
-	
-	template <auto& logger = g_defaultLogger, class... Args>
-	void LOG_D(const char *fmt, Args... args) { _LOG<Level::Debug, logger>(fmt, args...); }
-	
-	template <const Level level = Level::None, auto& logger = g_defaultLogger>
-	inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
-	{
-		if constexpr (logger.isEnabled() && logger.isEnabled(level))
+		template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
+		[[gnu::always_inline]]
+		inline void LOG_N(const char *fmt, Args... args)
 		{
-			while (len)
+			if constexpr (logger.isEnabled() && logger.isEnabled(level))
+				logger.log(Level::None, fmt, args...);
+		}
+		
+		
+		
+		template <auto& logger = g_defaultLogger, class... Args>
+		void LOG_F(const char *fmt, Args... args) { _LOG<Level::Fatal, logger>(fmt, args...); }
+		
+		template <auto& logger = g_defaultLogger, class... Args>
+		void LOG_E(const char *fmt, Args... args) { _LOG<Level::Error, logger>(fmt, args...); }
+		
+		template <auto& logger = g_defaultLogger, class... Args>
+		void LOG_W(const char *fmt, Args... args) { _LOG<Level::Warning, logger>(fmt, args...); }
+		
+		template <auto& logger = g_defaultLogger, class... Args>
+		void LOG_I(const char *fmt, Args... args) { _LOG<Level::Info, logger>(fmt, args...); }
+		
+		template <auto& logger = g_defaultLogger, class... Args>
+		void LOG_D(const char *fmt, Args... args) { _LOG<Level::Debug, logger>(fmt, args...); }
+		
+		template <const Level level = Level::None, auto& logger = g_defaultLogger>
+		inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
+		{
+			if constexpr (logger.isEnabled() && logger.isEnabled(level))
 			{
-				for (size_t i = 0; len && i < line_count; i++, len--)
-					LOG_N<level, logger>(" %02X", *arr++);
-				
-				LOG_N<level, logger>("\n");
+				while (len)
+				{
+					for (size_t i = 0; len && i < line_count; i++, len--)
+						LOG_N<level, logger>(" %02X", *arr++);
+					
+					LOG_N<level, logger>("\n");
+				}
 			}
 		}
-	}
-	
-	template <const Level level = Level::None, auto& logger = g_defaultLogger>
-	inline void LOGSEP()
-	{
-		LOG_N<level, logger>("--------------------------------------------------------------------------------\n");
+		
+		template <const Level level = Level::None, auto& logger = g_defaultLogger>
+		inline void LOGSEP()
+		{
+			LOG_N<level, logger>("--------------------------------------------------------------------------------\n");
+		}
 	}
 	
 	template <const Level level = Level::None, auto& logger = g_defaultLogger>
