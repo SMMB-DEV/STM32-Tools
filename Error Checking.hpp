@@ -9,6 +9,32 @@ namespace STM32T
 {
 	/**
 	* @tparam T - The integer type used for calculating CRC. Determines the size of the CRC.
+	* @tparam TABLE - Must be the same type as T and have 256 values.
+	* @copyright Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
+	*/
+	template <const auto (&TABLE)[256], typename T = std::remove_const_t<std::remove_reference_t<decltype(TABLE[0])>>>
+	constexpr T TableCRC(const uint8_t *data, size_t len, T crc_init = 0, const bool inputReflected = false)
+	{
+		static_assert(is_int_v<T>);
+		
+		while (len--)
+		{
+			const uint8_t curByte = (inputReflected ? reverse(*data) : *data);
+			++data;
+			
+			const uint8_t pos = (crc_init >> (sizeof(T) - 1) * 8) ^ curByte;
+			
+			if constexpr (sizeof(T) > 1)
+				crc_init = (crc_init << 8) ^ TABLE[pos];
+			else
+				crc_init = TABLE[pos];
+		}
+
+		return crc_init;
+	}
+	
+	/**
+	* @tparam T - The integer type used for calculating CRC. Determines the size of the CRC.
 	* @param table - Must have 256 values.
 	* @copyright Based on https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html#ch44
 	*/
