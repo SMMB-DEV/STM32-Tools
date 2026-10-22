@@ -4,8 +4,9 @@
 
 # Logging
 
-Include "Log.h" to use the logging module. You can use the `Logger` class to create a "static" or "dynamic" logger.
+Include "Log.hpp" to use the logging module. This module introduces the `Log`, `Stdout`, and `Stderr` namespaces.
 
+You can use the `Logger` class to create a "static" or "dynamic" logger.
 Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks). They also support printf-style formatting (+ `"b"`/`"B"` for binary formatting).
 
 The output format of loggers is currently fixed:
@@ -33,12 +34,12 @@ int main()
 
 A static logger is just a logger that is declared as `constexpr`.
 This has the benefit of actually removing unused log code and compile time level checking resulting in a smaller code footprint but with the restriction of fixed logger attributes.
-You can also use the LOG_X functions for a possibly smaller footprint.
+You can also use the `LOG_X` functions in `Log::DefLog` for a possibly smaller footprint.
 
 ```C++
 #include <Tools/Log.hpp>
 
-using STM32T::Log::LOG_I;
+using namespace STM32T::Log::DefLog;
 
 static constexpr STM32T::Log::Logger s_log(STM32T::Log::Level::Info, "MyModule"sv);		// Default output: stdout
 
@@ -61,7 +62,7 @@ You can use the `STM32T_DEFAULT_LOG_XXX` macros to change the attributes of the 
 #define STM32T_DEFAULT_LOG_LEVEL	Level::Info		// Default logger with Info level and stdout output. Must be defined before including "Log.hpp".
 #include <Tools/Log.hpp>
 
-using STM32T::Log::LOG_I;
+using namespace STM32T::Log::DefLog;
 
 int main()
 {
@@ -86,7 +87,7 @@ You can of course use your own custom output (e.g. to log to an SD card).
 ## Redirecting stdout and stderr
 
 You can redirect your logs to many different sinks including `stdout`. `stdout` and `stderr`
-can also be independently redirected to multiple sinks (except `stdout` itself).
+can also be independently redirected to multiple sinks (except themselves of course).
 Use the `STM32T_SYS_WRITE` macro as well as the `AddHandler(...)` and `RemoveHandler(...)` functions in `STM32T::Stdout` and `STM32T::Stderr`.
 
 Other libraries and frameworks might simply use `printf(...)` for logging. Or for example,

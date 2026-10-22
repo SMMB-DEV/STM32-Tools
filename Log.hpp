@@ -801,8 +801,6 @@ namespace STM32T::Log
 				logger.log(Level::None, fmt, args...);
 		}
 		
-		
-		
 		template <auto& logger = g_defaultLogger, class... Args>
 		void LOG_F(const char *fmt, Args... args) { _LOG<Level::Fatal, logger>(fmt, args...); }
 		
