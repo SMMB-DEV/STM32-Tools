@@ -1,3 +1,5 @@
+from elftools.elf.elffile import ELFFile
+from elftools.elf import sections
 from dataclasses import dataclass
 from enum import Enum
 
@@ -127,3 +129,46 @@ class Version:
 
 	def value(self) -> int:
 		return (self.major << 24) | (self.minor << 16) | (self.patch << 8) | self.pr.value
+
+def get_version(axf_file: str, version_name: str = '_ZL7VERSION'):
+	""" https://github.com/eliben/pyelftools/issues/227#issuecomment-495184612
+	"""
+	with open(axf_file, "rb") as f:
+		elf = ELFFile(f)
+		section: sections.SymbolTableSection = elf.get_section_by_name(".symtab")
+		if not section:
+			print(".symtab section not found in axf file!")
+			exit()
+		
+		symbols = section.get_symbol_by_name(version_name)
+		if not symbols:
+			print("Version not found! Candidate symbol names:")
+			
+			for symbol in section.iter_symbols():
+				if symbol.name.lower().endswith('version'):
+					print(symbol.name)
+			
+			exit(1)
+		elif len(symbols) > 1:
+			print(f'Multiple "{version_name}" symbols found!')
+			exit(1)
+
+		symbol = symbols[0]
+
+		file_offset = None
+		for seg in elf.iter_segments():
+			if seg.header['p_type'] != 'PT_LOAD':
+				continue
+			
+			if symbol['st_value'] >= seg['p_vaddr'] and symbol['st_value'] < seg['p_vaddr'] + seg['p_filesz']:
+				file_offset = symbol['st_value'] - seg['p_vaddr'] + seg['p_offset']
+				break
+
+		if not file_offset:
+			print('Error getting file offset from ELF data')
+			exit(1)
+		
+		elf.stream.seek(file_offset)
+		content = elf.stream.read(4)
+		ver = Version(content[3], content[2], content[1], content[0])
+		return ver
