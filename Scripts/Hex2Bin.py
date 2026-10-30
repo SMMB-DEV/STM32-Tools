@@ -1,4 +1,4 @@
-from Version import Version, get_version
+from Version import Version
 
 import Crypto.Cipher.AES as AES
 from Crypto.Hash import SHA512
@@ -126,7 +126,7 @@ def main():
 	version_group.add_argument('--add-version', action=argparse.BooleanOptionalAction, default=True, help="Whether or not the version should be added to output file names.")
 	version_group.add_argument('--axf-file', default='*/*.axf', type=check_single_file,
 	                           help="The AXF file's name for versioning. Could be a glob pattern. Must match exactly one file.")
-	version_group.add_argument('--version-name', default=signature(get_version).parameters['version_name'].default, type=str,
+	version_group.add_argument('--version-name', default=signature(Version.get_from_file).parameters['version_name'].default, type=str,
 	                           help="The name of the version symbol in the AXF file.")
 
 	enc_group = parser.add_argument_group('Encryption',
@@ -152,7 +152,10 @@ def main():
 
 	ver = None
 	if args.add_version:
-		ver = get_version(args.axf_file, args.version_name)
+		ver = Version.get_from_file(args.axf_file, args.version_name)
+		if not ver:
+			exit(1)
+		
 		split = os.path.splitext(args.bin_file)
 		args.bin_file = split[0] + f" v{ver}" + split[1]
 	
