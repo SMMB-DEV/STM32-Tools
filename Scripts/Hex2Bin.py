@@ -39,6 +39,7 @@ def print_file_size(file_size: int, max_size: int | None) -> None:
 		print(f"File size: {file_size} B - {file_size / 1024 :.1f} KiB / {max_size / 1024 :.1f} KiB ({100 * file_size / max_size :.1f}%)")
 
 def convert_to_binary(args: argparse.Namespace):
+	print(f' \nConverting hex file "{args.hex_file}" (offset = 0x{args.input_offset:08X}) to binary file...')
 	result = subprocess.run(f'srec_cat "{args.hex_file}" -Intel -offset -{args.input_offset:#X} -o "{args.bin_file}" -Binary')
 	if result.returncode != 0:
 		print(f"Error converting hex file to binary: {result.stderr}")
@@ -50,11 +51,11 @@ def convert_to_binary(args: argparse.Namespace):
 		file.write(file_crc.to_bytes(4, 'big'))
 		file_size = file.tell()
 
-	print(f' \nCreated binary file "{args.bin_file}" from hex file "{args.hex_file}" (offset = 0x{args.input_offset:08X}).')
+	print(f'Created binary file "{args.bin_file}".')
 	print(f'CRC: 0x{file_crc:08X}')
 	print_file_size(file_size, args.max_size)
 
-def encrypt(args: argparse.Namespace, ver: Version):
+def encrypt(args: argparse.Namespace):
 	KEY_LEN = 32
 	TAG_LEN = 16
 	NONCE_LEN = 12	# https://crypto.stackexchange.com/questions/41601/aes-gcm-recommended-iv-size-why-12-bytes
@@ -135,8 +136,8 @@ def main():
 	enc_group.add_argument('--encrypt', action=argparse.BooleanOptionalAction, default=False, help="Whether or not an encrypted version should be created.")
 	enc_group.add_argument('--key', type=lambda x: bytes.fromhex(x), dest='master_key',
 	                       help='The master key used for HKDF to generate the encryption key in hexadecimal format. Example: "EF3B"')
-	enc_group.add_argument('--salt', default="", type=lambda x: bytes.fromhex(x),
-	                       help="The salt used for HKDF to generate the encryption key in hexadecimal format.")
+	enc_group.add_argument('--salt', type=lambda x: bytes.fromhex(x),
+	                       help="The salt used for HKDF to generate the encryption key in hexadecimal format. Uses an array of zeros by default.")
 	enc_group.add_argument('--enc-file', type=str, help="The encrypted file's name. Uses the input file name by default. Overwrites existing files.")
 	enc_group.add_argument('--header', type=check_single_file, dest='header_file',
 	                    help="An optional file containing metadata that will be prepended to the binary data unencrypted. Could be a glob pattern.")
@@ -164,16 +165,12 @@ def main():
 	if args.encrypt:
 		if args.master_key is None:
 			parser.error("--key must be provided when --encrypt is specified!")
-		
-		if ver is None:
-			parser.error("The version is required for creating encrypted files.")
 
 		if args.enc_file is None:
 			split = os.path.splitext(args.bin_file)
 			args.enc_file = split[0] + ".enc"
-
-	assert ver is not None
-	encrypt(args, ver)
+		
+		encrypt(args)
 
 	print(f" \nProcessing time: {time.process_time() * 1000 :.0f} ms")
 

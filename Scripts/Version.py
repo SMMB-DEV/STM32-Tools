@@ -133,6 +133,25 @@ class Version:
 		return (self.major << 24) | (self.minor << 16) | (self.patch << 8) | self.pr.value
 
 	@staticmethod
+	def find_in_file(axf_file: str, version_name_like: str = 'version'):
+		"""
+		:param axf_file: rhtegwef
+		:param version_name_like: ryjhtegsrfe
+		"""
+		with open(axf_file, "rb") as f:
+			elf = ELFFile(f)
+			section: sections.SymbolTableSection = elf.get_section_by_name(".symtab")
+			if not section:
+				print(".symtab section not found in axf file!")
+				return None
+			
+			print("Candidate symbol names:")
+			
+			for symbol in section.iter_symbols():
+				if symbol.name.lower().find('version') >= 0:
+					print(symbol.name)
+	
+	@staticmethod
 	def get_from_file(axf_file: str, version_name: str = '_ZL7VERSION') -> Version | None:
 		""" https://github.com/eliben/pyelftools/issues/227#issuecomment-495184612
 		"""
@@ -148,7 +167,7 @@ class Version:
 				print("Version not found! Candidate symbol names:")
 				
 				for symbol in section.iter_symbols():
-					if symbol.name.lower().endswith('version'):
+					if symbol.name.lower().find('version') >= 0:
 						print(symbol.name)
 				
 				return None
