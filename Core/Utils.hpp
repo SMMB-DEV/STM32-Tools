@@ -11,1665 +11,1646 @@
 
 namespace STM32T
 {
-	template <class T>
-	using vec = std::vector<T>;
-	
-	template <class F>
-	using func = std::function<F>;
-	
-	template <class T>
-	constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
-	
-	inline constexpr size_t operator"" _Ki(unsigned long long x) noexcept { return x * 1024; }
-	inline constexpr size_t operator"" _Ki(long double x) noexcept { return x * 1024; }
-	inline constexpr uint8_t operator"" _u8(unsigned long long x) noexcept { return x; }
-	inline constexpr uint16_t operator"" _u16(unsigned long long x) noexcept { return x; }
-	inline constexpr uint32_t operator"" _u32(unsigned long long x) noexcept { return x; }
-	inline constexpr uint64_t operator"" _u64(unsigned long long x) noexcept { return x; }
-	
-	/**
-	* @retval Max. 63 characters.
-	*/
-	inline const char * GetResetCause()
+	inline namespace Utils
 	{
-		static constexpr const char * BIT_NAMES[] =
+		template <class T>
+		using vec [[deprecated("Use std::vector instead. Will be removed in v0.5.0.")]] = std::vector<T>;
+		
+		template <class F>
+		using func [[deprecated("Use std::function instead. Will be removed in v0.5.0.")]] = std::function<F>;
+		
+		template <class T>
+		constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
+		
+		inline namespace Literals
 		{
-			#ifdef RCC_CSR_BORRSTF	// b25
-			"BOR",
-			#else
-			" OBL",
-			#endif
-			
-			"Reset Pin",			// b26
-			"POR/PDR",				// b27
-			"Software",				// b28
-			"IWDG",					// b29
-			"WWDG",					// b30
-			"LPWR",					// b31
-		};
+			constexpr size_t operator"" _Ki(unsigned long long x) noexcept { return x * 1024; }
+			constexpr size_t operator"" _Ki(long double x) noexcept { return x * 1024; }
+			constexpr uint8_t operator"" _u8(unsigned long long x) noexcept { return x; }
+			constexpr uint16_t operator"" _u16(unsigned long long x) noexcept { return x; }
+			constexpr uint32_t operator"" _u32(unsigned long long x) noexcept { return x; }
+			constexpr uint64_t operator"" _u64(unsigned long long x) noexcept { return x; }
+		}
 		
-		
-		static char s_buf[64];
-		
-		int len = 0;
-		
-		// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
-		const uint32_t reset_flags = RCC->CSR;
-		bool first = true;
-		
-		for (uint32_t b = 31; b >= 25; --b)
+		/**
+		* @retval Max. 63 characters.
+		*/
+		inline const char * GetResetCause()
 		{
-			if (reset_flags & 1 << b)
+			static constexpr const char * BIT_NAMES[] =
 			{
-				if (first)
+				#ifdef RCC_CSR_BORRSTF	// b25
+				"BOR",
+				#else
+				" OBL",
+				#endif
+				
+				"Reset Pin",			// b26
+				"POR/PDR",				// b27
+				"Software",				// b28
+				"IWDG",					// b29
+				"WWDG",					// b30
+				"LPWR",					// b31
+			};
+			
+			
+			static char s_buf[64];
+			
+			int len = 0;
+			
+			// https://community.st.com/t5/stm32cubeide-mcus/how-can-you-validate-that-independent-watchdog-iwdg-is-resetting/m-p/89220/highlight/true#M2197
+			const uint32_t reset_flags = RCC->CSR;
+			bool first = true;
+			
+			for (uint32_t b = 31; b >= 25; --b)
+			{
+				if (reset_flags & 1 << b)
 				{
-					len += sprintf(s_buf + len, "%s", BIT_NAMES[b - 25]);
-					first = false;
+					if (first)
+					{
+						len += sprintf(s_buf + len, "%s", BIT_NAMES[b - 25]);
+						first = false;
+					}
+					else
+						len += sprintf(s_buf + len, " | %s", BIT_NAMES[b - 25]);
+				}
+			}
+			
+			return s_buf;
+		}
+		
+		constexpr char H2C(const uint8_t x)
+		{
+			static constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+			
+			return CHARS[x & 0x0F];
+		}
+		
+		template <typename T>
+		constexpr void H2C(const T val, char *const buf)
+		{
+			static_assert(is_int_v<T>);
+			
+			for (size_t i = 0, b = sizeof(T) * 8 - 4; i < sizeof(T) * 2; ++i, b -= 4)
+				buf[i] = H2C(val >> b);
+		}
+		
+		template <typename T>
+		constexpr void H2C(const T *conv, size_t conv_count, char *buf)
+		{
+			static_assert(is_int_v<T>);
+			
+			while (conv_count--)
+			{
+				H2C(*conv++, buf);
+				buf += sizeof(T) * 2;
+			}
+		}
+		
+		/**
+		* Converts a hexadecimal character (0-9, A-F, a-f) to a number.
+		* @retval A number in the range [0, 15] or 0xFF for invalid characters.
+		*/
+		constexpr uint8_t C2H(const uint8_t ch)
+		{
+			static constexpr uint8_t HEX[256] =
+			{
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 0 - 15
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 16 - 31
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 32 - 47
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 48 - 63
+				0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 64 - 79
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 80 - 95
+				0xFF, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 96 - 111
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 112 - 127
+				
+				// 128 - 255
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+			};
+			
+			return HEX[ch];
+		}
+		
+		/**
+		* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to a number consuming at most `sizeof(T) * 2` characters.
+		* @retval The converted value or std::nullopt in case an invalid character is found.
+		*/
+		template <typename T>
+		constexpr std::optional<T> C2H(const char *str)
+		{
+			static_assert(is_int_v<T>);
+			
+			T ret = T(0);
+			for (size_t i = 0; i < sizeof(T) * 2; ++i)
+			{
+				const uint8_t h = C2H(*str++);
+				if (h == 0xFF)
+					return std::nullopt;
+				
+				ret <<= 4;
+				ret |= h;
+			}
+			
+			return ret;
+		}
+		
+		/**
+		* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to an array of numbers consuming at most `conv_count * sizeof(T) * 2` characters.
+		* @retval Number of numbers successfully converted.
+		*/
+		template <typename T>
+		constexpr size_t C2H(const char *str, T *conv, size_t conv_count)
+		{
+			static_assert(is_int_v<T>);
+			
+			size_t converted = 0;
+			
+			while (conv_count--)
+			{
+				if (const auto v = C2H<T>(str))
+				{
+					*conv++ = *v;
+					str += sizeof(T) * 2;
+					++converted;
 				}
 				else
-					len += sprintf(s_buf + len, " | %s", BIT_NAMES[b - 25]);
+					return converted;
 			}
-		}
-		
-		return s_buf;
-	}
-	
-	constexpr char H2C(const uint8_t x)
-	{
-		static constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-		
-		return CHARS[x & 0x0F];
-	}
-	
-	template <typename T>
-	constexpr void H2C(const T val, char *const buf)
-	{
-		static_assert(is_int_v<T>);
-		
-		for (size_t i = 0, b = sizeof(T) * 8 - 4; i < sizeof(T) * 2; ++i, b -= 4)
-			buf[i] = H2C(val >> b);
-	}
-	
-	template <typename T>
-	constexpr void H2C(const T *conv, size_t conv_count, char *buf)
-	{
-		static_assert(is_int_v<T>);
-		
-		while (conv_count--)
-		{
-			H2C(*conv++, buf);
-			buf += sizeof(T) * 2;
-		}
-	}
-	
-	/**
-	* Converts a hexadecimal character (0-9, A-F, a-f) to a number.
-	* @retval A number in the range [0, 15] or 0xFF for invalid characters.
-	*/
-	constexpr uint8_t C2H(const uint8_t ch)
-	{
-		static constexpr uint8_t HEX[256] =
-		{
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  15
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  31
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  47
-			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  63
-			0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  79
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	//  95
-			0xFF, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 111
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 127
 			
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-		};
-		
-		return HEX[ch];
-	}
-	
-	/**
-	* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to a number consuming at most `sizeof(T) * 2` characters.
-	* @retval The converted value or std::nullopt in case an invalid character is found.
-	*/
-	template <typename T>
-	constexpr std::optional<T> C2H(const char *str)
-	{
-		static_assert(is_int_v<T>);
-		
-		T ret = T(0);
-		for (size_t i = 0; i < sizeof(T) * 2; ++i)
-		{
-			const uint8_t h = C2H(*str++);
-			if (h == 0xFF)
-				return std::nullopt;
-			
-			ret <<= 4;
-			ret |= h;
+			return converted;
 		}
 		
-		return ret;
-	}
-	
-	/**
-	* Converts a string of hexadecimal chcarcters (0-9, A-F, a-f) to an array of numbers consuming at most `conv_count * sizeof(T) * 2` characters.
-	* @retval Number of numbers successfully converted.
-	*/
-	template <typename T>
-	constexpr size_t C2H(const char *str, T *conv, size_t conv_count)
-	{
-		static_assert(is_int_v<T>);
-		
-		size_t converted = 0;
-		
-		while (conv_count--)
+		constexpr uint32_t exp10(const uint8_t pow)
 		{
-			if (const auto v = C2H<T>(str))
+			uint32_t val = 1;
+			for (uint8_t i = 0; i < pow; i++)
+				val *= 10;
+			
+			return val;
+		}
+		
+		[[deprecated("Use exp10() instead. Will be removed in v0.5.0.")]]
+		constexpr uint32_t pow10(const uint8_t pow) { return exp10(pow); }
+		
+		/**
+		* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+		*/
+		constexpr bool is_power_2(const uint32_t val)
+		{
+			return val && !(val & (val - 1));
+		}
+		
+		/**
+		* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+		*/
+		constexpr uint8_t bit_count(uint32_t val)
+		{
+			uint8_t c = 0;
+			for (; val; c++)
+				val &= val - 1;		//clear the least significant bit set
+			
+			return c;
+		}
+		
+		/**
+		* @brief https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
+		* @retval True if val has odd parity.
+		*/
+		template <typename T>
+		constexpr bool parity(T val)
+		{
+			static_assert(std::is_integral_v<T>);
+			
+			if constexpr (sizeof(T) > sizeof(uint64_t))
+				val ^= val >> 64;
+			
+			if constexpr (sizeof(T) > sizeof(uint32_t))
+				val ^= val >> 32;
+			
+			if constexpr (sizeof(T) > sizeof(uint16_t))
+				val ^= val >> 16;
+			
+			if constexpr (sizeof(T) > sizeof(uint8_t))
+				val ^= val >> 8;
+			
+			val ^= val >> 4;
+			val &= 0x0F;
+			return (0b0110'1001'1001'0110 >> val) & 1;
+		}
+		
+		/**
+		* @brief https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
+		*/
+		template <typename T>
+		constexpr T reverse(T v)
+		{
+			static_assert(std::is_integral_v<T>);
+			
+			if constexpr (sizeof(T) <= 4)
 			{
-				*conv++ = *v;
-				str += sizeof(T) * 2;
-				++converted;
+				static_assert(sizeof(int) == 4);	// All numbers are promoted to int
+				
+				if constexpr (sizeof(T) >= 4)		// swap 2-byte long pairs
+					v = (v >> 16) | (v << 16);
+				
+				if constexpr (sizeof(T) >= 2)		// swap bytes
+					v = ((v >> 8) & 0x00FF'00FF) | ((v & 0x00FF'00FF) << 8);
+				
+				// swap nibbles ... 
+				v = ((v >> 4) & 0x0F0F'0F0F) | ((v & 0x0F0F'0F0F) << 4);
+				
+				// swap consecutive pairs
+				v = ((v >> 2) & 0x3333'3333) | ((v & 0x3333'3333) << 2);
+				
+				// swap odd and even bits
+				v = ((v >> 1) & 0x5555'5555) | ((v & 0x5555'5555) << 1);
+			}
+			else if constexpr (sizeof(T) == 8)
+			{
+				// swap 4-byte long pairs
+				v = (v >> 32) | (v << 32);
+				
+				// swap 2-byte long pairs
+				v = ((v >> 16) & 0x0000'FFFF'0000'FFFF) | ((v & 0x0000'FFFF'0000'FFFF) << 16);
+				
+				// swap bytes
+				v = ((v >> 8) & 0x00FF'00FF'00FF'00FF) | ((v & 0x00FF'00FF'00FF'00FF) << 8);
+				
+				// swap nibbles ... 
+				v = ((v >> 4) & 0x0F0F'0F0F'0F0F'0F0F) | ((v & 0x0F0F'0F0F'0F0F'0F0F) << 4);
+				
+				// swap consecutive pairs
+				v = ((v >> 2) & 0x3333'3333'3333'3333) | ((v & 0x3333'3333'3333'3333) << 2);
+				
+				// swap odd and even bits
+				v = ((v >> 1) & 0x5555'5555'5555'5555) | ((v & 0x5555'5555'5555'5555) << 1);
 			}
 			else
-				return converted;
+				static_assert(false, "Undefined integer type!");
+			
+			return v;
 		}
 		
-		return converted;
-	}
-	
-	constexpr uint32_t exp10(const uint8_t pow)
-	{
-		uint32_t val = 1;
-		for (uint8_t i = 0; i < pow; i++)
-			val *= 10;
-		
-		return val;
-	}
-	
-	[[deprecated("Use exp10() instead. Will be removed in v0.5.0.")]]
-	constexpr uint32_t pow10(const uint8_t pow) { return exp10(pow); }
-	
-	/**
-	* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
-	*/
-	constexpr bool is_power_2(const uint32_t val)
-	{
-		return val && !(val & (val - 1));
-	}
-	
-	/**
-	* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-	*/
-	constexpr uint8_t bit_count(uint32_t val)
-	{
-		uint8_t c = 0;
-		for (; val; c++)
-			val &= val - 1;		//clear the least significant bit set
-		
-		return c;
-	}
-	
-	/**
-	* @brief https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
-	* @retval True if val has odd parity.
-	*/
-	template <typename T>
-	constexpr bool parity(T val)
-	{
-		static_assert(std::is_integral_v<T>);
-		
-		if constexpr (sizeof(T) > sizeof(uint64_t))
-			val ^= val >> 64;
-		
-		if constexpr (sizeof(T) > sizeof(uint32_t))
-			val ^= val >> 32;
-		
-		if constexpr (sizeof(T) > sizeof(uint16_t))
-			val ^= val >> 16;
-		
-		if constexpr (sizeof(T) > sizeof(uint8_t))
-			val ^= val >> 8;
-		
-		val ^= val >> 4;
-		val &= 0x0F;
-		return (0b0110'1001'1001'0110 >> val) & 1;
-	}
-	
-	/**
-	* @brief https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
-	*/
-	template <typename T>
-	constexpr T reverse(T v)
-	{
-		static_assert(std::is_integral_v<T>);
-		
-		if constexpr (sizeof(T) <= 4)
+		template <typename T>
+		constexpr T ceil(const T p, const T q)
 		{
-			static_assert(sizeof(int) == 4);	// All numbers are promoted to int
+			static_assert(is_int_v<T>);
 			
-			if constexpr (sizeof(T) >= 4)		// swap 2-byte long pairs
-				v = (v >> 16) | (v << 16);
-			
-			if constexpr (sizeof(T) >= 2)		// swap bytes
-				v = ((v >> 8) & 0x00FF'00FF) | ((v & 0x00FF'00FF) << 8);
-			
-			// swap nibbles ... 
-			v = ((v >> 4) & 0x0F0F'0F0F) | ((v & 0x0F0F'0F0F) << 4);
-			
-			// swap consecutive pairs
-			v = ((v >> 2) & 0x3333'3333) | ((v & 0x3333'3333) << 2);
-			
-			// swap odd and even bits
-			v = ((v >> 1) & 0x5555'5555) | ((v & 0x5555'5555) << 1);
+			return p / q + (p % q != 0);
 		}
-		else if constexpr (sizeof(T) == 8)
+		
+		template <typename T>
+		constexpr T prev_multiple(const T n, const T multiple)
 		{
-			// swap 4-byte long pairs
-			v = (v >> 32) | (v << 32);
+			static_assert(is_int_v<T>);
 			
-			// swap 2-byte long pairs
-			v = ((v >> 16) & 0x0000'FFFF'0000'FFFF) | ((v & 0x0000'FFFF'0000'FFFF) << 16);
-			
-			// swap bytes
-			v = ((v >> 8) & 0x00FF'00FF'00FF'00FF) | ((v & 0x00FF'00FF'00FF'00FF) << 8);
-			
-			// swap nibbles ... 
-			v = ((v >> 4) & 0x0F0F'0F0F'0F0F'0F0F) | ((v & 0x0F0F'0F0F'0F0F'0F0F) << 4);
-			
-			// swap consecutive pairs
-			v = ((v >> 2) & 0x3333'3333'3333'3333) | ((v & 0x3333'3333'3333'3333) << 2);
-			
-			// swap odd and even bits
-			v = ((v >> 1) & 0x5555'5555'5555'5555) | ((v & 0x5555'5555'5555'5555) << 1);
+			return n / multiple * multiple;
 		}
-		else
-			static_assert(false, "Undefined integer type!");
 		
-		return v;
-	}
-	
-	template <typename T>
-	constexpr T ceil(const T p, const T q)
-	{
-		static_assert(is_int_v<T>);
-		
-		return p / q + (p % q != 0);
-	}
-	
-	template <typename T>
-	constexpr T prev_multiple(const T n, const T multiple)
-	{
-		static_assert(is_int_v<T>);
-		
-		return n / multiple * multiple;
-	}
-	
-	template <typename T>
-	constexpr T next_multiple(const T n, const T multiple)
-	{
-		static_assert(is_int_v<T>);
-		
-		// todo: check this for negative numbers and min/max edge cases
-		return (n + multiple - 1) / multiple * multiple;
-	}
-	
-	inline void JumpToApp(const volatile uint32_t app_addr)
-	{
-		RCC_ClkInitTypeDef rcc =
+		template <typename T>
+		constexpr T next_multiple(const T n, const T multiple)
 		{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wc++23-extensions"
+			static_assert(is_int_v<T>);
+			
+			// todo: check this for negative numbers and min/max edge cases
+			return (n + multiple - 1) / multiple * multiple;
+		}
+		
+		inline void JumpToApp(const volatile uint32_t app_addr)
+		{
+			RCC_ClkInitTypeDef rcc =
+			{
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wc++23-extensions"
 
-#ifdef STM32F4
-			.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
-			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
-			.AHBCLKDivider = RCC_SYSCLK_DIV1,
-			.APB1CLKDivider = RCC_HCLK_DIV1,
-			.APB2CLKDivider = RCC_HCLK_DIV1
-#elifdef STM32G0
-			.ClockType = RCC_CLOCKTYPE_ALL,
-			.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
-			.AHBCLKDivider = RCC_SYSCLK_DIV1,
-			.APB1CLKDivider = RCC_HCLK_DIV1
-#else
-#error "Clock configuration code not available for this family!"
-#endif
+	#ifdef STM32F4
+				.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
+				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
+				.AHBCLKDivider = RCC_SYSCLK_DIV1,
+				.APB1CLKDivider = RCC_HCLK_DIV1,
+				.APB2CLKDivider = RCC_HCLK_DIV1
+	#elifdef STM32G0
+				.ClockType = RCC_CLOCKTYPE_ALL,
+				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
+				.AHBCLKDivider = RCC_SYSCLK_DIV1,
+				.APB1CLKDivider = RCC_HCLK_DIV1
+	#else
+	#error "Clock configuration code not available for this family!"
+	#endif
 
-#pragma GCC diagnostic pop
+	#pragma GCC diagnostic pop
+			};
+			
+			// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
+			if (HAL_RCC_ClockConfig(&rcc, FLASH_LATENCY_0) != HAL_OK)
+				Error_Handler();
+			
+			using fp = void (*)();
+			
+			fp app = (fp)(*(__IO uint32_t*)(app_addr + 4));
+			
+			// Jump to user application
+			// Initialize user application's Stack Pointer
+			SCB->VTOR = app_addr;
+			__set_MSP(*(__IO uint32_t*)app_addr);
+			app();
+		}
+		
+		template <class T>
+		union SharedArray
+		{
+			static_assert(sizeof(T) > sizeof(uint8_t));
+			
+			uint8_t arr[sizeof(T)];
+			T val;
+			
+			SharedArray<T>& operator=(const SharedArray<T>& other)
+			{
+				val = other.val;
+				return *this;
+			}
 		};
 		
-		// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
-		if (HAL_RCC_ClockConfig(&rcc, FLASH_LATENCY_0) != HAL_OK)
-			Error_Handler();
+		template <class T>
+		using shared_arr [[deprecated("Use SharedArray<T> instead. Will bre removed in v0.5.0.")]] = SharedArray<T>;
 		
-		using fp = void (*)();
-		
-		fp app = (fp)(*(__IO uint32_t*)(app_addr + 4));
-		
-		// Jump to user application
-		// Initialize user application's Stack Pointer
-		SCB->VTOR = app_addr;
-		__set_MSP(*(__IO uint32_t*)app_addr);
-		app();
-	}
-	
-	template <class T>
-	union SharedArray
-	{
-		static_assert(sizeof(T) > sizeof(uint8_t));
-		
-		uint8_t arr[sizeof(T)];
-		T val;
-		
-		SharedArray<T>& operator=(const SharedArray<T>& other)
+		template <class F, typename R = void>
+		class ScopeAction
 		{
-			val = other.val;
-			return *this;
-		}
-	};
-	
-	template <class T>
-	using shared_arr [[deprecated("Use SharedArray<T> instead. Will bre removed in v0.5.0.")]] = SharedArray<T>;
-	
-	class ScopeAction
-	{
-		void (*m_end)();
-		
-	public:
-		ScopeAction(void (* end)()) : m_end(end) {}
-		~ScopeAction()
-		{
-			if (m_end)
-				m_end();
-		}
-		
-		void EarlyExit()
-		{
-			if (m_end)
-				m_end();
+		public:
+			using func_t = std::function<R()>;
 			
-			m_end = nullptr;
-		}
-		
-		void Cancel()
-		{
-			m_end = nullptr;
-		}
-	};
-	
-	class ScopeActionF
-	{
-	public:
-		using funt_t = func<void()>;
-		
-		ScopeActionF(funt_t &&end) : m_end(std::move(end)) {}
-		~ScopeActionF()
-		{
-			if (m_end)
-				m_end();
-		}
-		
-		void EarlyExit()
-		{
-			if (m_end)
-				m_end();
-			
-			m_end = nullptr;
-		}
-		
-		void Cancel()
-		{
-			m_end = nullptr;
-		}
-		
-	private:
-		funt_t m_end;
-	};
-	
-	template <typename T, T MIN, T MAX>
-	class ClampedInt
-	{
-		static_assert(is_int_v<T>);
-		
-		T m_val;
-		
-	public:
-		static constexpr T VAL_MIN = MIN, VAL_MAX = MAX;
-		static constexpr uintmax_t RANGE = MAX - MIN;
-		static constexpr bool IS_UNLIMITED = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
-		
-		
-		ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
-		ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
-		
-		operator T() const { return m_val; }
-		operator T() const volatile { return m_val; }
-		
-		ClampedInt& operator=(const T val)
-		{
-			if constexpr (IS_UNLIMITED)
-				m_val = val;
-			else
-				m_val = std::clamp(val, MIN, MAX);
-			
-			return *this;
-		}
-		
-		volatile ClampedInt& operator=(const T val) volatile
-		{
-			m_val = std::clamp(val, MIN, MAX);
-			return *this;
-		}
-		
-		T val() const { return m_val; }
-		constexpr T min() const { return MIN; }
-		constexpr T max() const { return MAX; }
-		
-		template <typename E>
-		bool operator==(const E val)
-		{
-			static_assert(is_int_v<E>);
-			
-			return m_val == val;
-		}
-		
-		ClampedInt& operator++()	// prefix
-		{
-			if constexpr (IS_UNLIMITED)
-				m_val++;
-			else
+			ScopeAction(F &&end) : m_end(std::forward<func_t>(end)) {}
+			~ScopeAction()
 			{
-				if (m_val >= MAX)
-					m_val = MIN;
-				else
-					m_val++;
+				if (m_end)
+					m_end();
 			}
 			
-			return *this;
-		}
-		
-		ClampedInt& operator--()	// prefix
-		{
-			if constexpr (IS_UNLIMITED)
-				m_val--;
-			else
+			void EarlyExit()
 			{
-				if (m_val <= MIN)
-					m_val = MAX;
-				else
-					m_val--;
-			}
-			
-			return *this;
-		}
-		
-		ClampedInt operator++(int)	// postfix
-		{
-			ClampedInt val = *this;
-			
-			if constexpr (IS_UNLIMITED)
-				m_val++;
-			else
-			{
-				if (m_val >= MAX)
-					m_val = MIN;
-				else
-					m_val++;
-			}
-			
-			return val;
-		}
-		
-		ClampedInt operator--(int)	// postfix
-		{
-			ClampedInt val = *this;
-			
-			if constexpr (IS_UNLIMITED)
-				m_val--;
-			else
-			{
-				if (m_val <= MIN)
-					m_val = MAX;
-				else
-					m_val--;
-			}
-			
-			return val;
-		}
-		
-		volatile ClampedInt& operator++() volatile	// prefix
-		{
-			if constexpr (IS_UNLIMITED)
-				m_val++;
-			else
-			{
-				if (m_val >= MAX)
-					m_val = MIN;
-				else
-					m_val++;
-			}
-			
-			return *this;
-		}
-		
-		volatile ClampedInt& operator--() volatile	// prefix
-		{
-			if constexpr (IS_UNLIMITED)
-				m_val--;
-			else
-			{
-				if (m_val <= MIN)
-					m_val = MAX;
-				else
-					m_val--;
-			}
-			
-			return *this;
-		}
-		
-		ClampedInt operator++(int) volatile	// postfix
-		{
-			ClampedInt val = *this;
-			
-			if constexpr (IS_UNLIMITED)
-				m_val++;
-			else
-			{
-				if (m_val >= MAX)
-					m_val = MIN;
-				else
-					m_val++;
-			}
-			
-			return val;
-		}
-		
-		ClampedInt operator--(int) volatile	// postfix
-		{
-			ClampedInt val = *this;
-			
-			if constexpr (IS_UNLIMITED)
-				m_val--;
-			else
-			{
-				if (m_val <= MIN)
-					m_val = MAX;
-				else
-					m_val--;
-			}
-			
-			return val;
-		}
-		
-		template <typename A>
-		ClampedInt& operator+=(A add)
-		{
-			static_assert(is_int_v<A>);
-			
-			if constexpr (IS_UNLIMITED)
-				m_val += add;
-			else
-			{
-				if (add >= 0)
+				if (m_end)
 				{
-					add %= RANGE + 1;
-					
-					const uintmax_t rem = MAX - m_val;	// always <= RANGE
-					if (add > rem)
-					{
-						add -= rem + 1;
-						m_val = MIN;
-					}
-					
-					m_val += add;
-				}
-				else
-				{
-					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= RANGE + 1;
-					
-					const uintmax_t rem = m_val - MIN;
-					if (add_pos > rem)
-					{
-						add_pos -= rem + 1;
-						m_val = MAX;
-					}
-					
-					m_val -= add_pos;
+					m_end();
+					m_end = nullptr;
 				}
 			}
 			
-			return *this;
-		}
-		
-		template <typename A>
-		ClampedInt& operator-=(A sub)
-		{
-			static_assert(is_int_v<A>);
-			
-			if constexpr (IS_UNLIMITED)
-				m_val -= sub;
-			else
+			void Cancel()
 			{
-				if (sub >= 0)
-				{
-					sub %= RANGE + 1;
-					
-					const uintmax_t rem = m_val - MIN;	// always <= RANGE
-					if (sub > rem)
-					{
-						sub -= rem + 1;
-						m_val = MAX;
-					}
-					
-					m_val -= sub;
-				}
-				else
-				{
-					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= RANGE + 1;
-					
-					const uintmax_t rem = MAX - m_val;
-					if (sub_pos > rem)
-					{
-						sub_pos -= rem + 1;
-						m_val = MIN;
-					}
-					
-					m_val += sub_pos;
-				}
+				m_end = nullptr;
 			}
 			
-			return *this;
-		}
+		private:
+			func_t m_end;
+		};
 		
-		template <typename A>
-		volatile ClampedInt& operator+=(A add) volatile
+		template <class F, typename R = void>
+		using ScopeActionF [[deprecated("Use ScopeAction instead. Will be removed in v0.5.0.")]] = ScopeAction<F, R>;
+		
+		template <typename T, T MIN, T MAX>
+		class ClampedInt
 		{
-			static_assert(is_int_v<A>);
+			static_assert(is_int_v<T>);
 			
-			if constexpr (IS_UNLIMITED)
-				m_val += add;
-			else
-			{
-				if (add >= 0)
-				{
-					add %= RANGE + 1;
-					
-					const uintmax_t rem = MAX - m_val;	// always <= RANGE
-					if (add > rem)
-					{
-						add -= rem + 1;
-						m_val = MIN;
-					}
-					
-					m_val += add;
-				}
-				else
-				{
-					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= RANGE + 1;
-					
-					const uintmax_t rem = m_val - MIN;
-					if (add_pos > rem)
-					{
-						add_pos -= rem + 1;
-						m_val = MAX;
-					}
-					
-					m_val -= add_pos;
-				}
-			}
-			
-			return *this;
-		}
-		
-		template <typename A>
-		volatile ClampedInt& operator-=(A sub) volatile
-		{
-			static_assert(is_int_v<A>);
-			
-			if constexpr (IS_UNLIMITED)
-				m_val -= sub;
-			else
-			{
-				if (sub >= 0)
-				{
-					sub %= RANGE + 1;
-					
-					const uintmax_t rem = m_val - MIN;	// always <= RANGE
-					if (sub > rem)
-					{
-						sub -= rem + 1;
-						m_val = MAX;
-					}
-					
-					m_val -= sub;
-				}
-				else
-				{
-					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= RANGE + 1;
-					
-					const uintmax_t rem = MAX - m_val;
-					if (sub_pos > rem)
-					{
-						sub_pos -= rem + 1;
-						m_val = MIN;
-					}
-					
-					m_val += sub_pos;
-				}
-			}
-			
-			return *this;
-		}
-	};
-	
-	template <typename T>
-	class DynClampedInt
-	{
-		static_assert(is_int_v<T>);
-		
-		uintmax_t m_range;
-		T m_min, m_max, m_val;
-		
-	public:
-		bool IsUnlimited()
-		{
-			return m_min == std::numeric_limits<T>::min() && m_max == std::numeric_limits<T>::max();
-		}
-		
-		
-		DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
-		DynClampedInt(const T val, const T min, const T max) : m_range(max - min), m_min(min), m_max(max), m_val(std::clamp(val, min, max)) {}
-		
-		operator T() const { return m_val; }
-		operator T() const volatile { return m_val; }
-		
-		DynClampedInt& operator=(const T val)
-		{
-			m_val = std::clamp(val, m_min, m_max);
-			return *this;
-		}
-		
-		volatile DynClampedInt& operator=(const T val) volatile
-		{
-			m_val = std::clamp(val, m_min, m_max);
-			return *this;
-		}
-		
-		T val() const { return m_val; }
-		constexpr T min() const { return m_min; }
-		constexpr T max() const { return m_max; }
-		
-		template <typename E>
-		bool operator==(const E val)
-		{
-			static_assert(is_int_v<E>);
-			
-			return m_val == val;
-		}
-		
-		DynClampedInt& operator++()	// prefix
-		{
-			if (m_val >= m_max)
-				m_val = m_min;
-			else
-				m_val++;
-			
-			return *this;
-		}
-		
-		DynClampedInt& operator--()	// prefix
-		{
-			if (m_val <= m_min)
-				m_val = m_max;
-			else
-				m_val--;
-			
-			return *this;
-		}
-		
-		DynClampedInt operator++(int)	// postfix
-		{
-			DynClampedInt val = *this;
-			
-			if (m_val >= m_max)
-				m_val = m_min;
-			else
-				m_val++;
-			
-			return val;
-		}
-		
-		DynClampedInt operator--(int)	// postfix
-		{
-			DynClampedInt val = *this;
-			
-			if (m_val <= m_min)
-				m_val = m_max;
-			else
-				m_val--;
-			
-			return val;
-		}
-		
-		volatile DynClampedInt& operator++() volatile	// prefix
-		{
-			if (m_val >= m_max)
-				m_val = m_min;
-			else
-				m_val++;
-			
-			return *this;
-		}
-		
-		volatile DynClampedInt& operator--() volatile	// prefix
-		{
-			if (m_val <= m_min)
-				m_val = m_max;
-			else
-				m_val--;
-			
-			return *this;
-		}
-		
-		DynClampedInt operator++(int) volatile	// postfix
-		{
-			DynClampedInt val = *this;
-			
-			if (m_val >= m_max)
-				m_val = m_min;
-			else
-				m_val++;
-			
-			return val;
-		}
-		
-		DynClampedInt operator--(int) volatile	// postfix
-		{
-			DynClampedInt val = *this;
-			
-			if (m_val <= m_min)
-				m_val = m_max;
-			else
-				m_val--;
-			
-			return val;
-		}
-		
-		template <typename A>
-		DynClampedInt& operator+=(A add)
-		{
-			static_assert(is_int_v<A>);
-			
-			if (IsUnlimited())
-				m_val += add;
-			else
-			{
-				if (add >= 0)
-				{
-					add %= m_range + 1;
-					
-					const uintmax_t rem = m_max - m_val;	// always <= RANGE
-					if (add > rem)
-					{
-						add -= rem + 1;
-						m_val = m_min;
-					}
-					
-					m_val += add;
-				}
-				else
-				{
-					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= m_range + 1;
-					
-					const uintmax_t rem = m_val - m_min;
-					if (add_pos > rem)
-					{
-						add_pos -= rem + 1;
-						m_val = m_max;
-					}
-					
-					m_val -= add_pos;
-				}
-			}
-			
-			return *this;
-		}
-		
-		template <typename A>
-		DynClampedInt& operator-=(A sub)
-		{
-			static_assert(is_int_v<A>);
-			
-			if constexpr (IsUnlimited())
-				m_val -= sub;
-			else
-			{
-				if (sub >= 0)
-				{
-					sub %= m_range + 1;
-					
-					const uintmax_t rem = m_val - m_min;	// always <= RANGE
-					if (sub > rem)
-					{
-						sub -= rem + 1;
-						m_val = m_max;
-					}
-					
-					m_val -= sub;
-				}
-				else
-				{
-					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= m_range + 1;
-					
-					const uintmax_t rem = m_max - m_val;
-					if (sub_pos > rem)
-					{
-						sub_pos -= rem + 1;
-						m_val = m_min;
-					}
-					
-					m_val += sub_pos;
-				}
-			}
-			
-			return *this;
-		}
-		
-		template <typename A>
-		volatile DynClampedInt& operator+=(A add) volatile
-		{
-			static_assert(is_int_v<A>);
-			
-			if (IsUnlimited())
-				m_val += add;
-			else
-			{
-				if (add >= 0)
-				{
-					add %= m_range + 1;
-					
-					const uintmax_t rem = m_max - m_val;	// always <= RANGE
-					if (add > rem)
-					{
-						add -= rem + 1;
-						m_val = m_min;
-					}
-					
-					m_val += add;
-				}
-				else
-				{
-					uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
-					add_pos %= m_range + 1;
-					
-					const uintmax_t rem = m_val - m_min;
-					if (add_pos > rem)
-					{
-						add_pos -= rem + 1;
-						m_val = m_max;
-					}
-					
-					m_val -= add_pos;
-				}
-			}
-			
-			return *this;
-		}
-		
-		template <typename A>
-		volatile DynClampedInt& operator-=(A sub) volatile
-		{
-			static_assert(is_int_v<A>);
-			
-			if constexpr (IsUnlimited())
-				m_val -= sub;
-			else
-			{
-				if (sub >= 0)
-				{
-					sub %= m_range + 1;
-					
-					const uintmax_t rem = m_val - m_min;	// always <= RANGE
-					if (sub > rem)
-					{
-						sub -= rem + 1;
-						m_val = m_max;
-					}
-					
-					m_val -= sub;
-				}
-				else
-				{
-					uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
-					sub_pos %= m_range + 1;
-					
-					const uintmax_t rem = m_max - m_val;
-					if (sub_pos > rem)
-					{
-						sub_pos -= rem + 1;
-						m_val = m_min;
-					}
-					
-					m_val += sub_pos;
-				}
-			}
-			
-			return *this;
-		}
-		
-		void SetMax(T max)
-		{
-			m_max = max;
-			m_range = m_max - m_min;
-			
-			if (m_val > max)
-				m_val = max;
-		}
-		
-		void SetMin(T min)
-		{
-			m_min = min;
-			m_range = m_max - m_min;
-			
-			if (m_val > min)
-				m_val = min;
-		}
-	};
-	
-	/**
-	* @brief Similar to std::forward_list. Useful for queuing work inside an ISR to be handled in the main loop.
-	*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
-	* @note In very rare cases, it might not be able to add items to the list. Do not use for critical information.
-	*/
-	template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
-	class LinkedList
-	{
-		static_assert(MAX_SIZE > 0 && MAX_SIZE < SIZE_MAX);
-		
-		class container
-		{
-			friend class LinkedList<T, MAX_SIZE>;
-			
-			container *p_next = nullptr;
 			T m_val;
 			
-			container(const T& val) : m_val(val) {}
-			container(T&& val) : m_val(std::move(val)) {}
-		};
-		
-		container *p_list = nullptr;
-		size_t m_size = 0;
-		volatile size_t removing = SIZE_MAX;
-		
-		container ** find_end()
-		{
-			if (full())
-				return nullptr;
-			
-			if (m_size && removing == m_size - 1)	// fixme
-				return nullptr;
-			
-			container **end = &p_list;
-			
-			while (*end)	// Not relying on m_size because it might not be in sync with p_list.
-				end = &((*end)->p_next);
-			
-			return end;
-		}
-		
-	public:
-		template <typename U>
-		class _iterator
-		{
-			friend class LinkedList<T, MAX_SIZE>;
-			
-			container* m_con;
-			size_t m_index;
-			
-			_iterator() : m_con(nullptr), m_index(SIZE_MAX) {}
-			_iterator(container *p, size_t index) : m_con(p), m_index(index) {}
-			
 		public:
-			_iterator(const _iterator<std::remove_const_t<U>>& other) : m_con(other.m_con), m_index(other.m_index) {}
+			static constexpr T VAL_MIN = MIN, VAL_MAX = MAX;
+			static constexpr uintmax_t RANGE = MAX - MIN;
+			static constexpr bool IS_UNLIMITED = MIN == std::numeric_limits<T>::min() && MAX == std::numeric_limits<T>::max();
 			
-			~_iterator() {}
 			
-			using difference_type = std::ptrdiff_t;
-			using value_type = U;
-			using reference = U&;
-			using pointer = U*;
-			using iterator_category = std::forward_iterator_tag;
+			constexpr ClampedInt() : m_val(std::clamp(T(0), MIN, MAX)) {}
+			constexpr ClampedInt(const T val) : m_val(std::clamp(val, MIN, MAX)) {}
 			
-			reference operator*() const { return m_con->m_val; }
-			pointer operator->() const { return &m_con->m_val; }
+			constexpr operator T() const { return m_val; }
+			constexpr operator T() const volatile { return m_val; }
 			
-			_iterator& operator++()
+			ClampedInt& operator=(const T val)
 			{
-				m_con = m_con->p_next;
-				++m_index;
+				if constexpr (IS_UNLIMITED)
+					m_val = val;
+				else
+					m_val = std::clamp(val, MIN, MAX);
+				
 				return *this;
 			}
 			
-			_iterator operator++(int)
+			volatile ClampedInt& operator=(const T val) volatile
 			{
-				auto tmp = *this;
-				++*this;
-				return tmp;
+				m_val = std::clamp(val, MIN, MAX);
+				return *this;
 			}
 			
-			bool operator==(const _iterator& other) const { return m_con == other.m_con; }
-			bool operator!=(const _iterator& other) const { return !operator==(other); }
-		};
-		
-		using iterator = _iterator<T>;
-		using const_iterator = _iterator<const T>;
-		
-		LinkedList() {}
-		~LinkedList()
-		{
-			while (pop_front());
-		}
-		
-		/**
-		* @note Must not be called on an empty linked_list.
-		*/
-		T& front() const { return p_list->m_val; }
-		
-		bool empty() const { return !m_size; }
-		bool full() const { return m_size >= MAX_SIZE; }
-		size_t size() const { return m_size; }
-		
-		iterator begin() noexcept { return iterator(p_list, 0); }
-		const_iterator begin() const noexcept { return const_iterator(p_list, 0); }
-		const_iterator cbegin() const noexcept { return const_iterator(p_list, 0); }
-		
-		iterator end() noexcept { return iterator(); }
-		const_iterator end() const noexcept { return const_iterator(); }
-		const_iterator cend() const noexcept { return const_iterator(); }
-		
-		/**
-		* @brief Meant to be called from the main loop.
-		*/
-		bool pop_front()
-		{
-			return erase(0);
-		}
-		
-		bool erase(const size_t pos)
-		{
-			if (pos >= m_size)
-				return false;
+			constexpr T val() const { return m_val; }
+			constexpr T min() const { return MIN; }
+			constexpr T max() const { return MAX; }
 			
-			container **current = &p_list;
-			
-			for (size_t i = 0; i < pos; ++i)
-				current = &((*current)->p_next);
-			
-			container *elem = *current;
-			
-			removing = pos;
-			*current = (*current)->p_next;
-			removing = SIZE_MAX;
-			
-			--m_size;
-			delete elem;
-			
-			return true;
-		}
-		
-		iterator erase_after(const_iterator iter)
-		{
-			container *elem = iter->p_next;
-			
-			removing = iter.m_index + 1;
-			iter->p_next = elem->p_next;
-			removing = SIZE_MAX;
-			
-			--m_size;
-			delete elem;
-			
-			++iter;
-			return iterator(iter.m_con, iter.m_index);
-		}
-		
-		iterator erase(const_iterator iter)
-		{
-			const size_t index = iter.m_index;
-			++iter;
-			erase(index);
-			--iter.m_index;
-			return iterator(iter.m_con, iter.m_index);
-		}
-		
-		/**
-		* @brief Meant to be called from an ISR.
-		* @note Don't call this from multiple ISRs with different priorities.
-		*/
-		template <class... Args>
-		bool emplace_back(Args&&... args)
-		{
-			container **end = find_end();
-			if (!end)
-				return false;
-			
-			*end = new container(T{args...});
-			++m_size;
-			
-			return true;
-		}
-		
-		bool push_back(const T& t)
-		{
-			container **end = find_end();
-			if (!end)
-				return false;
-			
-			*end = new container(t);
-			++m_size;
-			
-			return true;
-		}
-		
-		bool push_back(T&& t)
-		{
-			container **end = find_end();
-			if (!end)
-				return false;
-			
-			*end = new container(std::move(t));
-			++m_size;
-			
-			return true;
-		}
-	};
-	
-	template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
-	class StaticQueue
-	{
-	protected:
-		static_assert(std::is_unsigned_v<INDEX_T>);
-		static_assert(MAX_SIZE - 1 <= std::numeric_limits<INDEX_T>::max());
-		
-		using index_t = ClampedInt<INDEX_T, 0, MAX_SIZE - 1>;
-		
-		T m_items[MAX_SIZE];
-		
-		// m_front always modified in pop_front() and m_back always modified in push_back().
-		volatile index_t m_front = 0, m_back = 0;
-		
-	public:
-		StaticQueue() {}
-		~StaticQueue() {}
-		
-		bool empty() const
-		{
-			return m_front == m_back;
-		}
-		
-		bool full() const
-		{
-			index_t end = m_back;
-			return (++end).val() == m_front;
-		}
-		
-		void clear()
-		{
-			m_front = m_back;
-		}
-		
-		size_t size() const
-		{
-			index_t begin = m_front, end = m_back;
-			
-			if (end >= begin)
-				return end - begin;
-			
-			return MAX_SIZE - (begin - end);
-		}
-		
-		bool push_back(T&& t)
-		{
-			if (full())
-				return false;
-			
-			m_items[m_back++] = std::move(t);
-			return true;
-		}
-		
-		bool push_back(const T& t)
-		{
-			if (full())
-				return false;
-			
-			m_items[m_back++] = t;
-			return true;
-		}
-		
-		std::optional<T> pop_back()
-		{
-			if (empty())
-				return std::nullopt;
-			
-			return std::move(m_items[--m_back]);
-		}
-		
-		std::optional<T> pop_front()
-		{
-			if (empty())
-				return std::nullopt;
-			
-			return std::move(m_items[m_front++]);
-		}
-		
-		size_t erase(size_t count)
-		{
-			size_t _size = size();
-			if (count > _size)
-				count = _size;
-			
-			m_front += count;
-			return count;
-		}
-		
-		T& operator[](size_t i)
-		{
-			index_t index = m_front;
-			return m_items[index += i];
-		}
-	};
-	
-	template <class T, size_t MAX_SIZE = 256>
-	class PriorityQueue : protected StaticQueue<T, MAX_SIZE, uint8_t>
-	{
-		using parent = StaticQueue<T, MAX_SIZE, uint8_t>;
-		
-	public:
-		using prio_t = uint8_t;
-		
-	private:
-		using typename parent::index_t;
-		using parent::m_back;
-		using parent::m_front;
-		using parent::m_items;
-		
-		prio_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
-		
-	public:
-		PriorityQueue() {}
-		~PriorityQueue() {}
-		
-		using parent::empty;
-		using parent::full;
-		using parent::clear;
-		
-		enum class PopAction : uint8_t { Cancel, Stop, RemNone, RemFirst, RemSecond, RemBoth };
-		
-		/**
-		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
-		*/
-		void push_back(T&& t, const prio_t prio = 1)
-		{
-			if (full() || !prio)
-				return;
-			
-			m_prio[m_back] = prio;
-			parent::push_back(std::move(t));
-		}
-		
-		/**
-		* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
-		*/
-		void push_back(const T& t, const prio_t prio = 1)
-		{
-			if (full() || !prio)
-				return;
-			
-			m_prio[m_back] = prio;
-			parent::push_back(t);
-		}
-		
-		/**
-		* @param filter - Should return a PopAction value. The behavior of this funtion is determined based on the returned value:
-		*					- Cancel: The search is canceled and nothing is returned.
-		*					- Stop: The search is stopped and the first item is returned.
-		*					- RemNone: The search continues.
-		*					- RemFirst: The first item is removed from the queue and the search continues.
-		*					- RemSecond: The second item is removed from the queue and the search continues.
-		*					- RemBoth: Both items are removed from the queue and the search is restarted.
-		*/
-		std::optional<T> pop_front(const func<PopAction (const T *, std::optional<const T *>)>& filter = nullptr)
-		{
-			const index_t back = m_back, front = m_front;	// For fewer volatile accesses
-			
-			// Find the first index of the highest priority
-			index_t prio_index;
-			prio_t max_prio = 0;
-			for (index_t i = front; i != back; ++i)
+			template <typename E>
+			bool operator==(const E val)
 			{
-				if (m_prio[i] && m_prio[i] > max_prio)	// Ignore previously handled items
-				{
-					max_prio = m_prio[i];
-					prio_index = i;
-				}
-			}
-			
-			if (!max_prio)
-			{
-				m_front = back;		// Can't call clear(). m_back might have changed.
-				return std::nullopt;
-			}
-			
-			if (filter)
-			{
-				index_t i = prio_index;
-				++i;
+				static_assert(is_int_v<E>);
 				
-				for (; i != back; ++i)
+				return m_val == val;
+			}
+			
+			ClampedInt& operator++()	// prefix
+			{
+				if constexpr (IS_UNLIMITED)
+					m_val++;
+				else
 				{
-					if (m_prio[i] == max_prio)
+					if (m_val >= MAX)
+						m_val = MIN;
+					else
+						m_val++;
+				}
+				
+				return *this;
+			}
+			
+			ClampedInt& operator--()	// prefix
+			{
+				if constexpr (IS_UNLIMITED)
+					m_val--;
+				else
+				{
+					if (m_val <= MIN)
+						m_val = MAX;
+					else
+						m_val--;
+				}
+				
+				return *this;
+			}
+			
+			ClampedInt operator++(int)	// postfix
+			{
+				ClampedInt val = *this;
+				
+				if constexpr (IS_UNLIMITED)
+					m_val++;
+				else
+				{
+					if (m_val >= MAX)
+						m_val = MIN;
+					else
+						m_val++;
+				}
+				
+				return val;
+			}
+			
+			ClampedInt operator--(int)	// postfix
+			{
+				ClampedInt val = *this;
+				
+				if constexpr (IS_UNLIMITED)
+					m_val--;
+				else
+				{
+					if (m_val <= MIN)
+						m_val = MAX;
+					else
+						m_val--;
+				}
+				
+				return val;
+			}
+			
+			volatile ClampedInt& operator++() volatile	// prefix
+			{
+				if constexpr (IS_UNLIMITED)
+					m_val++;
+				else
+				{
+					if (m_val >= MAX)
+						m_val = MIN;
+					else
+						m_val++;
+				}
+				
+				return *this;
+			}
+			
+			volatile ClampedInt& operator--() volatile	// prefix
+			{
+				if constexpr (IS_UNLIMITED)
+					m_val--;
+				else
+				{
+					if (m_val <= MIN)
+						m_val = MAX;
+					else
+						m_val--;
+				}
+				
+				return *this;
+			}
+			
+			ClampedInt operator++(int) volatile	// postfix
+			{
+				ClampedInt val = *this;
+				
+				if constexpr (IS_UNLIMITED)
+					m_val++;
+				else
+				{
+					if (m_val >= MAX)
+						m_val = MIN;
+					else
+						m_val++;
+				}
+				
+				return val;
+			}
+			
+			ClampedInt operator--(int) volatile	// postfix
+			{
+				ClampedInt val = *this;
+				
+				if constexpr (IS_UNLIMITED)
+					m_val--;
+				else
+				{
+					if (m_val <= MIN)
+						m_val = MAX;
+					else
+						m_val--;
+				}
+				
+				return val;
+			}
+			
+			template <typename A>
+			ClampedInt& operator+=(A add)
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IS_UNLIMITED)
+					m_val += add;
+				else
+				{
+					if (add >= 0)
 					{
-						const PopAction action = filter(&m_items[prio_index], &m_items[i]);
+						add %= RANGE + 1;
 						
-						switch (action)
+						const uintmax_t rem = MAX - m_val;	// always <= RANGE
+						if (add > rem)
 						{
-							case PopAction::Cancel:
-								goto cleanupOnly;
-							
-							case PopAction::Stop:
-								goto ret;
-							
-							case PopAction::RemNone:
-								break;
-							
-							case PopAction::RemFirst:
-								m_prio[prio_index] = 0;
-								prio_index = i;
-								break;
-							
-							case PopAction::RemSecond:
-								m_prio[i] = 0;
-								break;
-							
-							case PopAction::RemBoth:
-								m_prio[prio_index] = m_prio[i] = 0;
-								return pop_front(filter);
+							add -= rem + 1;
+							m_val = MIN;
 						}
+						
+						m_val += add;
+					}
+					else
+					{
+						uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+						add_pos %= RANGE + 1;
+						
+						const uintmax_t rem = m_val - MIN;
+						if (add_pos > rem)
+						{
+							add_pos -= rem + 1;
+							m_val = MAX;
+						}
+						
+						m_val -= add_pos;
 					}
 				}
 				
-				const PopAction action = filter(&m_items[prio_index], std::nullopt);
-				
-				switch (action)
-				{
-					case PopAction::Cancel:
-						goto cleanupOnly;
-					
-					case PopAction::Stop:
-					case PopAction::RemNone:
-					case PopAction::RemSecond:
-						break;
-					
-					case PopAction::RemFirst:
-					case PopAction::RemBoth:
-						m_front = back;		// Can't call clear(). m_back might have changed.
-						return std::nullopt;
-				}
+				return *this;
 			}
 			
-		ret:
-			m_prio[prio_index] = 0;
+			template <typename A>
+			ClampedInt& operator-=(A sub)
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IS_UNLIMITED)
+					m_val -= sub;
+				else
+				{
+					if (sub >= 0)
+					{
+						sub %= RANGE + 1;
+						
+						const uintmax_t rem = m_val - MIN;	// always <= RANGE
+						if (sub > rem)
+						{
+							sub -= rem + 1;
+							m_val = MAX;
+						}
+						
+						m_val -= sub;
+					}
+					else
+					{
+						uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+						sub_pos %= RANGE + 1;
+						
+						const uintmax_t rem = MAX - m_val;
+						if (sub_pos > rem)
+						{
+							sub_pos -= rem + 1;
+							m_val = MIN;
+						}
+						
+						m_val += sub_pos;
+					}
+				}
+				
+				return *this;
+			}
 			
-			// Remove handled items at the beginning of the list
-			for (index_t i = front; i != back && !m_prio[i]; ++i)
-				++m_front;
+			template <typename A>
+			volatile ClampedInt& operator+=(A add) volatile
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IS_UNLIMITED)
+					m_val += add;
+				else
+				{
+					if (add >= 0)
+					{
+						add %= RANGE + 1;
+						
+						const uintmax_t rem = MAX - m_val;	// always <= RANGE
+						if (add > rem)
+						{
+							add -= rem + 1;
+							m_val = MIN;
+						}
+						
+						m_val += add;
+					}
+					else
+					{
+						uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+						add_pos %= RANGE + 1;
+						
+						const uintmax_t rem = m_val - MIN;
+						if (add_pos > rem)
+						{
+							add_pos -= rem + 1;
+							m_val = MAX;
+						}
+						
+						m_val -= add_pos;
+					}
+				}
+				
+				return *this;
+			}
 			
-			return std::move(m_items[prio_index]);
+			template <typename A>
+			volatile ClampedInt& operator-=(A sub) volatile
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IS_UNLIMITED)
+					m_val -= sub;
+				else
+				{
+					if (sub >= 0)
+					{
+						sub %= RANGE + 1;
+						
+						const uintmax_t rem = m_val - MIN;	// always <= RANGE
+						if (sub > rem)
+						{
+							sub -= rem + 1;
+							m_val = MAX;
+						}
+						
+						m_val -= sub;
+					}
+					else
+					{
+						uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+						sub_pos %= RANGE + 1;
+						
+						const uintmax_t rem = MAX - m_val;
+						if (sub_pos > rem)
+						{
+							sub_pos -= rem + 1;
+							m_val = MIN;
+						}
+						
+						m_val += sub_pos;
+					}
+				}
+				
+				return *this;
+			}
+		};
+		
+		template <typename T>
+		class DynClampedInt
+		{
+			static_assert(is_int_v<T>);
 			
-		cleanupOnly:
-			// Remove handled items at the beginning of the list
-			for (index_t i = front; i != back && !m_prio[i]; ++i)
-				++m_front;
+			uintmax_t m_range;
+			T m_min, m_max, m_val;
 			
-			return std::nullopt;
-		}
-	};
-	
-	template<bool condition>
-	struct warn_if {};
+		public:
+			constexpr bool IsUnlimited() const { return m_min == std::numeric_limits<T>::min() && m_max == std::numeric_limits<T>::max(); }
+			
+			constexpr DynClampedInt(const T min, const T max) : DynClampedInt(T(0), min, max) {}
+			constexpr DynClampedInt(const T val, const T min, const T max) : m_range(max - min), m_min(min), m_max(max), m_val(std::clamp(val, min, max)) {}
+			
+			DynClampedInt& operator=(const T val)
+			{
+				m_val = std::clamp(val, m_min, m_max);
+				return *this;
+			}
+			
+			volatile DynClampedInt& operator=(const T val) volatile
+			{
+				m_val = std::clamp(val, m_min, m_max);
+				return *this;
+			}
+			
+			constexpr operator T() const { return m_val; }
+			constexpr operator T() const volatile { return m_val; }
+			
+			constexpr T val() const { return m_val; }
+			constexpr T min() const { return m_min; }
+			constexpr T max() const { return m_max; }
+			
+			void SetMax(T max)
+			{
+				m_max = max;
+				m_range = m_max - m_min;
+				
+				if (m_val > max)
+					m_val = max;
+			}
+			
+			void SetMin(T min)
+			{
+				m_min = min;
+				m_range = m_max - m_min;
+				
+				if (m_val < min)
+					m_val = min;
+			}
+			
+			template <typename E>
+			constexpr bool operator==(const E val) const
+			{
+				static_assert(is_int_v<E>);
+				
+				return m_val == val;
+			}
+			
+			DynClampedInt& operator++()	// prefix
+			{
+				if (m_val >= m_max)
+					m_val = m_min;
+				else
+					m_val++;
+				
+				return *this;
+			}
+			
+			DynClampedInt& operator--()	// prefix
+			{
+				if (m_val <= m_min)
+					m_val = m_max;
+				else
+					m_val--;
+				
+				return *this;
+			}
+			
+			DynClampedInt operator++(int)	// postfix
+			{
+				DynClampedInt val = *this;
+				
+				if (m_val >= m_max)
+					m_val = m_min;
+				else
+					m_val++;
+				
+				return val;
+			}
+			
+			DynClampedInt operator--(int)	// postfix
+			{
+				DynClampedInt val = *this;
+				
+				if (m_val <= m_min)
+					m_val = m_max;
+				else
+					m_val--;
+				
+				return val;
+			}
+			
+			volatile DynClampedInt& operator++() volatile	// prefix
+			{
+				if (m_val >= m_max)
+					m_val = m_min;
+				else
+					m_val++;
+				
+				return *this;
+			}
+			
+			volatile DynClampedInt& operator--() volatile	// prefix
+			{
+				if (m_val <= m_min)
+					m_val = m_max;
+				else
+					m_val--;
+				
+				return *this;
+			}
+			
+			DynClampedInt operator++(int) volatile	// postfix
+			{
+				DynClampedInt val = *this;
+				
+				if (m_val >= m_max)
+					m_val = m_min;
+				else
+					m_val++;
+				
+				return val;
+			}
+			
+			DynClampedInt operator--(int) volatile	// postfix
+			{
+				DynClampedInt val = *this;
+				
+				if (m_val <= m_min)
+					m_val = m_max;
+				else
+					m_val--;
+				
+				return val;
+			}
+			
+			template <typename A>
+			DynClampedInt& operator+=(A add)
+			{
+				static_assert(is_int_v<A>);
+				
+				if (IsUnlimited())
+					m_val += add;
+				else
+				{
+					if (add >= 0)
+					{
+						add %= m_range + 1;
+						
+						const uintmax_t rem = m_max - m_val;	// always <= RANGE
+						if (add > rem)
+						{
+							add -= rem + 1;
+							m_val = m_min;
+						}
+						
+						m_val += add;
+					}
+					else
+					{
+						uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+						add_pos %= m_range + 1;
+						
+						const uintmax_t rem = m_val - m_min;
+						if (add_pos > rem)
+						{
+							add_pos -= rem + 1;
+							m_val = m_max;
+						}
+						
+						m_val -= add_pos;
+					}
+				}
+				
+				return *this;
+			}
+			
+			template <typename A>
+			DynClampedInt& operator-=(A sub)
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IsUnlimited())
+					m_val -= sub;
+				else
+				{
+					if (sub >= 0)
+					{
+						sub %= m_range + 1;
+						
+						const uintmax_t rem = m_val - m_min;	// always <= RANGE
+						if (sub > rem)
+						{
+							sub -= rem + 1;
+							m_val = m_max;
+						}
+						
+						m_val -= sub;
+					}
+					else
+					{
+						uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+						sub_pos %= m_range + 1;
+						
+						const uintmax_t rem = m_max - m_val;
+						if (sub_pos > rem)
+						{
+							sub_pos -= rem + 1;
+							m_val = m_min;
+						}
+						
+						m_val += sub_pos;
+					}
+				}
+				
+				return *this;
+			}
+			
+			template <typename A>
+			volatile DynClampedInt& operator+=(A add) volatile
+			{
+				static_assert(is_int_v<A>);
+				
+				if (IsUnlimited())
+					m_val += add;
+				else
+				{
+					if (add >= 0)
+					{
+						add %= m_range + 1;
+						
+						const uintmax_t rem = m_max - m_val;	// always <= RANGE
+						if (add > rem)
+						{
+							add -= rem + 1;
+							m_val = m_min;
+						}
+						
+						m_val += add;
+					}
+					else
+					{
+						uintmax_t add_pos = static_cast<uintmax_t>((add + 1) * -1) + 1;
+						add_pos %= m_range + 1;
+						
+						const uintmax_t rem = m_val - m_min;
+						if (add_pos > rem)
+						{
+							add_pos -= rem + 1;
+							m_val = m_max;
+						}
+						
+						m_val -= add_pos;
+					}
+				}
+				
+				return *this;
+			}
+			
+			template <typename A>
+			volatile DynClampedInt& operator-=(A sub) volatile
+			{
+				static_assert(is_int_v<A>);
+				
+				if constexpr (IsUnlimited())
+					m_val -= sub;
+				else
+				{
+					if (sub >= 0)
+					{
+						sub %= m_range + 1;
+						
+						const uintmax_t rem = m_val - m_min;	// always <= RANGE
+						if (sub > rem)
+						{
+							sub -= rem + 1;
+							m_val = m_max;
+						}
+						
+						m_val -= sub;
+					}
+					else
+					{
+						uintmax_t sub_pos = static_cast<uintmax_t>((sub + 1) * -1) + 1;
+						sub_pos %= m_range + 1;
+						
+						const uintmax_t rem = m_max - m_val;
+						if (sub_pos > rem)
+						{
+							sub_pos -= rem + 1;
+							m_val = m_min;
+						}
+						
+						m_val += sub_pos;
+					}
+				}
+				
+				return *this;
+			}
+		};
+		
+		/**
+		* @brief Similar to std::forward_list. Useful for queuing work inside an ISR to be handled in the main loop.
+		*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
+		* @note In very rare cases, it might not be able to add items to the list. Do not use for critical information.
+		*/
+		template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
+		class [[deprecated]] LinkedList
+		{
+			static_assert(MAX_SIZE > 0 && MAX_SIZE < SIZE_MAX);
+			
+			class container
+			{
+				friend class LinkedList<T, MAX_SIZE>;
+				
+				container *p_next = nullptr;
+				T m_val;
+				
+				container(const T& val) : m_val(val) {}
+				container(T&& val) : m_val(std::move(val)) {}
+			};
+			
+			container *p_list = nullptr;
+			size_t m_size = 0;
+			volatile size_t removing = SIZE_MAX;
+			
+			container ** find_end()
+			{
+				if (full())
+					return nullptr;
+				
+				if (m_size && removing == m_size - 1)	// fixme
+					return nullptr;
+				
+				container **end = &p_list;
+				
+				while (*end)	// Not relying on m_size because it might not be in sync with p_list.
+					end = &((*end)->p_next);
+				
+				return end;
+			}
+			
+		public:
+			template <typename U>
+			class _iterator
+			{
+				friend class LinkedList<T, MAX_SIZE>;
+				
+				container* m_con;
+				size_t m_index;
+				
+				_iterator() : m_con(nullptr), m_index(SIZE_MAX) {}
+				_iterator(container *p, size_t index) : m_con(p), m_index(index) {}
+				
+			public:
+				_iterator(const _iterator<std::remove_const_t<U>>& other) : m_con(other.m_con), m_index(other.m_index) {}
+				
+				~_iterator() {}
+				
+				using difference_type = std::ptrdiff_t;
+				using value_type = U;
+				using reference = U&;
+				using pointer = U*;
+				using iterator_category = std::forward_iterator_tag;
+				
+				reference operator*() const { return m_con->m_val; }
+				pointer operator->() const { return &m_con->m_val; }
+				
+				_iterator& operator++()
+				{
+					m_con = m_con->p_next;
+					++m_index;
+					return *this;
+				}
+				
+				_iterator operator++(int)
+				{
+					auto tmp = *this;
+					++*this;
+					return tmp;
+				}
+				
+				bool operator==(const _iterator& other) const { return m_con == other.m_con; }
+				bool operator!=(const _iterator& other) const { return !operator==(other); }
+			};
+			
+			using iterator = _iterator<T>;
+			using const_iterator = _iterator<const T>;
+			
+			LinkedList() {}
+			~LinkedList()
+			{
+				while (pop_front());
+			}
+			
+			/**
+			* @note Must not be called on an empty linked_list.
+			*/
+			T& front() const { return p_list->m_val; }
+			
+			bool empty() const { return !m_size; }
+			bool full() const { return m_size >= MAX_SIZE; }
+			size_t size() const { return m_size; }
+			
+			iterator begin() noexcept { return iterator(p_list, 0); }
+			const_iterator begin() const noexcept { return const_iterator(p_list, 0); }
+			const_iterator cbegin() const noexcept { return const_iterator(p_list, 0); }
+			
+			iterator end() noexcept { return iterator(); }
+			const_iterator end() const noexcept { return const_iterator(); }
+			const_iterator cend() const noexcept { return const_iterator(); }
+			
+			/**
+			* @brief Meant to be called from the main loop.
+			*/
+			bool pop_front()
+			{
+				return erase(0);
+			}
+			
+			bool erase(const size_t pos)
+			{
+				if (pos >= m_size)
+					return false;
+				
+				container **current = &p_list;
+				
+				for (size_t i = 0; i < pos; ++i)
+					current = &((*current)->p_next);
+				
+				container *elem = *current;
+				
+				removing = pos;
+				*current = (*current)->p_next;
+				removing = SIZE_MAX;
+				
+				--m_size;
+				delete elem;
+				
+				return true;
+			}
+			
+			iterator erase_after(const_iterator iter)
+			{
+				container *elem = iter->p_next;
+				
+				removing = iter.m_index + 1;
+				iter->p_next = elem->p_next;
+				removing = SIZE_MAX;
+				
+				--m_size;
+				delete elem;
+				
+				++iter;
+				return iterator(iter.m_con, iter.m_index);
+			}
+			
+			iterator erase(const_iterator iter)
+			{
+				const size_t index = iter.m_index;
+				++iter;
+				erase(index);
+				--iter.m_index;
+				return iterator(iter.m_con, iter.m_index);
+			}
+			
+			/**
+			* @brief Meant to be called from an ISR.
+			* @note Don't call this from multiple ISRs with different priorities.
+			*/
+			template <class... Args>
+			bool emplace_back(Args&&... args)
+			{
+				container **end = find_end();
+				if (!end)
+					return false;
+				
+				*end = new container(T{args...});
+				++m_size;
+				
+				return true;
+			}
+			
+			bool push_back(const T& t)
+			{
+				container **end = find_end();
+				if (!end)
+					return false;
+				
+				*end = new container(t);
+				++m_size;
+				
+				return true;
+			}
+			
+			bool push_back(T&& t)
+			{
+				container **end = find_end();
+				if (!end)
+					return false;
+				
+				*end = new container(std::move(t));
+				++m_size;
+				
+				return true;
+			}
+		};
+		
+		template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
+		class StaticQueue
+		{
+		protected:
+			static_assert(std::is_unsigned_v<INDEX_T>);
+			static_assert(MAX_SIZE - 1 <= std::numeric_limits<INDEX_T>::max());
+			
+			using index_t = ClampedInt<INDEX_T, 0, MAX_SIZE - 1>;
+			
+			T m_items[MAX_SIZE];
+			
+			// m_front always modified in main loop (pop_front) and m_back always modified in ISR (push_back).
+			volatile index_t m_front = 0, m_back = 0;
+			
+		public:
+			StaticQueue() {}
+			~StaticQueue() {}
+			
+			bool empty() const
+			{
+				return m_front == m_back;
+			}
+			
+			bool full() const
+			{
+				index_t end = m_back;
+				return (++end).val() == m_front;
+			}
+			
+			void clear()
+			{
+				m_front = m_back;
+			}
+			
+			size_t size() const
+			{
+				index_t begin = m_front, end = m_back;
+				
+				if (end >= begin)
+					return end - begin;
+				
+				return MAX_SIZE - (begin - end);
+			}
+			
+			bool push_back(T&& t)
+			{
+				if (full())
+					return false;
+				
+				m_items[m_back++] = std::move(t);
+				return true;
+			}
+			
+			bool push_back(const T& t)
+			{
+				if (full())
+					return false;
+				
+				m_items[m_back++] = t;
+				return true;
+			}
+			
+			std::optional<T> pop_back()
+			{
+				if (empty())
+					return std::nullopt;
+				
+				return std::move(m_items[--m_back]);
+			}
+			
+			std::optional<T> pop_front()
+			{
+				if (empty())
+					return std::nullopt;
+				
+				return std::move(m_items[m_front++]);
+			}
+			
+			size_t erase(size_t count)
+			{
+				size_t _size = size();
+				if (count > _size)
+					count = _size;
+				
+				m_front += count;
+				return count;
+			}
+			
+			T& operator[](size_t i)
+			{
+				index_t index = m_front;
+				return m_items[index += i];
+			}
+		};
+		
+		template <class T, size_t MAX_SIZE = 256>
+		class PriorityQueue : protected StaticQueue<T, MAX_SIZE, uint8_t>
+		{
+			using parent = StaticQueue<T, MAX_SIZE, uint8_t>;
+			
+		public:
+			using prio_t = uint8_t;
+			
+		private:
+			using typename parent::index_t;
+			using parent::m_back;
+			using parent::m_front;
+			using parent::m_items;
+			
+			prio_t m_prio[MAX_SIZE] = { 0 };	// 0 means non-existent. Higher number means higher priority.
+			
+		public:
+			PriorityQueue() {}
+			~PriorityQueue() {}
+			
+			using parent::empty;
+			using parent::full;
+			using parent::clear;
+			
+			enum class PopAction : uint8_t { Cancel, Stop, RemNone, RemFirst, RemSecond, RemBoth };
+			
+			/**
+			* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
+			*/
+			void push_back(T&& t, const prio_t prio = 1)
+			{
+				if (full() || !prio)
+					return;
+				
+				m_prio[m_back] = prio;
+				parent::push_back(std::move(t));
+			}
+			
+			/**
+			* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
+			*/
+			void push_back(const T& t, const prio_t prio = 1)
+			{
+				if (full() || !prio)
+					return;
+				
+				m_prio[m_back] = prio;
+				parent::push_back(t);
+			}
+			
+			/**
+			* @param filter - Should return a PopAction value which determines the behavior of this funtion:
+			*					- Cancel: The search is canceled and nothing is returned.
+			*					- Stop: The search is stopped and the first item is returned.
+			*					- RemNone: The search continues.
+			*					- RemFirst: The first item is removed from the queue and the search continues.
+			*					- RemSecond: The second item is removed from the queue and the search continues.
+			*					- RemBoth: Both items are removed from the queue and the search is restarted.
+			*/
+			std::optional<T> pop_front(const func<PopAction (const T *, std::optional<const T *>)>& filter = nullptr)
+			{
+				const index_t back = m_back, front = m_front;	// For fewer volatile accesses
+				
+				// Find the first index of the highest priority
+				index_t prio_index;
+				prio_t max_prio = 0;
+				for (index_t i = front; i != back; ++i)
+				{
+					if (m_prio[i] && m_prio[i] > max_prio)	// Ignore previously handled items
+					{
+						max_prio = m_prio[i];
+						prio_index = i;
+					}
+				}
+				
+				if (!max_prio)
+				{
+					m_front = back;		// Can't call clear(). m_back might have changed.
+					return std::nullopt;
+				}
+				
+				if (filter)
+				{
+					index_t i = prio_index;
+					++i;
+					
+					for (; i != back; ++i)
+					{
+						if (m_prio[i] == max_prio)
+						{
+							const PopAction action = filter(&m_items[prio_index], &m_items[i]);
+							
+							switch (action)
+							{
+								case PopAction::Cancel:
+									goto cleanupOnly;
+								
+								case PopAction::Stop:
+									goto ret;
+								
+								case PopAction::RemNone:
+									break;
+								
+								case PopAction::RemFirst:
+									m_prio[prio_index] = 0;
+									prio_index = i;
+									break;
+								
+								case PopAction::RemSecond:
+									m_prio[i] = 0;
+									break;
+								
+								case PopAction::RemBoth:
+									m_prio[prio_index] = m_prio[i] = 0;
+									return pop_front(filter);
+							}
+						}
+					}
+					
+					const PopAction action = filter(&m_items[prio_index], std::nullopt);
+					
+					switch (action)
+					{
+						case PopAction::Cancel:
+							goto cleanupOnly;
+						
+						case PopAction::Stop:
+						case PopAction::RemNone:
+						case PopAction::RemSecond:
+							break;
+						
+						case PopAction::RemFirst:
+						case PopAction::RemBoth:
+							m_front = back;		// Can't call clear(). m_back might have changed.
+							return std::nullopt;
+					}
+				}
+				
+			ret:
+				m_prio[prio_index] = 0;
+				
+				// Remove handled items at the beginning of the list
+				for (index_t i = front; i != back && !m_prio[i]; ++i)
+					++m_front;
+				
+				return std::move(m_items[prio_index]);
+				
+			cleanupOnly:
+				// Remove handled items at the beginning of the list
+				for (index_t i = front; i != back && !m_prio[i]; ++i)
+					++m_front;
+				
+				return std::nullopt;
+			}
+		};
+		
+		template<bool condition>
+		struct warn_if {};
 
-	template<> struct __attribute__((deprecated)) warn_if<false> { constexpr warn_if() = default; };
-	
-	#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
-	
-	template<typename T>
-	constexpr T pack_be(const void *buf)
-	{
-		static_assert(is_int_v<T>);
+		template<> struct __attribute__((deprecated)) warn_if<false> { constexpr warn_if() = default; };
 		
-		const uint8_t *buf2 = reinterpret_cast<const uint8_t *>(buf);
+		#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
 		
-		T val = 0;
-		for (size_t i = 0; i < sizeof(T); i++)
+		template<typename T>
+		constexpr T pack_be(const void *buf)
 		{
-			val <<= 8;
-			val |= *buf2++;
-		}
-		
-		return val;
-	}
-	
-	template<typename T>
-	constexpr T pack_le(const void *buf)
-	{
-		static_assert(is_int_v<T>);
-		
-		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
-		{
+			static_assert(is_int_v<T>);
+			
 			const uint8_t *buf2 = reinterpret_cast<const uint8_t *>(buf);
 			
 			T val = 0;
-			buf2 += sizeof(T);
 			for (size_t i = 0; i < sizeof(T); i++)
 			{
 				val <<= 8;
-				val |= *--buf2;
+				val |= *buf2++;
 			}
 			
 			return val;
 		}
-		else
-			return *reinterpret_cast<const T*>(buf);
-	}
-	
-	template<typename T>
-	inline size_t unpack_be(void *buf, T val)
-	{
-		static_assert(is_int_v<T>);
 		
-		uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
-		for (int i = sizeof(T) - 1; i >= 0; i--)
-			*buf2++ = val >> (i * 8);
-		
-		return sizeof(T);
-	}
-	
-	template<typename T>
-	inline size_t unpack_le(void *buf, T val)
-	{
-		static_assert(is_int_v<T>);
-		
-		if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+		template<typename T>
+		constexpr T pack_le(const void *buf)
 		{
-			uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
-			for (size_t i = 0; i < sizeof(T); i++)
-				*buf2++ = val >> (i * 8);
+			static_assert(is_int_v<T>);
+			
+			if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+			{
+				const uint8_t *buf2 = reinterpret_cast<const uint8_t *>(buf);
+				
+				T val = 0;
+				buf2 += sizeof(T);
+				for (size_t i = 0; i < sizeof(T); i++)
+				{
+					val <<= 8;
+					val |= *--buf2;
+				}
+				
+				return val;
+			}
+			else
+				return *reinterpret_cast<const T*>(buf);
 		}
-		else
-			*reinterpret_cast<T*>(buf) = val;
 		
-		return sizeof(T);
-	}
-	
-	template<typename T>
-	inline T le2be(const T t)
-	{
-		static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
-		
-		SharedArray<T> _t {.val = t};
-		
-		for (uint8_t i = 0; i < sizeof(T) / 2; i++)
-			std::swap(_t.arr[i], _t.arr[sizeof(T) - 1 - i]);
-		
-		return _t.val;
-	}
-	
-	template <class F, class F2, class R, class... Args>
-	inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, F2&& _fail)
-	{
-		if (_try() == ok)
-			return true;
-		
-		while (retry--)
+		template<typename T>
+		inline size_t unpack_be(void *buf, T val)
 		{
-			HAL_Delay(delay_ms);
+			static_assert(is_int_v<T>);
+			
+			uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
+			for (int i = sizeof(T) - 1; i >= 0; i--)
+				*buf2++ = val >> (i * 8);
+			
+			return sizeof(T);
+		}
+		
+		template<typename T>
+		inline size_t unpack_le(void *buf, T val)
+		{
+			static_assert(is_int_v<T>);
+			
+			if (reinterpret_cast<uintptr_t>(buf) % alignof(T))
+			{
+				uint8_t *buf2 = reinterpret_cast<uint8_t *>(buf);
+				for (size_t i = 0; i < sizeof(T); i++)
+					*buf2++ = val >> (i * 8);
+			}
+			else
+				*reinterpret_cast<T*>(buf) = val;
+			
+			return sizeof(T);
+		}
+		
+		template<typename T>
+		inline T le2be(const T t)
+		{
+			static_assert(!std::is_same_v<T, bool> && std::is_integral_v<T> && sizeof(T) > 1, "");
+			
+			SharedArray<T> _t {.val = t};
+			
+			for (uint8_t i = 0; i < sizeof(T) / 2; i++)
+				std::swap(_t.arr[i], _t.arr[sizeof(T) - 1 - i]);
+			
+			return _t.val;
+		}
+		
+		template <class F, class F2, class R, class... Args>
+		inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, F2&& _fail)
+		{
 			if (_try() == ok)
 				return true;
+			
+			while (retry--)
+			{
+				HAL_Delay(delay_ms);
+				if (_try() == ok)
+					return true;
+			}
+			
+			_fail();
+			
+			return false;
 		}
-		
-		_fail();
-		
-		return false;
-	}
 
-	#define RETRY(_retry_count, _delay_ms, _try, _ok, _fail) \
-	{ \
-		uint8_t _retry = _retry_count; \
-		if (_try != _ok) \
+		#define RETRY(_retry_count, _delay_ms, _try, _ok, _fail) \
 		{ \
-			bool _success = false; \
-			while (_retry--) \
+			uint8_t _retry = _retry_count; \
+			if (_try != _ok) \
 			{ \
-				HAL_Delay(_delay_ms); \
-				if (_try == _ok) \
+				bool _success = false; \
+				while (_retry--) \
 				{ \
-					_success = true; \
-					break; \
+					HAL_Delay(_delay_ms); \
+					if (_try == _ok) \
+					{ \
+						_success = true; \
+						break; \
+					} \
 				} \
+				\
+				if (!_success) \
+					_fail; \
 			} \
-			\
-			if (!_success) \
-				_fail; \
-		} \
+		}
 	}
-	
 }

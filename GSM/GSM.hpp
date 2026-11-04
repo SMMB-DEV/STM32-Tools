@@ -140,7 +140,7 @@ namespace STM32T
 		UART_HandleTypeDef* const p_huart;
 		bool m_urcEnabled = false;
 		
-		void addURCs(const vec<strv>& tokens, size_t len = SIZE_MAX)
+		void addURCs(const std::vector<strv>& tokens, size_t len = SIZE_MAX)
 		{
 			for (size_t i = 0; i < tokens.size() && i < len; ++i)
 				addURC(tokens[i]);
@@ -148,7 +148,7 @@ namespace STM32T
 		
 		void addURCFromBuf(const strv buf)
 		{
-			vec<strv> tokens;
+			std::vector<strv> tokens;
 			buf.tokenize("\r\n"sv, tokens, true);
 			addURCs(tokens);
 		}
@@ -282,7 +282,7 @@ namespace STM32T
 			return 0;
 		}
 		
-		ErrorCode Standard(vec<strv>& tokens)
+		ErrorCode Standard(std::vector<strv>& tokens)
 		{
 			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
@@ -303,7 +303,7 @@ namespace STM32T
 			return ret;
 		}
 		
-		ErrorCode Error(vec<strv>& tokens)
+		ErrorCode Error(std::vector<strv>& tokens)
 		{
 			ErrorCode ret = UNKNOWN;
 			for (size_t i = 0; i < tokens.size(); i++)
@@ -357,7 +357,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& handler,
+		ErrorCode NoToken(const uint32_t timeout, const CommandType type, const strv cmd, const std::function<ErrorCode (strv)>& handler,
 			const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
 			_GET_ARGS(fmt_args);
@@ -394,7 +394,7 @@ namespace STM32T
 		
 		template <size_t CHUNK_LEN = 600, size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		int32_t ReceiveOnline(const uint32_t timeout, const uint32_t dl_to, const CommandType type, const strv cmd,
-			const func<ErrorCode (strv, size_t)>& chunk_handler, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
+			const std::function<ErrorCode (strv, size_t)>& chunk_handler, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
 			_GET_ARGS(fmt_args);
 			
@@ -409,7 +409,7 @@ namespace STM32T
 			
 			const bool urcEnabled = m_urcEnabled;
 			
-			ScopeActionF exit([this, urcEnabled]()
+			ScopeAction exit([this, urcEnabled]()
 			{
 				HAL_UART_AbortReceive_IT(p_huart);
 				ExitOnline();
@@ -468,7 +468,7 @@ namespace STM32T
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (vec<strv>&)>& op,
+		ErrorCode Tokens2(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const std::function<ErrorCode (std::vector<strv>&)>& op,
 			const bool allowSingleEnded = false)
 		{
 			if (!op)
@@ -479,14 +479,14 @@ namespace STM32T
 			if (len < OK)
 				return ErrorCode(len);
 			
-			vec<strv> tokens;
+			std::vector<strv> tokens;
 			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			return op(tokens);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode Tokens3(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const func<ErrorCode (vec<strv>&)>& op,
+		ErrorCode Tokens3(const uint32_t timeout, const CommandType type, const strv cmd, const strv args, const std::function<ErrorCode (std::vector<strv>&)>& op,
 			const bool allowSingleEnded = false)
 		{
 			if (!op)
@@ -497,7 +497,7 @@ namespace STM32T
 			if (len < OK)
 				return ErrorCode(len);
 			
-			vec<strv> tokens;
+			std::vector<strv> tokens;
 			strv(buffer, len).tokenize("\r\n"sv, tokens, !allowSingleEnded);
 			
 			if (tokens.size() == 0 || tokens.back() != "OK"sv)
@@ -512,7 +512,7 @@ namespace STM32T
 		ErrorCode SingleToken(const uint32_t timeout, const CommandType type, const strv cmd, const strv args,
 			const span<const std::pair<strv, ErrorCode>> responses, const bool allowSingleEnded)
 		{
-			return Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
+			return Tokens2<LEN>(timeout, type, cmd, args, [&](std::vector<strv>& tokens)
 			{
 				if (tokens.size() == 1)
 				{
@@ -551,14 +551,14 @@ namespace STM32T
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
 		ErrorCode ResponseToken(const uint32_t timeout, const CommandType type, const strv cmd,
-			const func<ErrorCode (vec<strv>&)>& op, const size_t ok_pos = 1, size_t expectedTokens = 2, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
+			const std::function<ErrorCode (std::vector<strv>&)>& op, const size_t ok_pos = 1, size_t expectedTokens = 2, const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
 			if (!op)
 				return INVALID_PARAM;
 			
 			_GET_ARGS(fmt_args);
 			
-			return Tokens2<LEN + RESPONSE_EXTRA>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](vec<strv>& tokens) mutable -> ErrorCode
+			return Tokens2<LEN + RESPONSE_EXTRA>(timeout, type, cmd, args, [ok_pos, cmd, this, &expectedTokens, &op](std::vector<strv>& tokens) mutable -> ErrorCode
 			{
 				bool ok = tokens.size() >= expectedTokens;
 				size_t offset = 0;
@@ -601,7 +601,7 @@ namespace STM32T
 		}
 		
 		template <size_t ARG_LEN = DEFAULT_ARG_LEN, size_t LEN = DEFAULT_RESPONSE_LEN>
-		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const func<ErrorCode (strv)>& op,
+		ErrorCode DelayedResponseToken(const uint32_t timeout, const CommandType type, const strv cmd, const std::function<ErrorCode (strv)>& op,
 			const std::variant<const char *, const strv> fmt_args = ""sv, ...)
 		{
 			_GET_ARGS(fmt_args);
@@ -609,7 +609,7 @@ namespace STM32T
 			bool done = false;
 			const uint32_t start = HAL_GetTick();
 			
-			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](vec<strv>& tokens)
+			ErrorCode code = Tokens2<LEN>(timeout, type, cmd, args, [&](std::vector<strv>& tokens)
 			{
 				if (tokens.size() < 1  || tokens.size() > 2 || tokens[0] != "OK"sv)
 					return Error(tokens);
@@ -636,7 +636,7 @@ namespace STM32T
 				return code;
 			
 			return ResponseToken<ARG_LEN, LEN>(Time::Remaining_Tick(start, timeout), CommandType::Bare, cmd,
-				[&](vec<strv>& tokens) { return op(tokens[0]); }, SIZE_MAX, 1);
+				[&](std::vector<strv>& tokens) { return op(tokens[0]); }, SIZE_MAX, 1);
 		}
 		
 		template <size_t LEN = DEFAULT_RESPONSE_LEN>
@@ -1077,7 +1077,7 @@ namespace STM32T
 		* @param handler - If it returns true, the urc will be removed and considered handled.
 		* @retval - The number of urcs handled.
 		*/
-		size_t HandleURCs(const func<bool (strv, uint32_t ts)>& handler, const bool stop_when_handled = false)
+		size_t HandleURCs(const std::function<bool (strv, uint32_t ts)>& handler, const bool stop_when_handled = false)
 		{
 			if (!handler)
 				return 0;
