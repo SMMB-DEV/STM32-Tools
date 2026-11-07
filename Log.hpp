@@ -10,33 +10,75 @@
 
 
 
-// [[deprecated]]
+static_assert(STM32T::VER < STM32T::Version(0, 5, 0), "Deprecated macros must be removed!");
+
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
 static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect. It will be removed in v0.5.0." \
-	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig().");
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nThen call STM32T::RT::AddHandler(STM32T::Log::default_output_gpio) and STM32T::Log::SetGPIOConfig() or provide your own custom handler." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
-// [[deprecated]]
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
 #define STM32T_SYS_WRITE_ITM \
 static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect. It will be removed in v0.5.0." \
-	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_itm).");
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nThen call STM32T::RT::AddHandler(STM32T::Log::default_output_itm) or provide your own custom handler." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
-// [[deprecated]]
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
 #define STM32T_SYS_WRITE_UART(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect. It will be removed in v0.5.0." \
-	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle().");
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nThen call STM32T::RT::AddHandler(STM32T::Log::default_output_uart) and STM32T::Log::SetUARTHandle() or provide your own custom handler." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
-// [[deprecated]]
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
 #define STM32T_SYS_WRITE_UART_DMA(PHUART) \
 static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect. It will be removed in v0.5.0." \
-	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle().");
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nThen call STM32T::RT::AddHandler(STM32T::Log::default_output_uart_dma) and STM32T::Log::SetUARTHandle() or provide your own custom handler." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
-// [[deprecated]]
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
 #define STM32T_SYS_WRITE_USB \
 static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect. It will be removed in v0.5.0." \
-	" Use STM32T_SYS_WRITE and call STM32T::Stdout::AddHandler(STM32T::Log::default_output_vcp).");
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nThen call STM32T::RT::AddHandler(STM32T::Log::default_output_vcp) or provide your own custom handler." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
-// [[deprecated]]
-#define STM32T_LOG_SYS_WRITE	static_assert(0, "STM32T_LOG_SYS_WRITE is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T_SYS_WRITE.");
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
+#define STM32T_LOG_SYS_WRITE \
+static_assert(0, "STM32T_LOG_SYS_WRITE is obsolete and has no effect. It will be removed in v0.5.0." \
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
+
+/**
+* @deprecated Will be removed in v0.5.0.
+* @hideinitializer
+*/
+#define STM32T_SYS_WRITE \
+static_assert(0, "STM32T_SYS_WRITE is obsolete and has no effect. It will be removed in v0.5.0." \
+	"\nInclude \"Retarget.hpp\" in exactly one translation unit and define \"STM32T_RT\" before it." \
+	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 
 
@@ -864,79 +906,36 @@ namespace STM32T::Log
 	}
 }
 
-#if __has_include("RTE_Components.h")
 
-#include <vector>
-#include "RTE_Components.h"
+
+static_assert(STM32T::VER < STM32T::Version(0, 5, 0), "Deprecated code must be removed!");
 
 namespace STM32T::Stdout
 {
-	inline std::vector<Log::output_t> _g_handlers;
-	
-#ifdef RTE_Compiler_IO_STDOUT_User
-	/**
-	* @note The logger must not call fflush().
-	*/
+	template <bool B = false>
 	inline void AddHandler(const Log::output_t logger)
 	{
-		if (logger != Log::default_output_stdout)
-		{
-			auto it = std::find(_g_handlers.begin(), _g_handlers.end(), logger);
-			if (it == _g_handlers.end())
-				_g_handlers.push_back(logger);
-		}
+		static_assert(B, "STM32T::Stdout::AddHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::AddHandler instead.");
 	}
 	
+	template <bool B = false>
 	inline void RemoveHandler(const Log::output_t logger)
 	{
-		auto it = std::remove(_g_handlers.begin(), _g_handlers.end(), logger);
-		_g_handlers.erase(it, _g_handlers.end());
+		static_assert(B, "STM32T::Stdout::RemoveHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::RemoveHandler instead.");
 	}
-#endif	// RTE_Compiler_IO_STDOUT_User
 }
 
 namespace STM32T::Stderr
 {
-	inline std::vector<Log::output_t> _g_handlers;
-	
-#ifdef RTE_Compiler_IO_STDERR_User
-	/**
-	* @note The logger must not call fflush().
-	*/
+	template <bool B = false>
 	inline void AddHandler(const Log::output_t logger)
 	{
-		if (logger != Log::default_output_stdout)
-		{
-			auto it = std::find(_g_handlers.begin(), _g_handlers.end(), logger);
-			if (it == _g_handlers.end())
-				_g_handlers.push_back(logger);
-		}
+		static_assert(B, "STM32T::Stderr::AddHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::AddHandler instead.");
 	}
 	
+	template <bool B = false>
 	inline void RemoveHandler(const Log::output_t logger)
 	{
-		auto it = std::remove(_g_handlers.begin(), _g_handlers.end(), logger);
-		_g_handlers.erase(it, _g_handlers.end());
+		static_assert(B, "STM32T::Stderr::RemoveHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::RemoveHandler instead.");
 	}
-#endif	// RTE_Compiler_IO_STDERR_User
 }
-
-#define STM32T_SYS_WRITE \
-extern "C" int _sys_write(int fh, const uint8_t *buf, uint32_t len, int mode) \
-{ \
-	static constexpr int FH_STDIN = 0x8001, FH_STDOUT = 0x8002, FH_STDERR = 0x8003; \
-	\
-	if (fh == FH_STDOUT) \
-		for (auto h : STM32T::Stdout::_g_handlers) h({reinterpret_cast<const char *>(buf), len}, true); \
-	else if (fh == FH_STDERR) \
-		for (auto h : STM32T::Stderr::_g_handlers) h({reinterpret_cast<const char *>(buf), len}, true); \
-	else \
-		return -1; \
-	\
-	return 0; \
-} \
-\
-extern "C" [[gnu::used]] [[gnu::weak]] int stdout_putchar(int ch) { return ch; } \
-extern "C" [[gnu::used]] [[gnu::weak]] int stderr_putchar(int ch) { return ch; }
-
-#endif	// __has_include("RTE_Componetns.h")
