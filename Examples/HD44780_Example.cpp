@@ -1,14 +1,5 @@
-##### [Go Back](./README.md)
-
----
-
-# HD44780
-
-You need to provide the HD44780 object with a read/write function pointer to manipulate the data pins as well as the RS, RW, and EN pins according to their timing specifications. Here is an example of such function:
-
-```C++
 #include <Tools/Display/HD44780.hpp>
-#include <Tools/Core/Timing.hpp>
+#include <Tools/Core/Time.hpp>
 
 static STM32T::IOs<4> g_dataPins =
 std::array{
@@ -39,19 +30,19 @@ static HD44780 lcd(16, 2, [](const bool rw, const bool rs, uint8_t data)
 	{
 		// write
 		g_dataPins.Set(data >> 4);
-		Delay_ns(250u);		// DSW, EH
+		Delay_ns(250u);			// DSW, EH
 	}
 	else
 	{
 		// read
-		Delay_ns(250);		// DDR, EH
+		Delay_ns(250);			// DDR, EH
 		data = g_dataPins.Read() << 4;
 	}
 	
 	en_pin.Reset();
 	last_low_cyc = GetCycle();
 	
-	Delay_ns(10);		// AH, H
+	Delay_ns(10);				// AH, H
 	
 	if (!rw)
 		g_dataPins.Set(0xFF);	// Release all pins
@@ -69,8 +60,8 @@ int main()
     
     lcd.Init().PutStr("Hello, World!");
 }
-```
 
----
-
-##### [Go Back](./README.md)
+/**
+* @example{lineno} HD44780_Example.cpp
+* Example usage of HD44780 class
+*/

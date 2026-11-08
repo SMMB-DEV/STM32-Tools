@@ -1,18 +1,14 @@
-##### [Go Back](../README.md)
-
----
-
 # Core Module
 
 The Core module contains core utilities and header files that are not dependent on other modules or headers in this framework.
 
-# Headers
+## Headers
 
-- [Utils.hpp](./Utils.md): General utility classes and helper functions
-- [strv.hpp](./strv.md): A subclass of std::string_view with added functionality
-- [span.hpp](./span.md): A replacement for std::span
-- [Time.hpp](./Time.md): Timing utilities
+- `span.hpp`: A replacement for `std::span`
+- `strv.hpp`: A subclass of std::string_view with added functionality
+- `Time.hpp`: Timing utilities
+- `Utils.hpp`: General utility classes and helper functions
 
 ---
 
-##### [Go Back](../README.md)
+#### [Go Back](../README.md)

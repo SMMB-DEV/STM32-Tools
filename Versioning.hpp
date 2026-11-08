@@ -1,6 +1,42 @@
+/**
+* @file
+* @brief A simplified implementation of [Semantic Versioning](https://semver.org)
+* # Simplified Semantic Versioning 1.0.0
+*
+* This versioning scheme is mostly identical to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) with limited major, minor, and patch versions (each max. 255) and fewer and more strict [pre-release identifiers](https://semver.org/spec/v2.0.0.html#spec-item-9). [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10) cannot be displayed using this format.
+*
+* If a patch version reaches 255, the next version will increment the minor version and reset the patch to 0 even if it's not actually a minor release. Similarly, after a minor version of 255, the major version is incremented and the minor and patch versions are reset to 0. If the major version reaches 255, maybe contemplate why you need 256 major versions.
+*
+* ## Storage
+*
+* The version can be stored (and transferred) as a 32-bit number divided into four 8-bit sections. Each section holds part of the version information.
+* 
+* |	8 (MSB)	|	8		|	8		|	8 (LSB)					|
+* |-----------|-----------|-----------|---------------------------|
+* |	Major	|	Minor	|	Patch	|	Pre-release identifier	|
+*
+* This makes comparing two versions as easy as comparing two 32-bit numbers while taking into account their precedence.
+*
+* ## Pre-release identifiers
+*
+* These are the **only** valid pre-release identifiers and their associated numeric value:
+* 
+* |	Value	|	Text Form		|	Description							|
+* |-----------|-------------------|---------------------------------------|
+* |	255		|					|	Normal version (not pre-release)	|
+* |	97-127	|	-rc<b>x</b>		|	Release candidate - x from 1 to 31	|
+* |	96		|	-rc, -rc0		|	Release candidate					|
+* |	65-95	|	-beta<b>x</b>	|	Beta version - x from 1 to 31		|
+* |	64		|	-beta, -beta0	|	Beta version						|
+* |	33-63	|	-alpha<b>x</b>	|	Alpha version - x from 1 to 31		|
+* |	32		|	-alpha, -alpha0	|	Alpha version						|
+* |	0		|	-x				|	Unspecified (not a valid pre-release but when comparing versions, it means that pre-release is not considered)	|
+*
+* The pre-release usually goes from _-alpha_ to _-beta_ and then to _-rc_ and finally to a normal version but **it can skip any of these states**.
+*/
+
 #pragma once
 
-#include "./Core/Utils.hpp"
 #include "./Core/strv.hpp"
 
 #include <charconv>
@@ -13,9 +49,7 @@ namespace STM32T
 	{
 		static inline char s_buf_strv[20];
 		
-		SharedArray<uint32_t> m_data;
-		
-		Version(SharedArray<uint32_t> data) : m_data(data) {}
+		uint8_t m_data[4];
 		
 	public:
 		enum PreRelease : uint8_t
@@ -51,47 +85,30 @@ namespace STM32T
 		/**
 		* @brief Constructs an invald Version.
 		*/
-		constexpr Version() : m_data{ .val = 0 } {}
-		constexpr Version(const uint32_t val) : m_data{.val = val} {}
-		constexpr Version(const uint8_t major, const uint8_t minor, const uint8_t patch, const PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
+		constexpr Version() : m_data{} {}
+		constexpr Version(const uint32_t val) : m_data{ uint8_t(val), uint8_t(val >> 8), uint8_t(val >> 16), uint8_t(val >> 24) } {}
+		constexpr Version(uint8_t major, uint8_t minor, uint8_t patch, PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
+		constexpr Version(const uint8_t (&arr)[4]) : m_data{arr[3], arr[2], arr[1], arr[0]} {}
 		
-		constexpr Version(const Version& other) : m_data(other.m_data) {}
+		constexpr Version(const Version& other) : m_data{other.m_data[0], other.m_data[1], other.m_data[2], other.m_data[3]} {}
 		
-		Version(const Version& other, PreRelease new_pr) : m_data(other.m_data)
-		{
-			m_data.arr[0] = new_pr;
-		}
+		Version(const Version& other, PreRelease new_pr) : m_data{new_pr, other.m_data[1], other.m_data[2], other.m_data[3]} {}
 		
 		Version& operator=(const Version& other)
 		{
-			m_data = other.m_data;
+			memcpy(m_data, other.m_data, sizeof(m_data));
 			return *this;
 		}
 		
-		explicit operator uint32_t() const
+		constexpr explicit operator uint32_t() const
 		{
-			return m_data.val;
+			return (Major() << 24) | (Minor() << 16) | (Patch() << 8) | PreRelease();
 		}
 		
-		constexpr uint8_t Major() const
-		{
-			return m_data.arr[3];
-		}
-		
-		constexpr uint8_t Minor() const
-		{
-			return m_data.arr[2];
-		}
-		
-		constexpr uint8_t Patch() const
-		{
-			return m_data.arr[1];
-		}
-		
-		constexpr uint8_t PreRelease() const
-		{
-			return m_data.arr[0];
-		}
+		[[gnu::always_inline]] constexpr uint8_t Major() const { return m_data[3]; }
+		[[gnu::always_inline]] constexpr uint8_t Minor() const { return m_data[2]; }
+		[[gnu::always_inline]] constexpr uint8_t Patch() const { return m_data[1]; }
+		[[gnu::always_inline]] constexpr uint8_t PreRelease() const { return m_data[0]; }
 		
 		constexpr bool Valid() const
 		{
@@ -104,34 +121,24 @@ namespace STM32T
 			return PreRelease();
 		}
 		
-		constexpr bool IsAlpha() const
-		{
-			return PreRelease() >= Alpha0 && PreRelease() <= Alpha31;
-		}
+		constexpr bool IsAlpha() const { return PreRelease() >= Alpha0 && PreRelease() <= Alpha31; }
 		
-		constexpr bool IsBeta() const
-		{
-			return PreRelease() >= Beta0 && PreRelease() <= Beta31;
-		}
+		constexpr bool IsBeta() const { return PreRelease() >= Beta0 && PreRelease() <= Beta31; }
 		
-		constexpr bool IsRC() const
-		{
-			return PreRelease() >= RC0 && PreRelease() <= RC31;
-		}
+		constexpr bool IsRC() const { return PreRelease() >= RC0 && PreRelease() <= RC31; }
 		
-		constexpr bool IsNormal() const
-		{
-			return PreRelease() == Normal;
-		}
+		constexpr bool IsNormal() const { return PreRelease() == Normal; }
 		
 		constexpr bool operator==(const Version& other) const
 		{
 			constexpr uint32_t NO_PR_MASK = 0xFFFF'FF00;
 			
-			if (Complete() && other.Complete())
-				return m_data.val == other.m_data.val;
+			const uint32_t t = uint32_t(*this), o = uint32_t(other);
 			
-			return (m_data.val & NO_PR_MASK) == (other.m_data.val & NO_PR_MASK);
+			if (Complete() && other.Complete())
+				return t == o;
+			
+			return (t & NO_PR_MASK) == (o & NO_PR_MASK);
 		}
 		
 		constexpr bool operator<(const Version& other) const
@@ -267,7 +274,7 @@ namespace STM32T
 		
 		static Version from_strv(strv ver)
 		{
-			SharedArray<uint32_t> data;
+			uint8_t arr[4];
 			
 			constexpr char SEP[] = { '.', '.', '-' };
 			
@@ -283,39 +290,40 @@ namespace STM32T
 						sep_idx = ver.size();
 				}
 				
+				// todo: use strv::to_num
 				uint8_t val;
 				const std::from_chars_result result = std::from_chars(ver.data(), ver.data() + sep_idx, val);
 				
 				if (result.ec != std::errc())
 					return Version();
 				
-				data.arr[sizeof(data) - 1 - i] = val;
+				arr[sizeof(arr) - 1 - i] = val;
 				ver.remove_prefix(std::min(sep_idx + 1, ver.size()));
 			}
 			
 			if (ver.remove_prefix("alpha"sv))
-				data.arr[0] = Alpha0;
+				arr[0] = Alpha0;
 			else if (ver.remove_prefix("beta"sv))
-				data.arr[0] = Beta0;
+				arr[0] = Beta0;
 			else if (ver.remove_prefix("rc"sv))
-				data.arr[0] = RC0;
+				arr[0] = RC0;
 			else if (ver == "x"sv)
-				data.arr[0] = Unspecified;
+				arr[0] = Unspecified;
 			else if (ver.empty())
-				data.arr[0] = Normal;
+				arr[0] = Normal;
 			else
 				return Version();
 			
-			if (!ver.empty() && data.arr[0] != Unspecified && data.arr[0] != Normal)
+			if (!ver.empty() && arr[0] != Unspecified && arr[0] != Normal)
 			{
 				uint8_t val;
 				if (!ver.to_num_raw(val) || val > 31)
 					return Version();
 				
-				data.arr[0] += val;
+				arr[0] += val;
 			}
 			
-			return Version(data);
+			return Version(arr);
 		}
 		
 		void Next()
@@ -324,25 +332,25 @@ namespace STM32T
 			
 			if (pr == Normal)
 			{
-				m_data.arr[0] = Alpha0;
+				m_data[0] = Alpha0;
 				
-				for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; i++);
+				for (uint8_t i = 1; i < 4 && ++m_data[i] == 0; i++);
 			}
 			else if (pr >= Alpha0 && pr < RC31)
-				m_data.arr[0]++;
+				m_data[0]++;
 			else if (pr == RC31)
-				m_data.arr[0] = Normal;
+				m_data[0] = Normal;
 			else
-				m_data.arr[0] = Alpha0;
+				m_data[0] = Alpha0;
 		}
 		
 		void NextNormal()
 		{
-			m_data.arr[0] = Normal;
-			for (uint8_t i = 1; i < 4 && ++m_data.arr[i] == 0; ++i);
+			m_data[0] = Normal;
+			for (uint8_t i = 1; i < 4 && ++m_data[i] == 0; ++i);
 		}
 	};
 	
 	// todo: Check what needs to be removed (deprecated) for each version. Search for "vx.y.z". Also update README.md.
-	constexpr Version VER(0, 3, 3, Version::Normal);	// Current version of the framework
+	constexpr Version VER = (0, 3, 3, Version::Normal);		///< Current version of the framework
 }

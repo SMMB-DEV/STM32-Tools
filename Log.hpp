@@ -1,3 +1,40 @@
+/**
+* @file
+* @brief Logging library with printf formatting, multiple sinks, logging levels, etc.
+*
+* You can use the @ref STM32T::Log::Logger class to create a "static" or "dynamic" logger.
+* Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks).
+* They also support printf-style formatting (+ `"b"`/`"B"` for binary formatting).
+*
+* The output format of loggers is currently fixed:
+*
+* ```log
+* [Timestamp][Level][Module name (if present)]: Log message
+* ```
+*
+* Examples: @ref Log_Static_Example.cpp, @ref Log_Dynamic_Example.cpp
+*
+* ### Default logger
+*
+* There is always a @ref STM32T::Log::g_defaultLogger "default static logger" which is disabled.
+* If you don't need multiple logging modules or simply want a main logging module, you can use the default logger.
+*
+* You can use the @ref default_log_macros "STM32T_DEFAULT_LOG_XXX" macros to change the attributes of the default logger
+* (including setting the level to something other than @ref STM32T::Log::Level::None which enables the logger).
+*
+* Example: @ref Log_Default_Example.cpp
+* @see default_log_macros
+*
+* ### Default outputs
+*
+* The outputs of a logger must be of type @ref STM32T::Log::output_t.
+* @see log_outputs
+*
+* By default all loggers use @ref STM32T::Log::default_output_stdout as their only sink.
+* You can of course use your own custom output (e.g. to log to an SD card).
+* @see Retarget.hpp
+*/
+
 #pragma once
 
 #include "./Core/strv.hpp"
@@ -82,11 +119,22 @@ static_assert(0, "STM32T_SYS_WRITE is obsolete and has no effect. It will be rem
 
 
 
+/// Logging utilities
 namespace STM32T::Log
 {
+	/**
+	* Specifies the logging level.
+	* Messages are displayed up to the set level. For example a logger with @ref Level::Warning doesn't show @ref Level::Info messages.
+	*/
 	enum class Level : uint8_t
 	{
-		None, Fatal, Error, Warning, Info, Debug, Max = 255
+		None,		///< Disables the logger
+		Fatal,		///< For unrecoverable conditions (calls the @ref Logger::fatal_handler "fatal handler")
+		Error,		///< For errors (calls the @ref Logger::error_handler "error handler")
+		Warning,	///< For warnings
+		Info,		///< For general information
+		Debug,		///< For debug messages (usually not shown to the user)
+		Max = 255
 	};
 	
 	inline strv LevelStr(Level level)
@@ -105,7 +153,7 @@ namespace STM32T::Log
 	
 	using timestamp_t = const char * (*)();
 	using handler_t = void (*)();
-	using output_t = void (*)(strv data, bool last_chunk);
+	using output_t = void (*)(strv data, bool last_chunk);	///< Function pointer for log outputs
 	
 	inline const char * default_timestamp()
 	{
@@ -115,6 +163,15 @@ namespace STM32T::Log
 		return str;
 	}
 	
+	/**
+	* @defgroup log_outputs Predefined logger outputs
+	* @brief These can be used as outputs for @ref Logger "loggers" and for @ref Retarget.hpp "retargeting" `stdout`, `stderr`, etc.
+	*/
+	
+	/**
+	* Writes to `stdout`.
+	* @ingroup log_outputs
+	*/
 	inline void default_output_stdout(strv data, bool last_chunk)
 	{
 		fwrite(data.data(), 1, data.size(), stdout);
@@ -189,6 +246,7 @@ namespace STM32T::Log
 		Parity parity;
 	} inline _g_stdout_gpio;
 	
+	/// Sets the GPIO pin used in @ref default_output_gpio.
 	inline void SetGPIOConfig(GPIO_TypeDef *port, uint16_t pin, uint32_t baud, uint8_t data_bits = 8, GPIOConfig::Parity parity = GPIOConfig::None)
 	{
 		_g_stdout_gpio.port = port;
@@ -198,6 +256,11 @@ namespace STM32T::Log
 		_g_stdout_gpio.parity = parity;
 	}
 	
+	/**
+	* Emulates UART using GPIO.
+	* @see SetGPIOConfig
+	* @ingroup log_outputs
+	*/
 	inline void default_output_gpio(strv data, bool last_chunk)
 	{
 		static volatile Time::cycle_t s_start = 0;	// fixme: this doesn't work
@@ -268,6 +331,10 @@ namespace STM32T::Log
 	}
 	
 	#ifdef ITM
+	/**
+	* Needs a debugger.
+	* @ingroup log_outputs
+	*/
 	inline void default_output_itm(strv data, bool last_chunk)	// todo: Rewrite (Unlock and enable ITM, check DWT status if necessary)
 	{
 		// ITM enabled & ITM port #0 enabled
@@ -285,14 +352,17 @@ namespace STM32T::Log
 	#ifdef HAL_UART_MODULE_ENABLED
 	inline UART_HandleTypeDef *_g_huart = nullptr;
 	
+	/// Set the UART handle used in @ref default_output_uart and @ref default_output_uart_dma.
 	inline void SetUARTHandle(UART_HandleTypeDef *huart) { _g_huart = huart; }
 	
+	/// Flushes outputs using UART. @see SetUARTHandle @ingroup log_outputs
 	inline void default_output_uart(strv data, bool last_chunk)
 	{
 		if (_g_huart)
 			HAL_UART_Transmit(_g_huart, reinterpret_cast<const uint8_t *>(data.data()), data.size(), HAL_MAX_DELAY);
 	}
 	
+	/// Flushes outputs using UART with DMA. @see SetUARTHandle @ingroup log_outputs
 	inline void default_output_uart_dma(strv data, bool last_chunk)
 	{
 		if (!_g_huart)
@@ -310,11 +380,14 @@ namespace STM32T::Log
 	
 	#if __has_include("usbd_cdc_if.h")
 	#include "usbd_cdc_if.h"
-	
+	#define _STM32T_LOG_OUTPUT_VCP
 	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
+	#endif	// __has_include("usbd_cdc_if.h")
 	
+	/// Writes to USB VCP only if USB_FS is enabled. @ingroup log_outputs
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
+		#ifdef _STM32T_LOG_OUTPUT_VCP
 		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
 		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
@@ -334,8 +407,8 @@ namespace STM32T::Log
 				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
 				&& HAL_GetTick() - start < 10);
 		});
+		#endif	// _STM32T_LOG_OUTPUT_VCP
 	}
-	#endif	// __has_include("usbd_cdc_if.h")
 	
 	template <size_t OUTPUT_COUNT = 1>
 	class Logger
@@ -345,7 +418,9 @@ namespace STM32T::Log
 		strv name;
 		std::array<output_t, OUTPUT_COUNT> outputs;
 		timestamp_t timestamp = default_timestamp;
-		handler_t error_handler = nullptr, fatal_handler = nullptr;
+		handler_t
+			error_handler = nullptr,	///< Called when a message with @ref Level::Error is logged.
+			fatal_handler = nullptr;	///< Called when a message with @ref Level::Fatal is logged.
 		
 		constexpr Logger(Level level, strv name) : level(level), name(name), outputs(std::array{default_output_stdout}) {}
 		constexpr Logger(Level level, strv name, std::array<output_t, OUTPUT_COUNT> outputs) : level(level), name(name), outputs(outputs) {}
@@ -784,30 +859,44 @@ namespace STM32T::Log
 		}
 	};
 	
+	/**
+	* @defgroup default_log_macros Default logger macros
+	* Define these macros before including @ref Log.hpp to customize the default logger.
+	*/
+	
 	#ifndef STM32T_DEFAULT_LOG_LEVEL
+	/// @ingroup default_log_macros
 	#define	STM32T_DEFAULT_LOG_LEVEL			Level::None
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_NAME
+	/// @ingroup default_log_macros
 	#define	STM32T_DEFAULT_LOG_NAME				""sv
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_OUTPUT
+	/// @ingroup default_log_macros
 	#define	STM32T_DEFAULT_LOG_OUTPUT			std::array{default_output_stdout}
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_TIMESTAMP
+	/// @ingroup default_log_macros
 	#define	STM32T_DEFAULT_LOG_TIMESTAMP		default_timestamp
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_ERROR_HANDLER
+	/// @ingroup default_log_macros
+	/// Is called (if specified) whenever a message with log level @ref STM32T::Log::Level::Error is logged.
 	#define	STM32T_DEFAULT_LOG_ERROR_HANDLER	nullptr
 	#endif
 	
 	#ifndef STM32T_DEFAULT_LOG_FATAL_HANDLER
+	/// @ingroup default_log_macros
+	/// Is called (if specified) whenever a message with log level @ref STM32T::Log::Level::Fatal is logged.
 	#define	STM32T_DEFAULT_LOG_FATAL_HANDLER	&Error_Handler
 	#endif
 	
+	/// Default logger object
 	inline constexpr Logger g_defaultLogger(STM32T_DEFAULT_LOG_LEVEL, STM32T_DEFAULT_LOG_NAME, STM32T_DEFAULT_LOG_OUTPUT, STM32T_DEFAULT_LOG_TIMESTAMP,
 		STM32T_DEFAULT_LOG_ERROR_HANDLER, STM32T_DEFAULT_LOG_FATAL_HANDLER);
 	
@@ -833,6 +922,7 @@ namespace STM32T::Log
 			logger.log(level, fmt, args...);
 	}
 	
+	/// @brief @ref Log_Static_Example.cpp "Static" logging functions
 	inline namespace DefLog
 	{
 		template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
@@ -912,12 +1002,14 @@ static_assert(STM32T::VER < STM32T::Version(0, 5, 0), "Deprecated code must be r
 
 namespace STM32T::Stdout
 {
+	/// @deprecated Will be removed in v0.5.0.
 	template <bool B = false>
 	inline void AddHandler(const Log::output_t logger)
 	{
 		static_assert(B, "STM32T::Stdout::AddHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::AddHandler instead.");
 	}
 	
+	/// @deprecated Will be removed in v0.5.0.
 	template <bool B = false>
 	inline void RemoveHandler(const Log::output_t logger)
 	{
@@ -927,12 +1019,14 @@ namespace STM32T::Stdout
 
 namespace STM32T::Stderr
 {
+	/// @deprecated Will be removed in v0.5.0.
 	template <bool B = false>
 	inline void AddHandler(const Log::output_t logger)
 	{
 		static_assert(B, "STM32T::Stderr::AddHandler is obsolete and has no effect. It will be removed in v0.5.0. Use STM32T::RT::AddHandler instead.");
 	}
 	
+	/// @deprecated Will be removed in v0.5.0.
 	template <bool B = false>
 	inline void RemoveHandler(const Log::output_t logger)
 	{

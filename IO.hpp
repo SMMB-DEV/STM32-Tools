@@ -192,9 +192,9 @@ namespace STM32T
 		}
 		
 		/**
-		* @param mode - Must be a value of @ref GPIO_mode
-		* @param pull - Must be a value of @ref GPIO_pull
-		* @param speed - Must be a value of @ref GPIO_speed
+		* @param mode - Must be a value of `GPIO_mode` (HAL)
+		* @param pull - Must be a value of `GPIO_pull` (HAL)
+		* @param speed - Must be a value of `GPIO_speed` (HAL)
 		*/
 		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
 		{
@@ -296,9 +296,9 @@ namespace STM32T
 		}
 		
 		/**
-		* @param mode - Must be a value of @ref GPIO_mode
-		* @param pull - Must be a value of @ref GPIO_pull
-		* @param speed - Must be a value of @ref GPIO_speed
+		* @param mode - Must be a value of `GPIO_mode` (HAL)
+		* @param pull - Must be a value of `GPIO_pull` (HAL)
+		* @param speed - Must be a value of `GPIO_speed` (HAL)
 		*/
 		virtual void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const uint32_t mask = 0xFFFF'FFFF) = 0;
 		

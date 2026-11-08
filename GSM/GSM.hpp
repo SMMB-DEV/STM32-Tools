@@ -1,3 +1,8 @@
+/**
+* @file
+* @brief Contains the generic @ref STM32T::GSM base class.
+*/
+
 #pragma once
 
 #include "main.h"
@@ -15,38 +20,52 @@
 
 
 
-#if defined(STM32T_GSM_URC_SUPPORT)
-#if USE_HAL_UART_REGISTER_CALLBACKS == 1
-
-#define STM32T_GSM_URC_ENABLED
-
 #ifndef STM32T_GSM_URC_BUF_SIZE
+/// Define to specify the size of the URC buffer for `GSM`. 
 #define STM32T_GSM_URC_BUF_SIZE		512
 #endif	// STM32T_GSM_URC_BUF_SIZE
 
+#ifdef STM32T_GSM_URC_SUPPORT
+#if USE_HAL_UART_REGISTER_CALLBACKS == 1
+#define STM32T_GSM_URC_ENABLED
 #else
 #warn USE_HAL_UART_REGISTER_CALLBACKS must be 1 to use GSM URC.
 #endif	// USE_HAL_UART_REGISTER_CALLBACKS == 1
-#endif	// defined(STM32T_GSM_URC_SUPPORT) && USE_HAL_UART_REGISTER_CALLBACKS == 1
+#else
+/**
+* Define to enable URC support for `GSM`.
+* The GSM instance can receive and store URCs sent by the GSM module to be handled later by calling @ref STM32T::GSM::HandleURCs.
+*
+* @note DMA for UART RX must be enabled and register callbacks for UART must be enabled (`USE_HAL_UART_REGISTER_CALLBACKS == 1`)
+* for this macro to have any effect.
+*/
+#define STM32T_GSM_URC_SUPPORT
+#undef STM32T_GSM_URC_SUPPORT
+#endif	// STM32T_GSM_URC_SUPPORT
 
 
 
+/// @hideinitializer
 #define CM_CODE(name, code)		name = -(code)
 
+/// @hideinitializer
 #define CM_CODE_10(name, code)		CM_CODE(name##0, (code) * 10 + 0), CM_CODE(name##1, (code) * 10 + 1), \
 CM_CODE(name##2, (code) * 10 + 2), CM_CODE(name##3, (code) * 10 + 3), CM_CODE(name##4, (code) * 10 + 4), CM_CODE(name##5, (code) * 10 + 5), \
 CM_CODE(name##6, (code) * 10 + 6), CM_CODE(name##7, (code) * 10 + 7), CM_CODE(name##8, (code) * 10 + 8), CM_CODE(name##9, (code) * 10 + 9)
 
+/// @hideinitializer
 #define CM_CODE_100(name, code)		CM_CODE_10(name##0, (code) * 10 + 0), CM_CODE_10(name##1, (code) * 10 + 1), \
 CM_CODE_10(name##2, (code) * 10 + 2), CM_CODE_10(name##3, (code) * 10 + 3), CM_CODE_10(name##4, (code) * 10 + 4), CM_CODE_10(name##5, (code) * 10 + 5), \
 CM_CODE_10(name##6, (code) * 10 + 6), CM_CODE_10(name##7, (code) * 10 + 7), CM_CODE_10(name##8, (code) * 10 + 8), CM_CODE_10(name##9, (code) * 10 + 9)
 
+/// @hideinitializer
 #define CM_CODE_1000(name, code)	CM_CODE_100(name##0, (code) * 10 + 0), CM_CODE_100(name##1, (code) * 10 + 1), \
 CM_CODE_100(name##2, (code) * 10 + 2), CM_CODE_100(name##3, (code) * 10 + 3), CM_CODE_100(name##4, (code) * 10 + 4), CM_CODE_100(name##5, (code) * 10 + 5), \
 CM_CODE_100(name##6, (code) * 10 + 6), CM_CODE_100(name##7, (code) * 10 + 7), CM_CODE_100(name##8, (code) * 10 + 8), CM_CODE_100(name##9, (code) * 10 + 9)
 
 
 
+/// @hideinitializer
 #define _FORMAT_ARGS()	\
 	if (!fmt) \
 		return FAIL; \
@@ -61,6 +80,7 @@ CM_CODE_100(name##6, (code) * 10 + 6), CM_CODE_100(name##7, (code) * 10 + 7), CM
 		return argsLen
 	
 
+/// @hideinitializer
 #define _GET_ARGS(var_name) \
 strv args; \
 char _args_buf[ARG_LEN]; \
@@ -87,6 +107,7 @@ else \
 
 namespace STM32T
 {
+	/// Base class for GSM classes. This class cannot be instantiated directly.
 	template <uint32_t DEF_RX_TO = 300, uint32_t DEF_IDLE_TO = 20, uint32_t DEF_O2C_TO = 1000>
 	class GSM
 	{
@@ -336,9 +357,7 @@ namespace STM32T
 			return ret;
 		}
 		
-		/**
-		* @note Calls va_end().
-		*/
+		/// @note Calls va_end().
 		int32_t FormatArgs(char *buf, size_t buf_len, const char *fmt, std::va_list args)
 		{
 			if (!fmt)
@@ -1008,6 +1027,12 @@ namespace STM32T
 		
 		static inline GSM *s_this = nullptr;
 		
+	protected:
+		void addURC(const strv token)
+		{
+			m_urcs.push_back(URC{token});
+		}
+		
 		void startURC()
 		{
 			__HAL_UART_CLEAR_OREFLAG(p_huart);
@@ -1017,12 +1042,6 @@ namespace STM32T
 		}
 		
 		void stopURC() { HAL_UART_DMAStop(p_huart); }	// todo: handle half received URC
-		
-	protected:
-		void addURC(const strv token)
-		{
-			m_urcs.push_back(URC{token});
-		}
 		
 	public:
 		void EnableURC(bool enable = true)
@@ -1108,6 +1127,7 @@ namespace STM32T
 		
 	public:
 		void EnableURC(bool enable = true) {}
+		size_t HandleURCs(const std::function<bool (strv, uint32_t)>& handler, const bool stop_when_handled = false) { return 0; }
 		#endif	// STM32T_GSM_URC_ENABLED
 	};
 }

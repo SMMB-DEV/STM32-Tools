@@ -1,3 +1,16 @@
+/**
+* @file
+* 
+* # Retargeting
+* 
+* Logs can be redirected to many different sinks including `stdout`. `stdout`, `stderr`, and `ttywrch`
+* can also be independently redirected to multiple sinks (except themselves of course).
+* 
+* Other libraries and frameworks might simply use `printf` for logging. Or for example,
+* the `<cassert>` library writes an error message to `stderr` when an assert fails.
+* By using this header you can redirect logs and error messages from other libraries to the same sinks as your normal logs.
+*/
+
 #include "./Log.hpp"
 
 
@@ -7,7 +20,7 @@ namespace STM32T::RT
 	inline std::vector<Log::output_t> _g_handlers;
 	
 	/**
-	@note The @p logger must not write to `stdout` or `stderr` or use `ttywrch`.
+	* @note The @p logger must not write to `stdout` or `stderr` or use `ttywrch`.
 	*/
 	inline void AddHandler(const Log::output_t logger)
 	{
@@ -82,5 +95,8 @@ extern "C"
 
 	long _sys_flen(FILEHANDLE fh) { return -1; }
 }
-
+#else
+/// Define this to enable retargeting
+#define STM32T_RT
+#undef STM32T_RT
 #endif	// STM32T_RT

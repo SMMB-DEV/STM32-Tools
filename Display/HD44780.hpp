@@ -1,3 +1,13 @@
+/**
+* @file
+* @brief Driver for HD44780 based (alphanumerical) displays
+*
+* The HD44780 object need to be provided with a read/write function pointer to manipulate the data pins as well as the RS, RW, and EN pins
+* according to their timing specifications.
+*
+* Here is an example of such functions: @ref HD44780_Example.cpp
+*/
+
 #pragma once
 
 #include "../Core/Time.hpp"

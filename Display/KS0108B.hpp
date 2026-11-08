@@ -1,3 +1,17 @@
+/**
+* @file
+* @brief Driver for KS0108B based (graphical) displays
+*
+* The KS0108B object needs to be provided with a read/write function pointer to manipulate the data pins as well as the RS, RW, and EN pins
+* according to their timing specifications. Apart from the R/W function, this object also requires a function to set the CS pins of the LCD.
+*
+* Here is an example of such functions: @ref KS0108B_Example.cpp
+*
+* ### Bitmaps
+*
+* The @ref BitmapToArray.py script can be used to convert images to monochrome bitmaps. The output format is compatible with `KS0108B`'s bitmap functions.
+*/
+
 #pragma once
 
 #include "./ILCD.hpp"

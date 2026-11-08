@@ -1,3 +1,12 @@
+"""
+@file
+Converts hex files to binary format. Run "python Hex2Bin.py -h" for more information.
+"""
+
+"""
+@cond Ignore the rest of the file
+"""
+
 from Version import Version
 
 import Crypto.Cipher.AES as AES
@@ -132,7 +141,7 @@ def main():
 
 	enc_group = parser.add_argument_group('Encryption',
 	    """The encryption algorithm is AES-256-GCM. The encryption key is derived using HKDF with SHA512. The header and footer will be used as AAD.
-		Encrypted file format: [Header] + Ciphertext + Tag + Nonce + [Footer]""")
+		Encrypted file format: [Header (plaintext)] + Ciphertext + Tag + Nonce + [Footer (plaintext)]""")
 	enc_group.add_argument('--encrypt', action=argparse.BooleanOptionalAction, default=False, help="Whether or not an encrypted version should be created.")
 	enc_group.add_argument('--key', type=lambda x: bytes.fromhex(x), dest='master_key',
 	                       help='The master key used for HKDF to generate the encryption key in hexadecimal format. Example: "EF3B"')

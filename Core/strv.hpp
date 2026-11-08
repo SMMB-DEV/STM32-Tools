@@ -1,3 +1,9 @@
+/**
+* @file
+* A subclass of `std::basic_string_view` with added functionality
+*/
+
+
 #pragma once
 
 #include <string_view>

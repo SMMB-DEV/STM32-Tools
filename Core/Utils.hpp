@@ -1,3 +1,8 @@
+/**
+* @file
+* Contains utility classes and generic helper functions and macros.
+*/
+
 #pragma once
 
 #include "main.h"
@@ -22,6 +27,7 @@ namespace STM32T
 		template <class T>
 		constexpr bool is_int_v = !std::is_same_v<T, bool> && std::is_integral_v<T>;
 		
+		/// Literal operators
 		inline namespace Literals
 		{
 			constexpr size_t operator"" _Ki(unsigned long long x) noexcept { return x * 1024; }
@@ -33,7 +39,7 @@ namespace STM32T
 		}
 		
 		/**
-		* @retval Max. 63 characters.
+		* @retval The cause(s) of reset in text form. Max. 63 characters.
 		*/
 		inline const char * GetResetCause()
 		{
@@ -200,7 +206,7 @@ namespace STM32T
 		constexpr uint32_t pow10(const uint8_t pow) { return exp10(pow); }
 		
 		/**
-		* @brief https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+		* @copyright https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
 		*/
 		constexpr bool is_power_2(const uint32_t val)
 		{
@@ -208,7 +214,7 @@ namespace STM32T
 		}
 		
 		/**
-		* @brief https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+		* @copyright https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 		*/
 		constexpr uint8_t bit_count(uint32_t val)
 		{
@@ -220,8 +226,8 @@ namespace STM32T
 		}
 		
 		/**
-		* @brief https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
-		* @retval True if val has odd parity.
+		* @retval True if @p val has odd parity.
+		* @copyright https://graphics.stanford.edu/~seander/bithacks.html#ParityParallel
 		*/
 		template <typename T>
 		constexpr bool parity(T val)
@@ -246,7 +252,7 @@ namespace STM32T
 		}
 		
 		/**
-		* @brief https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
+		* @copyright https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
 		*/
 		template <typename T>
 		constexpr T reverse(T v)
@@ -381,6 +387,7 @@ namespace STM32T
 		template <class T>
 		using shared_arr [[deprecated("Use SharedArray<T> instead. Will bre removed in v0.5.0.")]] = SharedArray<T>;
 		
+		/// For having a piece of code executed when returning from a function or exiting a scope.
 		template <class F, typename R = void>
 		class ScopeAction
 		{
@@ -415,6 +422,7 @@ namespace STM32T
 		template <class F, typename R = void>
 		using ScopeActionF [[deprecated("Use ScopeAction instead. Will be removed in v0.5.0.")]] = ScopeAction<F, R>;
 		
+		/// A wrapper for an integer type with a value constrained to a fixed min\. and max\.
 		template <typename T, T MIN, T MAX>
 		class ClampedInt
 		{
@@ -755,6 +763,7 @@ namespace STM32T
 			}
 		};
 		
+		/// A wrapper for an integer type with a value constrained to a modifiable min\. and max\.
 		template <typename T>
 		class DynClampedInt
 		{
@@ -1068,8 +1077,9 @@ namespace STM32T
 		};
 		
 		/**
-		* @brief Similar to std::forward_list. Useful for queuing work inside an ISR to be handled in the main loop.
-		*		Allocates memory on the heap. If the list gets full, new elements cannot be added.
+		* Similar to `std::forward_list`, useful for queuing tasks from an ISR.
+		* Allocates memory on the heap. If the list gets full, new elements cannot be added.
+		* 
 		* @note In very rare cases, it might not be able to add items to the list. Do not use for critical information.
 		*/
 		template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
@@ -1274,6 +1284,10 @@ namespace STM32T
 			}
 		};
 		
+		/**
+		* A queue with a static (fixed size, pre-allocated) circular buffer, useful for queuing tasks from an ISR.
+		* More robust and performant than @ref LinkedList but memory consuming.
+		*/
 		template <class T, size_t MAX_SIZE, typename INDEX_T = size_t>
 		class StaticQueue
 		{
@@ -1369,6 +1383,7 @@ namespace STM32T
 			}
 		};
 		
+		/// Similar to @ref StaticQueue but items are removed based on their priority first and order of insertion second.
 		template <class T, size_t MAX_SIZE = 256>
 		class PriorityQueue : protected StaticQueue<T, MAX_SIZE, uint8_t>
 		{
@@ -1396,7 +1411,8 @@ namespace STM32T
 			enum class PopAction : uint8_t { Cancel, Stop, RemNone, RemFirst, RemSecond, RemBoth };
 			
 			/**
-			* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
+			* @param t		The object to push to queue.
+			* @param prio	The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 			*/
 			void push_back(T&& t, const prio_t prio = 1)
 			{
@@ -1408,7 +1424,8 @@ namespace STM32T
 			}
 			
 			/**
-			* @param prio - The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
+			* @param t		The object to push to queue.
+			* @param prio	The priority of the item; the greater the number, the higher the priority. Priority 0 means the item won't be added.
 			*/
 			void push_back(const T& t, const prio_t prio = 1)
 			{

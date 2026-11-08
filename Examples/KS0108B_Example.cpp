@@ -1,14 +1,5 @@
-##### [Go Back](./README.md)
-
----
-
-# KS0108B
-
-You need to provide the KS0108B object with a read/write function pointer to manipulate the data pins as well as the RS, RW, and EN pins according to their timing specifications. Apart from the R/W function, this object also requires a function to set the CS pins of the LCD. Here is an example of such functions:
-
-```C++
 #include <Tools/Display/KS0108B.hpp>
-#include <Tools/Core/Timing.hpp>
+#include <Tools/Core/Time.hpp>
 
 static STM32T::IOArray<8> g_dataPins = std::array
 {
@@ -43,19 +34,19 @@ uint8_t my_glcd_rw(const bool rw, const bool rs, uint8_t data)
 	{
 		// write
 		g_dataPins.Set(data);
-		Delay_ns(500u);		// DSU, WH
+		Delay_ns(500u);			// DSU, WH
 	}
 	else
 	{
 		// read
-		Delay_ns(500);		// D, WH
+		Delay_ns(500);			// D, WH
 		data = g_dataPins.Read();
 	}
 	
 	en_pin.Reset();
 	last_low_cyc = GetCycle();
 	
-	Delay_ns(10);		// DHW, AH
+	Delay_ns(10);				// DHW, AH
 	
 	if (!rw)
 		g_dataPins.Set(0xFF);	// Release all pins
@@ -71,19 +62,15 @@ int main()
     for (uint8_t i = 0; i < g_dataPins.PinCount(); i++)
 		g_dataPins[i].SetMode(GPIO_MODE_OUTPUT_OD, GPIO_PULLUP, GPIO_SPEED_FREQ_VERY_HIGH);
     
-    KS0108B glcd(my_glcd_rw, [](uint8_t cs)     // Using lambda instead of function pointer
+    KS0108B glcd(my_glcd_rw, [](uint8_t cs)
     {
         // Set CS pins (no timing required)
     }, 2);
     
     glcd.Init().PutStr("Hello, World!");
 }
-```
 
-## Bitmaps
-
-The `BitmapToArray.py` script can be used to convert images to monochrome bitmaps. The output format is compatible with `KS0108B`'s bitmap functions.
-
----
-
-##### [Go Back](./README.md)
+/**
+* @example{lineno} KS0108B_Example.cpp
+* Example usage of KS0108B class
+*/

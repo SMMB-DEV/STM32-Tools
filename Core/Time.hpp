@@ -1,3 +1,13 @@
+/**
+* @file
+* Contains timing utilities.
+*
+* The @ref STM32T_TIME_CLK macro must be defined before including this header. You can define it in STM32CubeMX or Keil Options dialog.
+* The module also has functions for working with the conventional tick provided by `HAL_GetTick()`.
+*
+* @see STM32T::Time::Init
+*/
+
 #pragma once
 
 #include "main.h"
@@ -5,9 +15,32 @@
 #include <type_traits>
 #include <limits>
 #include <optional>
+#include <chrono>
+
+//__asm(".global __use_no_semihosting");
+
+#ifndef STM32T_TIME_CLK
+#error "STM32T_TIME_CLK not defined!"
+
+/**
+* Must be a `constexpr` value equal to `HCLK`.
+* @note Must be defined by the user.
+*/
+#define STM32T_TIME_CLK
+#undef STM32T_TIME_CLK
+#endif
+
+#ifndef STM32T_IWDG_TIMEOUT
+/// Can be defined (as a `uint32_t` value) before including any of this module's headers to refresh the `IWDG` during time consuming tasks.
+#define STM32T_IWDG_TIMEOUT
+#undef STM32T_IWDG_TIMEOUT
+#endif
 
 
 
+
+
+/// Timing uitilities
 namespace STM32T::Time
 {
 	#ifdef STM32T_IWDG_TIMEOUT
@@ -32,14 +65,15 @@ namespace STM32T::Time
 	using us_cycle_t = uint32_t;
 	using ns_cycle_t = uint64_t;
 	
-	#ifndef STM32T_TIME_CLK
-	#error "STM32T_TIME_CLK not defined!"
-	#endif
-	
 	static_assert(STM32T_TIME_CLK % 1'000'000 == 0, "STM32T_TIME_CLK must be divisible by 1,000,000!");
 	
+	/**
+	* Initializes the timing module and checks @ref STM32T_TIME_CLK validity.
+	* If your microcontroller has a `DWT` unit, it will be enabled and used for timing. Otherwise, the `SysTick` timer is used.
+	* @copyright https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
+	*/
+	
 	#ifdef DWT
-	// https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
 	inline void Init()
 	{
 		if (!READ_BIT(CoreDebug->DEMCR, CoreDebug_DEMCR_TRCENA_Msk))
@@ -227,7 +261,8 @@ namespace STM32T::Time
 	}
 	
 	/**
-	* @param month - [0:11]
+	* @param month	Must be in the range [0:11].
+	* @param year
 	*/
 	inline constexpr uint8_t MonthDays(int month, int year = 2001)
 	{

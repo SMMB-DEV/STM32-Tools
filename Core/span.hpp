@@ -1,3 +1,8 @@
+/**
+* @file
+* An almost identical recreation of `std::span` as much as it is possible in C++17
+*/
+
 #pragma once
 
 #include <cstddef>

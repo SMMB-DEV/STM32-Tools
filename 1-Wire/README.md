@@ -1,15 +1,11 @@
-##### [Go Back](../README.md)
-
----
-
 # 1-Wire Module
 
-This module contains headers for working with 1-wire sensor.
+This module contains headers for working with 1-wire sensors.
 
 ## Headers
 
-- AM230x.hpp
-- DS18B20.hpp
+- `AM230x.hpp`
+- `DS18B20.hpp`
 
 ---
 
