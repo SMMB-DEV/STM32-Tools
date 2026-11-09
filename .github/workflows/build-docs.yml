@@ -1,17 +1,18 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# Source - https://stackoverflow.com/q/79375478
+# Posted by wissem chiha, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-11-09, License - CC BY-SA 4.0
+
+name: build-docs
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+  
+  # Allows running the workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -22,21 +23,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update 
+          sudo apt-get install -y doxygen
+      - name: Install Graphviz
+        run: sudo apt-get install -y graphviz
+      - name: Run Doxygen to generate documentation
+        run: |
+          cd ./Docs
+          doxygen ./Config.doxygen
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
           path: './Docs/html'
       - name: Deploy to GitHub Pages
         id: deployment
