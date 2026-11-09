@@ -4,8 +4,16 @@
 *
 * The @ref STM32T_TIME_CLK macro must be defined before including this header. You can define it in STM32CubeMX or Keil Options dialog.
 * The module also has functions for working with the conventional tick provided by `HAL_GetTick()`.
-*
 * @see STM32T::Time::Init
+* 
+* The @ref STM32T::Time namespace introduces two clocks that can be used with `std::chrono`.
+* - @ref STM32T::Time::TickClock
+* - @ref STM32T::Time::HighResClock
+* 
+* @remark Using these clocks is generally not recommended unless you really have to use `std::chrono`.
+* The conversions between different duration types can potentially be done using 64-bit integers or floating point types
+* and involves multiplication and division which is not ideal for precise and time sensitive applications on a 32-bit CPU.
+* Also in some cases (very large delays), double to integer casting could limit the maximum delay duration.
 */
 
 #pragma once
@@ -20,23 +28,64 @@
 //__asm(".global __use_no_semihosting");
 
 #ifndef STM32T_TIME_CLK
-#error "STM32T_TIME_CLK not defined!"
+#error "STM32T_TIME_CLK not defined! Define it to be equal to HCLK."
+#endif	// STM32T_TIME_CLK
 
+#ifdef _DOXYGEN_
 /**
 * Must be a `constexpr` value equal to `HCLK`.
 * @note Must be defined by the user.
 */
 #define STM32T_TIME_CLK
-#undef STM32T_TIME_CLK
-#endif
 
-#ifndef STM32T_IWDG_TIMEOUT
 /// Can be defined (as a `uint32_t` value) before including any of this module's headers to refresh the `IWDG` during time consuming tasks.
 #define STM32T_IWDG_TIMEOUT
-#undef STM32T_IWDG_TIMEOUT
-#endif
 
+/**
+* Define to include the [`time`](https://cppreference.com/cpp/chrono/c/time) function.
+* @note The function always returns -1 if `HAL_RTC_MODULE_ENABLED` is not defined.
+* @attention The implementation calls `HAL_RTC_GetTime` and `HAL_RTC_GetDate`. This might interfere with other uses of the RTC (e.g. in an ISR).
+* @note Years [70, 99] are considered [1970, 1999] and [0, 69] are considered [2000, 2069].
+*/
+#define STM32T_TIME_TIME
+#endif	// _DOXYGEN_
 
+#ifdef STM32T_TIME_TIME
+#ifdef HAL_RTC_MODULE_ENABLED
+extern "C" RTC_HandleTypeDef *hrtc;
+
+extern "C" std::time_t time(std::time_t* timer)
+{
+	RTC_TimeTypeDef time;
+	RTC_DateTypeDef date;
+	
+	HAL_RTC_GetTime(hrtc, &time, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(hrtc, &date, RTC_FORMAT_BIN);
+	
+	std::tm tm{.tm_sec = time.Seconds, .tm_min = time.Minutes, .tm_hour = time.Hours,
+		.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = (date.Year>= 70 ? 1970 : 2000) + date.Year - 1900, .tm_isdst = 0};
+	
+	std::time_t result = std::mktime(&tm);
+	
+	if (timer != nullptr)
+		*timer = result;
+	
+	return result;
+}
+#else
+#warning "HAL_RTC_MODULE_ENABLED is not defined. `time` will always return -1."
+
+extern "C" std::time_t time(std::time_t* timer)
+{
+	std::time_t result = std::time_t(-1);
+	
+	if (timer != nullptr)
+		*timer = result;
+	
+	return result;
+}
+#endif	// HAL_RTC_MODULE_ENABLED
+#endif	// STM32T_TIME_TIME
 
 
 
@@ -67,13 +116,12 @@ namespace STM32T::Time
 	
 	static_assert(STM32T_TIME_CLK % 1'000'000 == 0, "STM32T_TIME_CLK must be divisible by 1,000,000!");
 	
+	#ifdef DWT
 	/**
 	* Initializes the timing module and checks @ref STM32T_TIME_CLK validity.
 	* If your microcontroller has a `DWT` unit, it will be enabled and used for timing. Otherwise, the `SysTick` timer is used.
 	* @copyright https://community.st.com/t5/stm32-mcus-embedded-software/dwt-and-microsecond-delay/m-p/632748/highlight/true#M44839
 	*/
-	
-	#ifdef DWT
 	inline void Init()
 	{
 		if (!READ_BIT(CoreDebug->DEMCR, CoreDebug_DEMCR_TRCENA_Msk))
@@ -90,6 +138,7 @@ namespace STM32T::Time
 		}
 	}
 	
+	/// @return The CPU cycle count.
 	[[gnu::always_inline]] inline cycle_t GetCycle() { return DWT->CYCCNT; }
 	#else
 	inline void Init()
@@ -330,6 +379,76 @@ namespace STM32T::Time
 		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
 	}
 	#endif	// HAL_RTC_MODULE_ENABLED
+	
+	template <class REP, class PER, bool Steady>
+	class BaseClock
+	{
+	public:
+		using rep = REP;
+		using period = PER;
+		using duration = std::chrono::duration<rep, period>;
+		using time_point = std::chrono::time_point<BaseClock>;
+		
+		static_assert(std::is_unsigned_v<rep> && std::is_integral_v<rep>);
+		
+		static constexpr bool is_steady = Steady;
+	};
+	
+	/**
+	* Generates a delay using a clock of type @ref BaseClock.
+	* Does not have the 49 day limitation of `HAL_GetTick` and can create very long delays with relative accuracy.
+	* @note Avoid for very small delays and precise timing.
+	*/
+	template <class Clock, class Rep, class Period>
+	inline void sleep_for(const std::chrono::duration<Rep, Period> &sleep_duration)
+	{
+		static_assert(std::is_base_of_v<BaseClock<typename Clock::rep, typename Clock::period, Clock::is_steady>, Clock>);
+		
+		const auto start = Clock::now();
+		
+		if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
+			return;
+		
+		auto d = std::chrono::duration_cast<std::chrono::duration<std::uintmax_t, typename Clock::period>>(sleep_duration);
+		if (d < sleep_duration)
+			++d;
+		
+		static constexpr auto _max = std::numeric_limits<typename Clock::rep>::max();
+		
+		auto rounds = d.count() / _max;
+		const typename Clock::time_point rem(typename Clock::duration(d.count() % _max));
+		
+		for (; rounds; --rounds)
+		{
+			static constexpr auto _mid = Clock::time_point::max().time_since_epoch() / 2;
+			
+			while (Clock::now().time_since_epoch() < _mid);
+			while (Clock::now().time_since_epoch() >= _mid);
+		}
+		
+		while (Clock::now() < start);
+		while (Clock::now() - start < d);
+	}
+	
+	/**
+	* Uses `HAL_GetTick` for its time base.
+	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
+	*/
+	class TickClock : public BaseClock<tick_t, std::milli, true>
+	{
+	public:
+		static time_point now() { return time_point(duration(HAL_GetTick())); }
+	};
+	
+	/**
+	* Uses @ref GetCycle for its time base.
+	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
+	*/
+	class HighResClock : public BaseClock<cycle_t, std::ratio<1, STM32T_TIME_CLK>, true>
+	{
+	public:
+		static time_point now() { return time_point(duration(GetCycle())); }
+	};
 	
 	template <typename TIME_T = cycle_t>
 	class Filter
