@@ -6,7 +6,7 @@ var searchData=
   ['scopeactionf_3',['ScopeActionF',['../namespace_s_t_m32_t_1_1_utils.html#a1d2b7f1ed5bd18fcd76e3e894500cb00',1,'STM32T::ScopeActionF'],['../namespace_s_t_m32_t_1_1_utils.html#a1d2b7f1ed5bd18fcd76e3e894500cb00',1,'STM32T::Utils::ScopeActionF']]],
   ['scopeio_4',['ScopeIO',['../struct_s_t_m32_t_1_1_scope_i_o.html',1,'STM32T']]],
   ['scopeprof_5',['ScopeProf',['../class_s_t_m32_t_1_1_scope_prof.html',1,'STM32T']]],
-  ['semantic_20versioning_201_200_200_6',['Simplified Semantic Versioning 1.0.0',['../_versioning_8hpp.html#autotoc_md26',1,'']]],
+  ['semantic_20versioning_201_200_200_6',['Simplified Semantic Versioning 1.0.0',['../_versioning_8hpp.html#autotoc_md25',1,'']]],
   ['set_7',['Set',['../class_s_t_m32_t_1_1___i_os.html#af56b12d4b12c163fb1135c7369bff11f',1,'STM32T::_IOs::Set()'],['../class_s_t_m32_t_1_1_i_o_array.html#a871bed4467d6d7c823ecd0bd1e630b03',1,'STM32T::IOArray::Set()']]],
   ['setgpioconfig_8',['SetGPIOConfig',['../namespace_s_t_m32_t_1_1_log.html#a8854bdc8804a6927b089062d9b6c9dbe',1,'STM32T::Log']]],
   ['setmode_9',['SetMode',['../class_s_t_m32_t_1_1_i_o.html#a044ddbb583bca9d127514173c5916ae6',1,'STM32T::IO::SetMode()'],['../class_s_t_m32_t_1_1___i_os.html#a42e41287734d88ce460587b39f493335',1,'STM32T::_IOs::SetMode()'],['../class_s_t_m32_t_1_1_i_o_array.html#aac95ceb66214ba8fb4e0b20317377437',1,'STM32T::IOArray::SetMode()']]],
@@ -15,7 +15,7 @@ var searchData=
   ['sharedarray_12',['SharedArray',['../union_s_t_m32_t_1_1_utils_1_1_shared_array.html',1,'STM32T::SharedArray&lt; T &gt;'],['../union_s_t_m32_t_1_1_utils_1_1_shared_array.html',1,'STM32T::Utils::SharedArray&lt; T &gt;']]],
   ['sim800x_13',['SIM800x',['../class_s_t_m32_t_1_1_s_i_m800x.html',1,'STM32T']]],
   ['simplecrc_14',['SimpleCRC',['../namespace_s_t_m32_t.html#a26ec6e3f5fc6e464d9180109b259e247',1,'STM32T::EC']]],
-  ['simplified_20semantic_20versioning_201_200_200_15',['Simplified Semantic Versioning 1.0.0',['../_versioning_8hpp.html#autotoc_md26',1,'']]],
+  ['simplified_20semantic_20versioning_201_200_200_15',['Simplified Semantic Versioning 1.0.0',['../_versioning_8hpp.html#autotoc_md25',1,'']]],
   ['span_16',['span',['../class_s_t_m32_t_1_1span.html',1,'STM32T']]],
   ['span_2ehpp_17',['span.hpp',['../span_8hpp.html',1,'']]],
   ['standalone_20headers_18',['Standalone headers',['../index.html#autotoc_md22',1,'']]],
@@ -48,6 +48,6 @@ var searchData=
   ['stm32t_5fsys_5fwrite_5fuart_5fdma_45',['STM32T_SYS_WRITE_UART_DMA',['../_log_8hpp.html#a7d524b9369d9f468d289a274d135cc9c',1,'Log.hpp']]],
   ['stm32t_5fsys_5fwrite_5fusb_46',['STM32T_SYS_WRITE_USB',['../_log_8hpp.html#ac8d1acad94a407434b2e76872dc0ad10',1,'Log.hpp']]],
   ['stm32t_5ftime_5fclk_47',['STM32T_TIME_CLK',['../_time_8hpp.html#ac0afd3f07bf4d383edea325ab3aaf4dd',1,'Time.hpp']]],
-  ['storage_48',['Storage',['../_versioning_8hpp.html#autotoc_md27',1,'']]],
+  ['storage_48',['Storage',['../_versioning_8hpp.html#autotoc_md26',1,'']]],
   ['strv_2ehpp_49',['strv.hpp',['../strv_8hpp.html',1,'']]]
 ];
