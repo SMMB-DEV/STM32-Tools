@@ -46,12 +46,6 @@ namespace STM32T
 			Do(callable, nullptr, delay);
 		}
 		
-		[[deprecated("Use Do(). Will be removed in v0.4.0.")]]
-		static void DoAfter(callable_t callable, uint32_t interval)
-		{
-			s_list.push_back({callable, interval, HAL_GetTick(), false, nullptr});
-		}
-		
 		static void Repeat(callable_t callable, uint32_t interval, const char *name = nullptr)
 		{
 			s_list.push_back({callable, interval, HAL_GetTick(), true, name});

@@ -108,16 +108,6 @@ namespace STM32T
 		
 	public:
 		/**
-		* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
-		*				The E pin must also be cycled according to the datasheet.
-		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
-		* @param _4_bit - Determines wether the display should work in 4-bit mode or 8-bit mode (usually 4-bit mode).
-		*/
-		[[deprecated("Will be removed in v0.4.0.")]]
-		HD44780(uint8_t (* const rw)(bool rw, bool rs, uint8_t data), const line_t line_count, const uint8_t col_count, bool _4_bit = true)
-			: cf_rw(rw), c_twoLines(line_count != 1), c_colCount(col_count), c_4Bit(_4_bit) {}
-		
-		/**
 		* @param line_count - Determines the number of lines on the display (usually 2). Valid values: 1, 2, 4
 		* @param rw - Function to set DB7:0 (or DB7:4), RW and RS pins according to input arguments and return the data on the bus (DB7:0 or DB7:4) if necessary.
 		*				The E pin must also be cycled according to the datasheet.

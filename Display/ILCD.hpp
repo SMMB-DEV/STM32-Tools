@@ -51,12 +51,6 @@ namespace STM32T
 			return *this;
 		}
 		
-		[[deprecated("Use PutStr(). Will be removed in v0.4.0")]]
-		ILCD& PutStrn(const char* str, size_t n)
-		{
-			return PutStr(n, str);
-		}
-		
 		ILCD& PutStr(const strv view)
 		{
 			return PutStr(view.length(), view.data());
@@ -101,12 +95,6 @@ namespace STM32T
 			va_end(args);
 			
 			return PutStrCtr(field_width, {buf, size_t(len)});
-		}
-		
-		[[deprecated("Use PutStrCtr() instead. Will be removed in v0.4.0")]]
-		ILCD& PutStrMid(const strv str, const size_t field_width)
-		{
-			return PutStrCtr(field_width, str);
 		}
 		
 		template <typename I, size_t BUF_SIZE = 32>
