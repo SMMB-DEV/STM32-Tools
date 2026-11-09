@@ -1,6 +1,6 @@
 @echo off
 
-doxygen ./Doxyfile
+doxygen ./Config.doxygen
 
 set ec=%errorlevel%
 if %ec% equ 0 (

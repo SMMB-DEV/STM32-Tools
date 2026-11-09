@@ -14,6 +14,29 @@
 
 
 
+#define PRAGMA(x)	_Pragma(#x)
+#define NO_WARN(warning, ...) \
+PRAGMA(GCC diagnostic push) \
+PRAGMA(GCC diagnostic ignored warning) \
+__VA_ARGS__ \
+PRAGMA(GCC diagnostic pop)
+
+#if __cplusplus < 202002L
+#define WCPP20EXT(...)				NO_WARN("-Wc++20-extensions", __VA_ARGS__)
+#else
+#define WCPP20EXT(warning, ...)		__VA_ARGS__
+#warn "Using WCPP20EXT in unnecessary!"
+#endif	// __cplusplus < 202002L
+
+#if __cplusplus < 202302L
+#define WCPP23EXT(...)				NO_WARN("-Wc++23-extensions", __VA_ARGS__)
+#else
+#define WCPP23EXT(warning, ...)		__VA_ARGS__
+#warn "Using WCPP23EXT in unnecessary!"
+#endif	// __cplusplus < 202302L
+
+
+
 namespace STM32T
 {
 	inline namespace Utils
@@ -87,7 +110,7 @@ namespace STM32T
 		
 		constexpr char H2C(const uint8_t x)
 		{
-			static constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+			WCPP23EXT(static constexpr char CHARS[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };)
 			
 			return CHARS[x & 0x0F];
 		}
@@ -117,31 +140,19 @@ namespace STM32T
 		* Converts a hexadecimal character (0-9, A-F, a-f) to a number.
 		* @retval A number in the range [0, 15] or 0xFF for invalid characters.
 		*/
-		constexpr uint8_t C2H(const uint8_t ch)
+		constexpr uint8_t C2H(uint8_t ch)
 		{
-			static constexpr uint8_t HEX[256] =
+			WCPP23EXT(static constexpr uint8_t HEX[] =	// static variable in constexpr function
 			{
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 0 - 15
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 16 - 31
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 32 - 47
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 48 - 63
 				0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 64 - 79
 				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 80 - 95
 				0xFF, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 96 - 111
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,	// 112 - 127
-				
-				// 128 - 255
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			};
+			};)
 			
-			return HEX[ch];
+			ch -= 48;
+			
+			return ch < std::size(HEX) ? HEX[ch] : 0xFF;
 		}
 		
 		/**
@@ -193,6 +204,16 @@ namespace STM32T
 			return converted;
 		}
 		
+		constexpr uint32_t pow(const uint32_t a, const uint8_t b)
+		{
+			uint32_t val = 1;
+			for (uint8_t i = 0; i < b; i++)
+				val *= a;
+			
+			return val;
+		}
+		
+		[[deprecated("Use pow(10, ...) instead. Will be removed in v0.5.0.")]]
 		constexpr uint32_t exp10(const uint8_t pow)
 		{
 			uint32_t val = 1;
@@ -202,7 +223,7 @@ namespace STM32T
 			return val;
 		}
 		
-		[[deprecated("Use exp10() instead. Will be removed in v0.5.0.")]]
+		[[deprecated("Use pow(10, ...) instead. Will be removed in v0.5.0.")]]
 		constexpr uint32_t pow10(const uint8_t pow) { return exp10(pow); }
 		
 		/**
@@ -333,25 +354,29 @@ namespace STM32T
 		{
 			RCC_ClkInitTypeDef rcc =
 			{
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wc++23-extensions"
+#if __cplusplus < 202302L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++23-extensions"		// elifdef
+#endif
 
-	#ifdef STM32F4
+#ifdef STM32F4
 				.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1,
 				.APB2CLKDivider = RCC_HCLK_DIV1
-	#elifdef STM32G0
+#elifdef STM32G0
 				.ClockType = RCC_CLOCKTYPE_ALL,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1
-	#else
-	#error "Clock configuration code not available for this family!"
-	#endif
+#else
+#error "Clock configuration code not available for this family!"
+#endif
 
-	#pragma GCC diagnostic pop
+#if __cplusplus < 202302L
+#pragma GCC diagnostic pop
+#endif
 			};
 			
 			// Not sure why this is necessary but wthout it, the application goes to Error_Handler() before getting to main() (in the startup file).
@@ -1083,7 +1108,7 @@ namespace STM32T
 		* @note In very rare cases, it might not be able to add items to the list. Do not use for critical information.
 		*/
 		template <class T, size_t MAX_SIZE = SIZE_MAX - 1>
-		class [[deprecated]] LinkedList
+		class LinkedList
 		{
 			static_assert(MAX_SIZE > 0 && MAX_SIZE < SIZE_MAX);
 			
@@ -1445,7 +1470,7 @@ namespace STM32T
 			*					- RemSecond: The second item is removed from the queue and the search continues.
 			*					- RemBoth: Both items are removed from the queue and the search is restarted.
 			*/
-			std::optional<T> pop_front(const func<PopAction (const T *, std::optional<const T *>)>& filter = nullptr)
+			std::optional<T> pop_front(const std::function<PopAction (const T *, std::optional<const T *>)> &filter = nullptr)
 			{
 				const index_t back = m_back, front = m_front;	// For fewer volatile accesses
 				
@@ -1542,12 +1567,16 @@ namespace STM32T
 			}
 		};
 		
-		template<bool condition>
-		struct warn_if {};
-
-		template<> struct __attribute__((deprecated)) warn_if<false> { constexpr warn_if() = default; };
-		
-		#define static_warn(x, ...) ((void) STM32T::warn_if<x>())
+		#define static_warn(cond, msg) \
+		struct static_warn ## __FILE__ ## __LINE__ \
+		{ \
+			[[deprecated(msg)]] \
+			void _(std::false_type const &) {}; \
+			\
+			void _(std::true_type const &) {}; \
+			\
+			static_warn ## __FILE__ ## __LINE__() { _(std::bool_constant<(cond)>()); } \
+		}
 		
 		template<typename T>
 		constexpr T pack_be(const void *buf)
