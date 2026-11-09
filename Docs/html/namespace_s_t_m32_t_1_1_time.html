@@ -120,6 +120,11 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('namespace_s_t_
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-nested-classes" class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:BaseClock" id="r_BaseClock"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_base_clock.html">BaseClock</a></td></tr>
+<tr class="memitem:TickClock" id="r_TickClock"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_tick_clock.html">TickClock</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uses <span class="tt">HAL_GetTick</span> for its time base.  <a href="class_s_t_m32_t_1_1_time_1_1_tick_clock.html#details">More...</a><br /></td></tr>
+<tr class="memitem:HighResClock" id="r_HighResClock"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_high_res_clock.html">HighResClock</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uses <a class="el" href="#a4994cc2497cc083343f44e526fe185d8" title="GetCycle">GetCycle</a> for its time base.  <a href="class_s_t_m32_t_1_1_time_1_1_high_res_clock.html#details">More...</a><br /></td></tr>
 <tr class="memitem:Filter" id="r_Filter"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_filter.html">Filter</a></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
@@ -151,8 +156,7 @@ using&#160;</td><td class="memItemRight"><b>ns_cycle_t</b> = uint64_t</td></tr>
 Functions</h2></td></tr>
 <tr class="memitem:a48192c765f7ca7549b372e097dbc12eb" id="r_a48192c765f7ca7549b372e097dbc12eb"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a48192c765f7ca7549b372e097dbc12eb">Init</a> ()</td></tr>
 <tr class="memdesc:a48192c765f7ca7549b372e097dbc12eb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initializes the timing module and checks <a class="el" href="_time_8hpp.html#ac0afd3f07bf4d383edea325ab3aaf4dd" title="STM32T_TIME_CLK">STM32T_TIME_CLK</a> validity.  <br /></td></tr>
-<tr class="memitem:a4994cc2497cc083343f44e526fe185d8" id="r_a4994cc2497cc083343f44e526fe185d8"><td class="memItemLeft"><a id="a4994cc2497cc083343f44e526fe185d8" name="a4994cc2497cc083343f44e526fe185d8"></a>
-cycle_t&#160;</td><td class="memItemRight"><b>GetCycle</b> ()</td></tr>
+<tr class="memitem:a4994cc2497cc083343f44e526fe185d8" id="r_a4994cc2497cc083343f44e526fe185d8"><td class="memItemLeft">cycle_t&#160;</td><td class="memItemRight"><a class="el" href="#a4994cc2497cc083343f44e526fe185d8">GetCycle</a> ()</td></tr>
 <tr class="memitem:a82e0b2809255bfed5f5c087d9dd7a877" id="r_a82e0b2809255bfed5f5c087d9dd7a877"><td class="memItemLeft"><a id="a82e0b2809255bfed5f5c087d9dd7a877" name="a82e0b2809255bfed5f5c087d9dd7a877"></a>
 constexpr cycle_t&#160;</td><td class="memItemRight"><b>msToCycles</b> (const ms_time_t time_ms)</td></tr>
 <tr class="memitem:a95965b69002b09f20e8cde41c58e7bb3" id="r_a95965b69002b09f20e8cde41c58e7bb3"><td class="memItemLeft"><a id="a95965b69002b09f20e8cde41c58e7bb3" name="a95965b69002b09f20e8cde41c58e7bb3"></a>
@@ -200,10 +204,46 @@ void&#160;</td><td class="memItemRight"><b>WaitAfter_us</b> (const cycle_t start
 <tr class="memitem:a0e67410c6770a25fc96636bf64d7236c" id="r_a0e67410c6770a25fc96636bf64d7236c"><td class="memItemLeft"><a id="a0e67410c6770a25fc96636bf64d7236c" name="a0e67410c6770a25fc96636bf64d7236c"></a>
 void&#160;</td><td class="memItemRight"><b>WaitAfter_ns</b> (const cycle_t startCycle, const ns_time_t wait_ns)</td></tr>
 <tr class="memitem:a107e7e440a6e08c9373e4c93ce86927b" id="r_a107e7e440a6e08c9373e4c93ce86927b"><td class="memItemLeft">constexpr <a class="el" href="classuint8__t.html">uint8_t</a>&#160;</td><td class="memItemRight"><a class="el" href="#a107e7e440a6e08c9373e4c93ce86927b">MonthDays</a> (int month, int year=2001)</td></tr>
+<tr class="memitem:ac075438aa5448e92164f8d5390465780" id="r_ac075438aa5448e92164f8d5390465780"><td class="memTemplParams" colspan="2">template&lt;class Clock, class Rep, class Period&gt; </td></tr>
+<tr class="memitem:ac075438aa5448e92164f8d5390465780 template"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#ac075438aa5448e92164f8d5390465780">sleep_for</a> (const std::chrono::duration&lt; Rep, Period &gt; &amp;sleep_duration)</td></tr>
+<tr class="memdesc:ac075438aa5448e92164f8d5390465780"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generates a delay using a clock of type <a class="el" href="class_s_t_m32_t_1_1_time_1_1_base_clock.html" title="BaseClock">BaseClock</a>.  <br /></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a51ca7cee51e60f2ccb76eb4e419bbded" id="r_a51ca7cee51e60f2ccb76eb4e419bbded"><td class="memItemLeft"><a id="a51ca7cee51e60f2ccb76eb4e419bbded" name="a51ca7cee51e60f2ccb76eb4e419bbded"></a>
+IWDG_HandleTypeDef&#160;</td><td class="memItemRight"><b>hiwdg</b></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Timing uitilities. </p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="a4994cc2497cc083343f44e526fe185d8" name="a4994cc2497cc083343f44e526fe185d8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4994cc2497cc083343f44e526fe185d8">&#9670;&#160;</a></span>GetCycle()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">cycle_t STM32T::Time::GetCycle </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<dl class="section return"><dt>Returns</dt><dd>The CPU cycle count. </dd></dl>
+<dl class="section examples"><dt>Examples</dt><dd><a class="el" href="_h_d44780__example_8cpp-example.html#_a2">HD44780_Example.cpp</a>, and <a class="el" href="_k_s0108_b__example_8cpp-example.html#_a3">KS0108B_Example.cpp</a>.</dd>
+</dl>
+
+</div>
+</div>
 <a id="a48192c765f7ca7549b372e097dbc12eb" name="a48192c765f7ca7549b372e097dbc12eb"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a48192c765f7ca7549b372e097dbc12eb">&#9670;&#160;</a></span>Init()</h2>
 
@@ -265,6 +305,36 @@ void&#160;</td><td class="memItemRight"><b>WaitAfter_ns</b> (const cycle_t start
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a id="ac075438aa5448e92164f8d5390465780" name="ac075438aa5448e92164f8d5390465780"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac075438aa5448e92164f8d5390465780">&#9670;&#160;</a></span>sleep_for()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class Clock, class Rep, class Period&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void STM32T::Time::sleep_for </td>
+          <td>(</td>
+          <td class="paramtype">const std::chrono::duration&lt; Rep, Period &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>sleep_duration</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Generates a delay using a clock of type <a class="el" href="class_s_t_m32_t_1_1_time_1_1_base_clock.html" title="BaseClock">BaseClock</a>. </p>
+<p>Does not have the 49 day limitation of <span class="tt">HAL_GetTick</span> and can create very long delays with relative accuracy. </p><dl class="section note"><dt>Note</dt><dd>Avoid for very small delays and precise timing. </dd></dl>
 
 </div>
 </div>

@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('_h_d44780__exa
 <div class="line"><span class="lineno">   23</span>    rw_pin.Set(rw);</div>
 <div class="line"><span class="lineno">   24</span>    rs_pin.Set(rs);</div>
 <div class="line"><span class="lineno">   25</span>    </div>
-<div class="line"><span class="lineno">   26</span>    Delay_ns(std::max(40u, std::min(250u, 250u - (uint32_t)CyclesTo_ns(GetCycle() - last_low_cyc))));   <span class="comment">// AS, cycE - EH</span></div>
+<div class="line"><span class="lineno">   26</span>    Delay_ns(std::max(40u, std::min(250u, 250u - (uint32_t)CyclesTo_ns(<a id="_a2" name="_a2"></a><a class="code hl_function" href="namespace_s_t_m32_t_1_1_time.html#a4994cc2497cc083343f44e526fe185d8">GetCycle</a>() - last_low_cyc))));   <span class="comment">// AS, cycE - EH</span></div>
 <div class="line"><span class="lineno">   27</span>    en_pin.Set();</div>
 <div class="line"><span class="lineno">   28</span>    </div>
 <div class="line"><span class="lineno">   29</span>    <span class="keywordflow">if</span> (!rw)</div>
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('_h_d44780__exa
 <div class="line"><span class="lineno">   40</span>    }</div>
 <div class="line"><span class="lineno">   41</span>    </div>
 <div class="line"><span class="lineno">   42</span>    en_pin.Reset();</div>
-<div class="line"><span class="lineno">   43</span>    last_low_cyc = GetCycle();</div>
+<div class="line"><span class="lineno">   43</span>    last_low_cyc = <a class="code hl_function" href="namespace_s_t_m32_t_1_1_time.html#a4994cc2497cc083343f44e526fe185d8">GetCycle</a>();</div>
 <div class="line"><span class="lineno">   44</span>    </div>
 <div class="line"><span class="lineno">   45</span>    Delay_ns(10);               <span class="comment">// AH, H</span></div>
 <div class="line"><span class="lineno">   46</span>    </div>
@@ -183,7 +183,8 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('_h_d44780__exa
 <div class="ttc" id="a_time_8hpp_html"><div class="ttname"><a href="_time_8hpp.html">Time.hpp</a></div><div class="ttdoc">Contains timing utilities.</div></div>
 <div class="ttc" id="aclass_s_t_m32_t_1_1_i_o_html"><div class="ttname"><a href="class_s_t_m32_t_1_1_i_o.html">STM32T::IO</a></div><div class="ttdef"><b>Definition</b> IO.hpp:140</div></div>
 <div class="ttc" id="aclassuint8__t_html"><div class="ttname"><a href="classuint8__t.html">uint8_t</a></div></div>
-<div class="ttc" id="anamespace_s_t_m32_t_1_1_time_html"><div class="ttname"><a href="namespace_s_t_m32_t_1_1_time.html">STM32T::Time</a></div><div class="ttdoc">Timing uitilities.</div><div class="ttdef"><b>Definition</b> Time.hpp:84</div></div>
+<div class="ttc" id="anamespace_s_t_m32_t_1_1_time_html"><div class="ttname"><a href="namespace_s_t_m32_t_1_1_time.html">STM32T::Time</a></div><div class="ttdoc">Timing uitilities.</div><div class="ttdef"><b>Definition</b> Time.hpp:93</div></div>
+<div class="ttc" id="anamespace_s_t_m32_t_1_1_time_html_a4994cc2497cc083343f44e526fe185d8"><div class="ttname"><a href="namespace_s_t_m32_t_1_1_time.html#a4994cc2497cc083343f44e526fe185d8">STM32T::Time::GetCycle</a></div><div class="ttdeci">cycle_t GetCycle()</div><div class="ttdef"><b>Definition</b> Time.hpp:141</div></div>
 <div class="ttc" id="anamespace_s_t_m32_t_html"><div class="ttname"><a href="namespace_s_t_m32_t.html">STM32T</a></div><div class="ttdef"><b>Definition</b> AM230x.hpp:12</div></div>
 </div><!-- fragment --> </div><!-- contents -->
 </div><!-- doc-content -->

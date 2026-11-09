@@ -7,6 +7,9 @@ var annotated_dup =
         [ "Logger", "class_s_t_m32_t_1_1_log_1_1_logger.html", "class_s_t_m32_t_1_1_log_1_1_logger" ]
       ] ],
       [ "Time", "namespace_s_t_m32_t_1_1_time.html", [
+        [ "BaseClock", "class_s_t_m32_t_1_1_time_1_1_base_clock.html", null ],
+        [ "TickClock", "class_s_t_m32_t_1_1_time_1_1_tick_clock.html", null ],
+        [ "HighResClock", "class_s_t_m32_t_1_1_time_1_1_high_res_clock.html", null ],
         [ "Filter", "class_s_t_m32_t_1_1_time_1_1_filter.html", "class_s_t_m32_t_1_1_time_1_1_filter" ]
       ] ],
       [ "Utils", "namespace_s_t_m32_t_1_1_utils.html", [

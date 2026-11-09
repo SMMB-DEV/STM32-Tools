@@ -11,5 +11,6 @@ var searchData=
   ['stm32t_5fsys_5fwrite_5fuart_8',['STM32T_SYS_WRITE_UART',['../_log_8hpp.html#abd3c8a09a508c22b85de8f2cffd0da5a',1,'Log.hpp']]],
   ['stm32t_5fsys_5fwrite_5fuart_5fdma_9',['STM32T_SYS_WRITE_UART_DMA',['../_log_8hpp.html#a7d524b9369d9f468d289a274d135cc9c',1,'Log.hpp']]],
   ['stm32t_5fsys_5fwrite_5fusb_10',['STM32T_SYS_WRITE_USB',['../_log_8hpp.html#ac8d1acad94a407434b2e76872dc0ad10',1,'Log.hpp']]],
-  ['stm32t_5ftime_5fclk_11',['STM32T_TIME_CLK',['../_time_8hpp.html#ac0afd3f07bf4d383edea325ab3aaf4dd',1,'Time.hpp']]]
+  ['stm32t_5ftime_5fclk_11',['STM32T_TIME_CLK',['../_time_8hpp.html#ac0afd3f07bf4d383edea325ab3aaf4dd',1,'Time.hpp']]],
+  ['stm32t_5ftime_5ftime_12',['STM32T_TIME_TIME',['../_time_8hpp.html#a97ab0c87ba3c1b33199078235fd5269f',1,'Time.hpp']]]
 ];

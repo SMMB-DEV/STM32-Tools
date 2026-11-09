@@ -8,5 +8,6 @@ var searchData=
   ['headers_5',['Standalone headers',['../index.html#autotoc_md22',1,'']]],
   ['hex2bin_6',['Hex2Bin',['../namespace_hex2_bin.html',1,'']]],
   ['hex2bin_2epy_7',['Hex2Bin.py',['../_hex2_bin_8py.html',1,'']]],
-  ['how_20to_20use_8',['How to use',['../index.html#autotoc_md23',1,'']]]
+  ['highresclock_8',['HighResClock',['../class_s_t_m32_t_1_1_time_1_1_high_res_clock.html',1,'STM32T::Time']]],
+  ['how_20to_20use_9',['How to use',['../index.html#autotoc_md23',1,'']]]
 ];

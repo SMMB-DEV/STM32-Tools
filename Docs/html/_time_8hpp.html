@@ -120,6 +120,11 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('_time_8hpp.htm
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-nested-classes" class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:STM32T_3A_3ATime_3A_3ABaseClock_3C_20REP_2C_20PER_2C_20Steady_20_3E" id="r_STM32T_3A_3ATime_3A_3ABaseClock_3C_20REP_2C_20PER_2C_20Steady_20_3E"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_base_clock.html">STM32T::Time::BaseClock&lt; REP, PER, Steady &gt;</a></td></tr>
+<tr class="memitem:STM32T_3A_3ATime_3A_3ATickClock" id="r_STM32T_3A_3ATime_3A_3ATickClock"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_tick_clock.html">STM32T::Time::TickClock</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uses <span class="tt">HAL_GetTick</span> for its time base.  <a href="class_s_t_m32_t_1_1_time_1_1_tick_clock.html#details">More...</a><br /></td></tr>
+<tr class="memitem:STM32T_3A_3ATime_3A_3AHighResClock" id="r_STM32T_3A_3ATime_3A_3AHighResClock"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_high_res_clock.html">STM32T::Time::HighResClock</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uses <a class="el" href="namespace_s_t_m32_t_1_1_time.html#a4994cc2497cc083343f44e526fe185d8" title="GetCycle">GetCycle</a> for its time base.  <a href="class_s_t_m32_t_1_1_time_1_1_high_res_clock.html#details">More...</a><br /></td></tr>
 <tr class="memitem:STM32T_3A_3ATime_3A_3AFilter_3C_20TIME_5FT_20_3E" id="r_STM32T_3A_3ATime_3A_3AFilter_3C_20TIME_5FT_20_3E"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="class_s_t_m32_t_1_1_time_1_1_filter.html">STM32T::Time::Filter&lt; TIME_T &gt;</a></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-namespaces" class="groupheader"><a id="namespaces" name="namespaces"></a>
@@ -134,6 +139,8 @@ Macros</h2></td></tr>
 <tr class="memitem:a3cd6353d3ccc24af17f9a07b8a5021f3" id="r_a3cd6353d3ccc24af17f9a07b8a5021f3"><td class="memItemLeft"><a id="a3cd6353d3ccc24af17f9a07b8a5021f3" name="a3cd6353d3ccc24af17f9a07b8a5021f3"></a>
 #define&#160;</td><td class="memItemRight"><b>STM32T_IWDG_TIMEOUT</b></td></tr>
 <tr class="memdesc:a3cd6353d3ccc24af17f9a07b8a5021f3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Can be defined (as a <span class="tt">uint32_t</span> value) before including any of this module's headers to refresh the <span class="tt">IWDG</span> during time consuming tasks. <br /></td></tr>
+<tr class="memitem:a97ab0c87ba3c1b33199078235fd5269f" id="r_a97ab0c87ba3c1b33199078235fd5269f"><td class="memItemLeft">#define&#160;</td><td class="memItemRight"><a class="el" href="#a97ab0c87ba3c1b33199078235fd5269f">STM32T_TIME_TIME</a></td></tr>
+<tr class="memdesc:a97ab0c87ba3c1b33199078235fd5269f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Define to include the <a href="https://cppreference.com/cpp/chrono/c/time"><span class="tt">time</span></a> function.  <br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
 Typedefs</h2></td></tr>
@@ -162,12 +169,11 @@ using&#160;</td><td class="memItemRight"><b>STM32T::Time::ns_cycle_t</b> = uint6
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a26c7d1dbf93fa8c23c5effbacec91f8c" id="r_a26c7d1dbf93fa8c23c5effbacec91f8c"><td class="memItemLeft"><a id="a26c7d1dbf93fa8c23c5effbacec91f8c" name="a26c7d1dbf93fa8c23c5effbacec91f8c"></a>
-time_t&#160;</td><td class="memItemRight"><b>time</b> (time_t *timer)</td></tr>
+<tr class="memitem:aeed524cca7ffc3d4f2a591167f50fe61" id="r_aeed524cca7ffc3d4f2a591167f50fe61"><td class="memItemLeft"><a id="aeed524cca7ffc3d4f2a591167f50fe61" name="aeed524cca7ffc3d4f2a591167f50fe61"></a>
+std::time_t&#160;</td><td class="memItemRight"><b>time</b> (std::time_t *timer)</td></tr>
 <tr class="memitem:a48192c765f7ca7549b372e097dbc12eb" id="r_a48192c765f7ca7549b372e097dbc12eb"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="namespace_s_t_m32_t_1_1_time.html#a48192c765f7ca7549b372e097dbc12eb">STM32T::Time::Init</a> ()</td></tr>
 <tr class="memdesc:a48192c765f7ca7549b372e097dbc12eb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initializes the timing module and checks <a class="el" href="#ac0afd3f07bf4d383edea325ab3aaf4dd" title="STM32T_TIME_CLK">STM32T_TIME_CLK</a> validity.  <br /></td></tr>
-<tr class="memitem:a4994cc2497cc083343f44e526fe185d8" id="r_a4994cc2497cc083343f44e526fe185d8"><td class="memItemLeft"><a id="a4994cc2497cc083343f44e526fe185d8" name="a4994cc2497cc083343f44e526fe185d8"></a>
-cycle_t&#160;</td><td class="memItemRight"><b>STM32T::Time::GetCycle</b> ()</td></tr>
+<tr class="memitem:a4994cc2497cc083343f44e526fe185d8" id="r_a4994cc2497cc083343f44e526fe185d8"><td class="memItemLeft">cycle_t&#160;</td><td class="memItemRight"><a class="el" href="namespace_s_t_m32_t_1_1_time.html#a4994cc2497cc083343f44e526fe185d8">STM32T::Time::GetCycle</a> ()</td></tr>
 <tr class="memitem:a82e0b2809255bfed5f5c087d9dd7a877" id="r_a82e0b2809255bfed5f5c087d9dd7a877"><td class="memItemLeft"><a id="a82e0b2809255bfed5f5c087d9dd7a877" name="a82e0b2809255bfed5f5c087d9dd7a877"></a>
 constexpr cycle_t&#160;</td><td class="memItemRight"><b>STM32T::Time::msToCycles</b> (const ms_time_t time_ms)</td></tr>
 <tr class="memitem:a95965b69002b09f20e8cde41c58e7bb3" id="r_a95965b69002b09f20e8cde41c58e7bb3"><td class="memItemLeft"><a id="a95965b69002b09f20e8cde41c58e7bb3" name="a95965b69002b09f20e8cde41c58e7bb3"></a>
@@ -215,11 +221,23 @@ void&#160;</td><td class="memItemRight"><b>STM32T::Time::WaitAfter_us</b> (const
 <tr class="memitem:a0e67410c6770a25fc96636bf64d7236c" id="r_a0e67410c6770a25fc96636bf64d7236c"><td class="memItemLeft"><a id="a0e67410c6770a25fc96636bf64d7236c" name="a0e67410c6770a25fc96636bf64d7236c"></a>
 void&#160;</td><td class="memItemRight"><b>STM32T::Time::WaitAfter_ns</b> (const cycle_t startCycle, const ns_time_t wait_ns)</td></tr>
 <tr class="memitem:a107e7e440a6e08c9373e4c93ce86927b" id="r_a107e7e440a6e08c9373e4c93ce86927b"><td class="memItemLeft">constexpr <a class="el" href="classuint8__t.html">uint8_t</a>&#160;</td><td class="memItemRight"><a class="el" href="namespace_s_t_m32_t_1_1_time.html#a107e7e440a6e08c9373e4c93ce86927b">STM32T::Time::MonthDays</a> (int month, int year=2001)</td></tr>
+<tr class="memitem:ac075438aa5448e92164f8d5390465780" id="r_ac075438aa5448e92164f8d5390465780"><td class="memTemplParams" colspan="2">template&lt;class Clock, class Rep, class Period&gt; </td></tr>
+<tr class="memitem:ac075438aa5448e92164f8d5390465780 template"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="namespace_s_t_m32_t_1_1_time.html#ac075438aa5448e92164f8d5390465780">STM32T::Time::sleep_for</a> (const std::chrono::duration&lt; Rep, Period &gt; &amp;sleep_duration)</td></tr>
+<tr class="memdesc:ac075438aa5448e92164f8d5390465780"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generates a delay using a clock of type <a class="el" href="class_s_t_m32_t_1_1_time_1_1_base_clock.html" title="BaseClock">BaseClock</a>.  <br /></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a51ca7cee51e60f2ccb76eb4e419bbded" id="r_a51ca7cee51e60f2ccb76eb4e419bbded"><td class="memItemLeft"><a id="a51ca7cee51e60f2ccb76eb4e419bbded" name="a51ca7cee51e60f2ccb76eb4e419bbded"></a>
+IWDG_HandleTypeDef&#160;</td><td class="memItemRight"><b>STM32T::Time::hiwdg</b></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Contains timing utilities. </p>
-<p>The <a class="el" href="#ac0afd3f07bf4d383edea325ab3aaf4dd" title="STM32T_TIME_CLK">STM32T_TIME_CLK</a> macro must be defined before including this header. You can define it in STM32CubeMX or Keil Options dialog. The module also has functions for working with the conventional tick provided by <span class="tt">HAL_GetTick()</span>.</p>
-<dl class="section see"><dt>See also</dt><dd><a class="el" href="namespace_s_t_m32_t_1_1_time.html#a48192c765f7ca7549b372e097dbc12eb" title="Initializes the timing module and checks STM32T_TIME_CLK validity.">STM32T::Time::Init</a> </dd></dl>
+<p>The <a class="el" href="#ac0afd3f07bf4d383edea325ab3aaf4dd" title="STM32T_TIME_CLK">STM32T_TIME_CLK</a> macro must be defined before including this header. You can define it in STM32CubeMX or Keil Options dialog. The module also has functions for working with the conventional tick provided by <span class="tt">HAL_GetTick()</span>. </p><dl class="section see"><dt>See also</dt><dd><a class="el" href="namespace_s_t_m32_t_1_1_time.html#a48192c765f7ca7549b372e097dbc12eb" title="Initializes the timing module and checks STM32T_TIME_CLK validity.">STM32T::Time::Init</a></dd></dl>
+<p>The <a class="el" href="namespace_s_t_m32_t_1_1_time.html" title="STM32T::Time">STM32T::Time</a> namespace introduces two clocks that can be used with <span class="tt">std::chrono</span>.</p><ul>
+<li><a class="el" href="class_s_t_m32_t_1_1_time_1_1_tick_clock.html" title="STM32T::Time::TickClock">STM32T::Time::TickClock</a></li>
+<li><a class="el" href="class_s_t_m32_t_1_1_time_1_1_high_res_clock.html" title="STM32T::Time::HighResClock">STM32T::Time::HighResClock</a></li>
+</ul>
+<dl class="section remark"><dt>Remarks</dt><dd>Using these clocks is generally not recommended unless you really have to use <span class="tt">std::chrono</span>. The conversions between different duration types can potentially be done using <span class="tt">uintmax_t</span> and involves multiplication and division which is not ideal for precise and time sensitive applications on a 32-bit CPU. </dd></dl>
 </div><a name="doc-define-members" id="doc-define-members"></a><h2 id="header-doc-define-members" class="groupheader">Macro Definition Documentation</h2>
 <a id="ac0afd3f07bf4d383edea325ab3aaf4dd" name="ac0afd3f07bf4d383edea325ab3aaf4dd"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac0afd3f07bf4d383edea325ab3aaf4dd">&#9670;&#160;</a></span>STM32T_TIME_CLK</h2>
@@ -235,6 +253,25 @@ void&#160;</td><td class="memItemRight"><b>STM32T::Time::WaitAfter_ns</b> (const
 
 <p>Must be a <span class="tt">constexpr</span> value equal to <span class="tt">HCLK</span>. </p>
 <dl class="section note"><dt>Note</dt><dd>Must be defined by the user. </dd></dl>
+
+</div>
+</div>
+<a id="a97ab0c87ba3c1b33199078235fd5269f" name="a97ab0c87ba3c1b33199078235fd5269f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a97ab0c87ba3c1b33199078235fd5269f">&#9670;&#160;</a></span>STM32T_TIME_TIME</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define STM32T_TIME_TIME</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Define to include the <a href="https://cppreference.com/cpp/chrono/c/time"><span class="tt">time</span></a> function. </p>
+<dl class="section note"><dt>Note</dt><dd>The function always returns -1 if <span class="tt">HAL_RTC_MODULE_ENABLED</span> is not defined. </dd></dl>
+<dl class="section attention"><dt>Attention</dt><dd>The implementation calls <span class="tt">HAL_RTC_GetTime</span> and <span class="tt">HAL_RTC_GetDate</span>. This might interfere with other uses of the RTC (e.g. in an ISR). </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>Years [70, 99] are considered [1970, 1999] and [0, 69] are considered [2000, 2069]. </dd></dl>
 
 </div>
 </div>

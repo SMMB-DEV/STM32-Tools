@@ -11,6 +11,13 @@ var hierarchy =
     [ "STM32T::span&lt; T, Extent &gt;::_riterator&lt; U &gt;", "class_s_t_m32_t_1_1span_1_1__riterator.html", null ],
     [ "STM32T::AM230x", "class_s_t_m32_t_1_1_a_m230x.html", null ],
     [ "STM32T::MFRC522::ATS", "struct_s_t_m32_t_1_1_m_f_r_c522_1_1_a_t_s.html", null ],
+    [ "STM32T::Time::BaseClock&lt; REP, PER, Steady &gt;", "class_s_t_m32_t_1_1_time_1_1_base_clock.html", null ],
+    [ "STM32T::Time::BaseClock&lt; cycle_t, std::ratio&lt; 1, STM32T_TIME_CLK &gt;, true &gt;", "class_s_t_m32_t_1_1_time_1_1_base_clock.html", [
+      [ "STM32T::Time::HighResClock", "class_s_t_m32_t_1_1_time_1_1_high_res_clock.html", null ]
+    ] ],
+    [ "STM32T::Time::BaseClock&lt; tick_t, std::milli, true &gt;", "class_s_t_m32_t_1_1_time_1_1_base_clock.html", [
+      [ "STM32T::Time::TickClock", "class_s_t_m32_t_1_1_time_1_1_tick_clock.html", null ]
+    ] ],
     [ "std::basic_string_view&lt; Char &gt;", null, [
       [ "STM32T::bstrv< std::string_view::value_type >", "class_s_t_m32_t_1_1bstrv.html", null ],
       [ "STM32T::bstrv< std::u16string_view::value_type >", "class_s_t_m32_t_1_1bstrv.html", null ],
