@@ -8,6 +8,10 @@ on:
   push:
     branches: ["main"]
   
+  # To allow testing changes in a PR
+  pull_request:
+    branches: ["main"]
+  
   # Allows running the workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -30,22 +34,35 @@ jobs:
     
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Install Doxygen
         run: |
-          sudo apt-get update 
-          sudo apt-get install -y doxygen
-      - name: Install Graphviz
-        run: sudo apt-get install -y graphviz
-      - name: Run Doxygen to generate documentation
+          sudo apt-get update
+          
+          VERSION=1.18.0
+          TAG=Release_1_18_0
+          
+          curl -fsSL -o doxygen.tar.gz "https://github.com/doxygen/doxygen/releases/download/${TAG}/doxygen-${VERSION}.linux.bin.tar.gz"
+          
+          echo "14fa81bdc34171edb5f1f02b1d60e74802f0439b77fa44e592565d517d72df90  doxygen.tar.gz" | sha256sum -c -
+          
+          tar -xzf doxygen.tar.gz
+          cd doxygen-${VERSION}
+          sudo make install
+          
+          doxygen --version
+          cd ~
+      #- name: Install Graphviz
+      #  run: sudo apt-get install -y graphviz
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Generate Docs
         run: |
           cd ./Docs
           doxygen ./Config.doxygen
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: './Docs/html'
       - name: Deploy to GitHub Pages
