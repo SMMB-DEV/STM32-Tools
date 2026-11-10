@@ -2553,8 +2553,7 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = HAL_UART_MODULE_ENABLED \
                          STM32T_GSM_URC_ENABLED \
                          ITM \
-                         _DOXYGEN_ \
-                         DWT
+                         _DOXYGEN_
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The
