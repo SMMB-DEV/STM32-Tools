@@ -1,3 +1,5 @@
 pycryptodome
 crc
 pyelftools
+numpy
+imageio

@@ -47,8 +47,12 @@ namespace STM32T::RT
 
 
 
-#ifdef STM32T_RT
+#ifdef _DOXYGEN_
+/// Define this to enable retargeting
+#define STM32T_RT
+#endif
 
+#ifdef STM32T_RT
 #include <rt_sys.h>
 
 extern "C"
@@ -95,8 +99,4 @@ extern "C"
 
 	long _sys_flen(FILEHANDLE fh) { return -1; }
 }
-#else
-/// Define this to enable retargeting
-#define STM32T_RT
-#undef STM32T_RT
 #endif	// STM32T_RT

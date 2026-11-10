@@ -1,7 +1,6 @@
 """
 @file
 Converts an image to a C++ array of bytes. Run "python BitmapToArray.py -h" for more information.
-@todo Move to Scripts
 """
 
 """
@@ -65,6 +64,8 @@ def main():
 		image = iio.imread(input, mode='L')
 		assert image.dtype == np.uint8
 		y, x = image.shape
+		
+		# iio.imwrite(os.path.splitext(input)[0] + "-new.bmp", image)
 		
 		file_name = os.path.splitext(os.path.split(output)[1])[0]
 		

@@ -14,7 +14,7 @@
 			"cwd": "${workspaceFolder}/../../MDK-ARM"
 		},
 		{
-			"name": "Normal",
+			"name": "Hex2Bin Normal",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${file}",

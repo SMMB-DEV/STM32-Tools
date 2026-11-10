@@ -20,6 +20,16 @@
 
 
 
+#ifdef _DOXYGEN_
+/**
+* Define to enable URC support for `GSM`.
+* The GSM instance can receive and store URCs sent by the GSM module to be handled later by calling @ref STM32T::GSM::HandleURCs.
+*
+* @note DMA for UART RX and register callbacks for UART must be enabled (`USE_HAL_UART_REGISTER_CALLBACKS == 1`) for this macro to have any effect.
+*/
+#define STM32T_GSM_URC_SUPPORT
+#endif
+
 #ifndef STM32T_GSM_URC_BUF_SIZE
 /// Define to specify the size of the URC buffer for `GSM`. 
 #define STM32T_GSM_URC_BUF_SIZE		512
@@ -29,18 +39,8 @@
 #if USE_HAL_UART_REGISTER_CALLBACKS == 1
 #define STM32T_GSM_URC_ENABLED
 #else
-#warn USE_HAL_UART_REGISTER_CALLBACKS must be 1 to use GSM URC.
+#warning "USE_HAL_UART_REGISTER_CALLBACKS must be 1 to use GSM URC."
 #endif	// USE_HAL_UART_REGISTER_CALLBACKS == 1
-#else
-/**
-* Define to enable URC support for `GSM`.
-* The GSM instance can receive and store URCs sent by the GSM module to be handled later by calling @ref STM32T::GSM::HandleURCs.
-*
-* @note DMA for UART RX must be enabled and register callbacks for UART must be enabled (`USE_HAL_UART_REGISTER_CALLBACKS == 1`)
-* for this macro to have any effect.
-*/
-#define STM32T_GSM_URC_SUPPORT
-#undef STM32T_GSM_URC_SUPPORT
 #endif	// STM32T_GSM_URC_SUPPORT
 
 

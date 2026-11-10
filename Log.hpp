@@ -1,38 +1,6 @@
 /**
 * @file
-* @brief Logging library with printf formatting, multiple sinks, logging levels, etc.
-*
-* You can use the @ref STM32T::Log::Logger class to create a "static" or "dynamic" logger.
-* Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks).
-* They also support printf-style formatting (+ `"b"`/`"B"` for binary formatting).
-*
-* The output format of loggers is currently fixed:
-*
-* ```log
-* [Timestamp][Level][Module name (if present)]: Log message
-* ```
-*
-* Examples: @ref Log_Static_Example.cpp, @ref Log_Dynamic_Example.cpp
-*
-* ### Default logger
-*
-* There is always a @ref STM32T::Log::g_defaultLogger "default static logger" which is disabled.
-* If you don't need multiple logging modules or simply want a main logging module, you can use the default logger.
-*
-* You can use the @ref default_log_macros "STM32T_DEFAULT_LOG_XXX" macros to change the attributes of the default logger
-* (including setting the level to something other than @ref STM32T::Log::Level::None which enables the logger).
-*
-* Example: @ref Log_Default_Example.cpp
-* @see default_log_macros
-*
-* ### Default outputs
-*
-* The outputs of a logger must be of type @ref STM32T::Log::output_t.
-* @see log_outputs
-*
-* By default all loggers use @ref STM32T::Log::default_output_stdout as their only sink.
-* You can of course use your own custom output (e.g. to log to an SD card).
-* @see Retarget.hpp
+* @brief Logging library with printf formatting, multiple sinks, logging levels, etc\. See STM32T::Log for more information.
 */
 
 #pragma once
@@ -50,7 +18,7 @@
 static_assert(STM32T::VER < STM32T::Version(0, 5, 0), "Deprecated macros must be removed!");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE_GPIO(PORT, PIN, BAUD) \
@@ -60,7 +28,7 @@ static_assert(0, "STM32T_SYS_WRITE_GPIO is obsolete and has no effect. It will b
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE_ITM \
@@ -70,7 +38,7 @@ static_assert(0, "STM32T_SYS_WRITE_ITM is obsolete and has no effect. It will be
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE_UART(PHUART) \
@@ -80,7 +48,7 @@ static_assert(0, "STM32T_SYS_WRITE_UART is obsolete and has no effect. It will b
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE_UART_DMA(PHUART) \
@@ -90,7 +58,7 @@ static_assert(0, "STM32T_SYS_WRITE_UART_DMA is obsolete and has no effect. It wi
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE_USB \
@@ -100,7 +68,7 @@ static_assert(0, "STM32T_SYS_WRITE_USB is obsolete and has no effect. It will be
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_LOG_SYS_WRITE \
@@ -109,7 +77,7 @@ static_assert(0, "STM32T_LOG_SYS_WRITE is obsolete and has no effect. It will be
 	"\nAlso, the compiler options for STDOUT and STDERR can be disabled.");
 
 /**
-* @deprecated Will be removed in v0.5.0.
+* @deprecated Has no effect. Will be removed in v0.5.0.
 * @hideinitializer
 */
 #define STM32T_SYS_WRITE \
@@ -119,7 +87,41 @@ static_assert(0, "STM32T_SYS_WRITE is obsolete and has no effect. It will be rem
 
 
 
-/// Logging utilities
+/**
+* Contains logging utilities
+*
+* You can use the @ref Logger class to create a "static" or "dynamic" logger.
+* Each logger has a level, a name, a timestamp formatter, and one or more outputs (sinks).
+* They also support printf-style formatting (with `"b"`/`"B"` added for binary formatting).
+*
+* The output format of loggers is currently fixed:
+*
+* ```log
+* [Timestamp][Level][Module name (if present)]: Log message
+* ```
+*
+* Examples: @ref Log_Static_Example.cpp, @ref Log_Dynamic_Example.cpp
+*
+* ### Default logger
+*
+* There is always a @ref g_defaultLogger "default static logger" which is disabled.
+* If you don't need multiple logging modules or simply want a main logging module, you can use the default logger.
+*
+* You can use the @ref default_log_macros "STM32T_DEFAULT_LOG_XXX" macros to change the attributes of the default logger
+* (including setting the level to something other than @ref Level::None which enables the logger).
+*
+* Example: @ref Log_Default_Example.cpp
+* @see default_log_macros
+*
+* ### Default outputs
+*
+* The outputs of a logger must be of type @ref output_t.
+* @see predef_log_outputs
+*
+* By default all loggers use @ref default_output_stdout as their only sink.
+* You can of course use your own custom output (e.g. to log to an SD card).
+* @see Retarget.hpp
+*/
 namespace STM32T::Log
 {
 	/**
@@ -164,13 +166,13 @@ namespace STM32T::Log
 	}
 	
 	/**
-	* @defgroup log_outputs Predefined logger outputs
+	* @defgroup predef_log_outputs Predefined logger outputs
 	* @brief These can be used as outputs for @ref Logger "loggers" and for @ref Retarget.hpp "retargeting" `stdout`, `stderr`, etc.
 	*/
 	
 	/**
 	* Writes to `stdout`.
-	* @ingroup log_outputs
+	* @ingroup predef_log_outputs
 	*/
 	inline void default_output_stdout(strv data, bool last_chunk)
 	{
@@ -259,7 +261,7 @@ namespace STM32T::Log
 	/**
 	* Emulates UART using GPIO.
 	* @see SetGPIOConfig
-	* @ingroup log_outputs
+	* @ingroup predef_log_outputs
 	*/
 	inline void default_output_gpio(strv data, bool last_chunk)
 	{
@@ -333,7 +335,7 @@ namespace STM32T::Log
 	#ifdef ITM
 	/**
 	* Needs a debugger.
-	* @ingroup log_outputs
+	* @ingroup predef_log_outputs
 	*/
 	inline void default_output_itm(strv data, bool last_chunk)	// todo: Rewrite (Unlock and enable ITM, check DWT status if necessary)
 	{
@@ -355,14 +357,14 @@ namespace STM32T::Log
 	/// Set the UART handle used in @ref default_output_uart and @ref default_output_uart_dma.
 	inline void SetUARTHandle(UART_HandleTypeDef *huart) { _g_huart = huart; }
 	
-	/// Flushes outputs using UART. @see SetUARTHandle @ingroup log_outputs
+	/// Flushes outputs using UART. @see SetUARTHandle @ingroup predef_log_outputs
 	inline void default_output_uart(strv data, bool last_chunk)
 	{
 		if (_g_huart)
 			HAL_UART_Transmit(_g_huart, reinterpret_cast<const uint8_t *>(data.data()), data.size(), HAL_MAX_DELAY);
 	}
 	
-	/// Flushes outputs using UART with DMA. @see SetUARTHandle @ingroup log_outputs
+	/// Flushes outputs using UART with DMA. @see SetUARTHandle @ingroup predef_log_outputs
 	inline void default_output_uart_dma(strv data, bool last_chunk)
 	{
 		if (!_g_huart)
@@ -384,10 +386,10 @@ namespace STM32T::Log
 	extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 	#endif	// __has_include("usbd_cdc_if.h")
 	
-	/// Writes to USB VCP only if USB_FS is enabled. @ingroup log_outputs
+	#if defined(_STM32T_LOG_OUTPUT_VCP) || defined(_DOXYGEN_)
+	/// Writes to USB VCP only if USB_FS is enabled. @ingroup predef_log_outputs
 	inline void default_output_vcp(strv data, bool last_chunk)
 	{
-		#ifdef _STM32T_LOG_OUTPUT_VCP
 		static Buffer<CDC_DATA_FS_MAX_PACKET_SIZE> s_buf;
 		
 		default_output_buffer(data, last_chunk, &s_buf, [](const char *buf, size_t len)
@@ -407,8 +409,8 @@ namespace STM32T::Log
 				&& CDC_Transmit_FS(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(buf)), len) == USBD_BUSY
 				&& HAL_GetTick() - start < 10);
 		});
-		#endif	// _STM32T_LOG_OUTPUT_VCP
 	}
+	#endif	// _STM32T_LOG_OUTPUT_VCP
 	
 	template <size_t OUTPUT_COUNT = 1>
 	class Logger

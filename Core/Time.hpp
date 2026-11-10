@@ -1,19 +1,6 @@
 /**
 * @file
-* Contains timing utilities.
-*
-* The @ref STM32T_TIME_CLK macro must be defined before including this header. You can define it in STM32CubeMX or Keil Options dialog.
-* The module also has functions for working with the conventional tick provided by `HAL_GetTick()`.
-* @see STM32T::Time::Init
-* 
-* The @ref STM32T::Time namespace introduces two clocks that can be used with `std::chrono`.
-* - @ref STM32T::Time::TickClock
-* - @ref STM32T::Time::HighResClock
-* 
-* @remark Using these clocks is generally not recommended unless you really have to use `std::chrono`.
-* The conversions between different duration types can potentially be done using 64-bit integers or floating point types
-* and involves multiplication and division which is not ideal for precise and time sensitive applications on a 32-bit CPU.
-* Also in some cases (very large delays), double to integer casting could limit the maximum delay duration.
+* See STM32T::Time for more information.
 */
 
 #pragma once
@@ -38,7 +25,7 @@
 */
 #define STM32T_TIME_CLK
 
-/// Can be defined (as a `uint32_t` value) before including any of this module's headers to refresh the `IWDG` during time consuming tasks.
+/// Can be defined (as a `uint32_t` value) and is used by some modules to refresh the `IWDG` during time consuming tasks.
 #define STM32T_IWDG_TIMEOUT
 
 /**
@@ -49,6 +36,10 @@
 */
 #define STM32T_TIME_TIME
 #endif	// _DOXYGEN_
+
+#ifdef STM32T_IWDG_TIMEOUT
+extern "C" IWDG_HandleTypeDef hiwdg;
+#endif	// STM32T_IWDG_TIMEOUT
 
 #ifdef STM32T_TIME_TIME
 #ifdef HAL_RTC_MODULE_ENABLED
@@ -89,13 +80,24 @@ extern "C" std::time_t time(std::time_t* timer)
 
 
 
-/// Timing uitilities
+/**
+* Contains timing uitilities.
+* 
+* The @ref STM32T_TIME_CLK macro must be defined before including Time.hpp. You can define it in STM32CubeMX or Keil Options dialog.
+* The module also has functions for working with the conventional tick provided by `HAL_GetTick()`.
+* @see Init
+* 
+* This namespace introduces two clocks that can be used with `std::chrono`.
+* - @ref TickClock
+* - @ref HighResClock
+* 
+* @remark Using these clocks is generally not recommended unless you really have to use `std::chrono`.
+* The conversions between different duration types can potentially be done using 64-bit integers or floating point types
+* and involves multiplication and division which is not ideal for precise and time sensitive applications on a 32-bit CPU.
+* Also in some cases (very large delays), double to integer casting could limit the maximum delay duration.
+*/
 namespace STM32T::Time
 {
-	#ifdef STM32T_IWDG_TIMEOUT
-	extern "C" IWDG_HandleTypeDef hiwdg;
-	#endif	// STM32T_IWDG_TIMEOUT
-	
 	template <typename T>
 	using TickFuncPtr = T (*)();
 	
@@ -395,7 +397,8 @@ namespace STM32T::Time
 	};
 	
 	/**
-	* Generates a delay using a clock of type @ref BaseClock.
+	* @brief Similar to `std::this_thread::sleep_for`. Generates a delay using a clock of type @ref BaseClock.
+	*
 	* Does not have the 49 day limitation of `HAL_GetTick` and can create very long delays with relative accuracy.
 	* @note Avoid for very small delays and precise timing.
 	*/
@@ -409,8 +412,10 @@ namespace STM32T::Time
 		if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
 			return;
 		
-		auto d = std::chrono::duration_cast<std::chrono::duration<std::uintmax_t, typename Clock::period>>(sleep_duration);
-		if (d < sleep_duration)
+		using max_duration_t = std::chrono::duration<std::uintmax_t, typename Clock::period>;
+		
+		auto d = std::chrono::duration_cast<max_duration_t>(sleep_duration);
+		if (d < sleep_duration && d != max_duration_t::max())
 			++d;
 		
 		static constexpr auto _max = std::numeric_limits<typename Clock::rep>::max();
