@@ -39,6 +39,7 @@ PRAGMA(GCC diagnostic pop)
 
 namespace STM32T
 {
+	/// Utility functions
 	inline namespace Utils
 	{
 		template <class T>

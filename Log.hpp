@@ -351,7 +351,7 @@ namespace STM32T::Log
 	}
 	#endif	// ITM
 	
-	#ifdef HAL_UART_MODULE_ENABLED
+	#if defined(HAL_UART_MODULE_ENABLED) || defined(_DOXYGEN_)
 	inline UART_HandleTypeDef *_g_huart = nullptr;
 	
 	/// Set the UART handle used in @ref default_output_uart and @ref default_output_uart_dma.

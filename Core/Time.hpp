@@ -382,7 +382,7 @@ namespace STM32T::Time
 	}
 	#endif	// HAL_RTC_MODULE_ENABLED
 	
-	template <class REP, class PER, bool Steady>
+	template <class REP, class PER, bool Steady, bool Epsilon>
 	class BaseClock
 	{
 	public:
@@ -393,7 +393,15 @@ namespace STM32T::Time
 		
 		static_assert(std::is_unsigned_v<rep> && std::is_integral_v<rep>);
 		
-		static constexpr bool is_steady = Steady;
+		static constexpr bool
+			is_steady = Steady,
+			
+			/**
+			* Determines whether the difference between two consecutive `now` calls always indicates the real amount of time passed.
+			* For example two consecutive `HAL_GetTick` values might be 1 unit apart but that doesn't mean exactly 1ms has passed
+			* (eigther call could be made in the middle of a millisecond). The same cannot happen for a cycle counter.
+			*/
+			is_epsilon = Epsilon;
 	};
 	
 	/**
@@ -403,11 +411,21 @@ namespace STM32T::Time
 	* @note Avoid for very small delays and precise timing.
 	*/
 	template <class Clock, class Rep, class Period>
-	inline void sleep_for(const std::chrono::duration<Rep, Period> &sleep_duration)
+	inline void sleep_for(const std::chrono::duration<Rep, Period> sleep_duration)
 	{
-		static_assert(std::is_base_of_v<BaseClock<typename Clock::rep, typename Clock::period, Clock::is_steady>, Clock>);
+		static_assert(std::is_base_of_v<BaseClock<typename Clock::rep, typename Clock::period, Clock::is_steady, Clock::is_epsilon>, Clock>);
 		
 		const auto start = Clock::now();
+		
+		if constexpr (sizeof(typename Clock::rep) >= sizeof(uintmax_t))
+		{
+			if constexpr (Clock::is_epsilon)
+				while (Clock::now() - start < sleep_duration);
+			else
+				while (Clock::now() - start <= sleep_duration);
+			
+			return;
+		}
 		
 		if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
 			return;
@@ -418,12 +436,11 @@ namespace STM32T::Time
 		if (d < sleep_duration && d != max_duration_t::max())
 			++d;
 		
-		static constexpr auto _max = std::numeric_limits<typename Clock::rep>::max();
+		static constexpr auto _max = uintmax_t(std::numeric_limits<typename Clock::rep>::max()) + 1;
 		
-		auto rounds = d.count() / _max;
-		const typename Clock::time_point rem(typename Clock::duration(d.count() % _max));
+		const typename Clock::duration rem(d.count() % _max);
 		
-		for (; rounds; --rounds)
+		for (auto rounds = d.count() / _max; rounds; --rounds)
 		{
 			static constexpr auto _mid = Clock::time_point::max().time_since_epoch() / 2;
 			
@@ -432,14 +449,18 @@ namespace STM32T::Time
 		}
 		
 		while (Clock::now() < start);
-		while (Clock::now() - start < d);
+		
+		if constexpr (Clock::is_epsilon)
+			while (Clock::now() - start < rem);
+		else
+			while (Clock::now() - start <= rem);
 	}
 	
 	/**
 	* Uses `HAL_GetTick` for its time base.
 	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
 	*/
-	class TickClock : public BaseClock<tick_t, std::milli, true>
+	class TickClock : public BaseClock<tick_t, std::milli, true, false>
 	{
 	public:
 		static time_point now() { return time_point(duration(HAL_GetTick())); }
@@ -449,7 +470,7 @@ namespace STM32T::Time
 	* Uses @ref GetCycle for its time base.
 	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
 	*/
-	class HighResClock : public BaseClock<cycle_t, std::ratio<1, STM32T_TIME_CLK>, true>
+	class HighResClock : public BaseClock<cycle_t, std::ratio<1, STM32T_TIME_CLK>, true, true>
 	{
 	public:
 		static time_point now() { return time_point(duration(GetCycle())); }
