@@ -94,7 +94,7 @@ extern "C" std::time_t time(std::time_t* timer)
 * @remark Using these clocks is generally not recommended unless you really have to use `std::chrono`.
 * The conversions between different duration types can potentially be done using 64-bit integers or floating point types
 * and involves multiplication and division which is not ideal for precise and time sensitive applications on a 32-bit CPU.
-* Also in some cases (very large delays), double to integer casting could limit the maximum delay duration.
+* Also in some cases (very large delays), floating point to integer casting could limit the maximum delay duration.
 */
 namespace STM32T::Time
 {
@@ -118,7 +118,7 @@ namespace STM32T::Time
 	
 	static_assert(STM32T_TIME_CLK % 1'000'000 == 0, "STM32T_TIME_CLK must be divisible by 1,000,000!");
 	
-	#ifdef DWT
+	#if defined(DWT) or defined(_DOXYGEN_)
 	/**
 	* Initializes the timing module and checks @ref STM32T_TIME_CLK validity.
 	* If your microcontroller has a `DWT` unit, it will be enabled and used for timing. Otherwise, the `SysTick` timer is used.
@@ -162,7 +162,7 @@ namespace STM32T::Time
 		else
 			return big2 * MS + (MS - small2);
 	}
-	#endif	// DWT
+	#endif	// defined(DWT)
 	
 	inline constexpr cycle_t msToCycles(const ms_time_t time_ms)
 	{
@@ -382,98 +382,119 @@ namespace STM32T::Time
 	}
 	#endif	// HAL_RTC_MODULE_ENABLED
 	
-	template <class REP, class PER, bool Steady, bool Epsilon>
-	class BaseClock
-	{
-	public:
-		using rep = REP;
-		using period = PER;
-		using duration = std::chrono::duration<rep, period>;
-		using time_point = std::chrono::time_point<BaseClock>;
-		
-		static_assert(std::is_unsigned_v<rep> && std::is_integral_v<rep>);
-		
-		static constexpr bool
-			is_steady = Steady,
-			
-			/**
-			* Determines whether the difference between two consecutive `now` calls always indicates the real amount of time passed.
-			* For example two consecutive `HAL_GetTick` values might be 1 unit apart but that doesn't mean exactly 1ms has passed
-			* (eigther call could be made in the middle of a millisecond). The same cannot happen for a cycle counter.
-			*/
-			is_epsilon = Epsilon;
-	};
-	
-	/**
-	* @brief Similar to `std::this_thread::sleep_for`. Generates a delay using a clock of type @ref BaseClock.
-	*
-	* Does not have the 49 day limitation of `HAL_GetTick` and can create very long delays with relative accuracy.
-	* @note Avoid for very small delays and precise timing.
-	*/
-	template <class Clock, class Rep, class Period>
-	inline void sleep_for(const std::chrono::duration<Rep, Period> sleep_duration)
-	{
-		static_assert(std::is_base_of_v<BaseClock<typename Clock::rep, typename Clock::period, Clock::is_steady, Clock::is_epsilon>, Clock>);
-		
-		const auto start = Clock::now();
-		
-		if constexpr (sizeof(typename Clock::rep) >= sizeof(uintmax_t))
-		{
-			if constexpr (Clock::is_epsilon)
-				while (Clock::now() - start < sleep_duration);
-			else
-				while (Clock::now() - start <= sleep_duration);
-			
-			return;
-		}
-		
-		if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
-			return;
-		
-		using max_duration_t = std::chrono::duration<std::uintmax_t, typename Clock::period>;
-		
-		auto d = std::chrono::duration_cast<max_duration_t>(sleep_duration);
-		if (d < sleep_duration && d != max_duration_t::max())
-			++d;
-		
-		static constexpr auto _max = uintmax_t(std::numeric_limits<typename Clock::rep>::max()) + 1;
-		
-		const typename Clock::duration rem(d.count() % _max);
-		
-		for (auto rounds = d.count() / _max; rounds; --rounds)
-		{
-			static constexpr auto _mid = Clock::time_point::max().time_since_epoch() / 2;
-			
-			while (Clock::now().time_since_epoch() < _mid);
-			while (Clock::now().time_since_epoch() >= _mid);
-		}
-		
-		while (Clock::now() < start);
-		
-		if constexpr (Clock::is_epsilon)
-			while (Clock::now() - start < rem);
-		else
-			while (Clock::now() - start <= rem);
-	}
-	
 	/**
 	* Uses `HAL_GetTick` for its time base.
 	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
 	*/
-	class TickClock : public BaseClock<tick_t, std::milli, true, false>
+	class TickClock
 	{
 	public:
+		using rep = tick_t;
+		using period = std::milli;
+		using duration = std::chrono::duration<rep, period>;
+		using time_point = std::chrono::time_point<TickClock>;
+		
+		static constexpr bool is_steady = true;
+		
 		static time_point now() { return time_point(duration(HAL_GetTick())); }
+		
+		/**
+		* @brief Similar to `std::this_thread::sleep_for`.
+		*
+		* Can create very long delays with relative accuracy.
+		* @note Avoid for very small delays and precise timing.
+		*/
+		template <class Rep, class Period>
+		static void sleep_for(const std::chrono::duration<Rep, Period> sleep_duration)
+		{
+			const auto start = now();
+			
+			if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
+				return;
+			
+			static_assert(sizeof(rep) < sizeof(uintmax_t));
+			
+			using max_duration_t = std::chrono::duration<std::uintmax_t, period>;
+			
+			max_duration_t d = sleep_duration > max_duration_t::max() ? max_duration_t::max() : std::chrono::duration_cast<max_duration_t>(sleep_duration);
+			
+			if (d < sleep_duration && d != max_duration_t::max())
+				++d;
+			
+			static constexpr auto _max = uintmax_t(std::numeric_limits<rep>::max()) + 1;
+			
+			const duration rem(d.count() % _max);
+			
+			for (auto rounds = d.count() / _max; rounds; --rounds)
+			{
+				static constexpr auto _mid = time_point::max().time_since_epoch() / 2;
+				
+				while (now().time_since_epoch() < _mid);
+				while (now().time_since_epoch() >= _mid);
+			}
+			
+			while (now() < start);
+			while (now() - start <= rem);
+		}
 	};
 	
 	/**
 	* Uses @ref GetCycle for its time base.
 	* @note This clock is defined as "steady" even though its tick counter could be modified manually - though that would be highly unusual.
 	*/
-	class HighResClock : public BaseClock<cycle_t, std::ratio<1, STM32T_TIME_CLK>, true, true>
+	class HighResClock
 	{
 	public:
+		using rep = cycle_t;
+		using period = std::ratio<1, STM32T_TIME_CLK>;
+		using duration = std::chrono::duration<rep, period>;
+		using time_point = std::chrono::time_point<HighResClock>;
+		
+		static constexpr bool is_steady = true;
+		
 		static time_point now() { return time_point(duration(GetCycle())); }
+		
+		/// @copydoc TickClock::sleep_for
+		template <class Rep, class Period>
+		static void sleep_for(const std::chrono::duration<Rep, Period> sleep_duration)
+		{
+			const auto start = now();
+			
+			if (sleep_duration <= std::chrono::duration<Rep, Period>::zero())
+				return;
+			
+			static_assert(sizeof(rep) < sizeof(uintmax_t));
+			
+			using max_duration_t = std::chrono::duration<std::uintmax_t, period>;
+			
+			max_duration_t d = sleep_duration > max_duration_t::max() ? max_duration_t::max() : std::chrono::duration_cast<max_duration_t>(sleep_duration);
+			
+			if (d < sleep_duration && d != max_duration_t::max())
+				++d;
+			
+			static constexpr auto _max = uintmax_t(std::numeric_limits<rep>::max()) + 1;
+			
+			const duration rem(d.count() % _max);
+			
+			for (auto rounds = d.count() / _max; rounds; --rounds)
+			{
+				static constexpr auto _mid = time_point::max().time_since_epoch() / 2;
+				
+				while (now().time_since_epoch() < _mid);
+				while (now().time_since_epoch() >= _mid);
+			}
+			
+			while (now() < start);
+			while (now() - start < rem);
+		}
+	};
+	
+		
+		
+		{
+			
+		}
+		
 	};
 	
 	template <typename TIME_T = cycle_t>
