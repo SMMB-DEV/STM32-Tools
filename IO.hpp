@@ -1,3 +1,5 @@
+/// @file
+
 #pragma once
 
 #include "./Core/Time.hpp"
@@ -34,6 +36,7 @@ namespace STM32T
 		return true;
 	}
 	
+	/// Base class for anything representing a GPIO pin.
 	class _IO
 	{
 	public:
@@ -203,12 +206,14 @@ namespace STM32T
 		}
 	};
 	
+	/// Base class for anything representing a collection of @ref _IO "_IO"s.
 	template <size_t COUNT>
 	class _IOs
 	{
 		static_assert(COUNT > 1 && COUNT <= 32);
 		
 	public:
+		/// A proxy for a single pin in the collection.
 		class PinProxy : public _IO
 		{
 			friend class _IOs;

@@ -1,4 +1,4 @@
-# STM32 Tools
+# Introduction
 
 STM32T is a framework of useful utilities for working with STM32 microcontrollers. Although some of the code might be usable with other microcontrollers
 (or just as a standalone library), it was mainly written to help with STM32 development.
@@ -10,9 +10,9 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 > [!NOTE]
 > **Full documentation [here](https://SMMB-DEV.github.io/STM32-Tools)**
 
-## What's in it
+# What's in it
 
-### Modules (directories)
+## Modules (directories)
 
 - [`Core`](./Core/README.md): Core utilities that aren't dependent on other modules or header files in this framework
 - [`Display`](./Display/README.md): For using different types of display
@@ -22,7 +22,7 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 - `Experimental`: Might change substantially or be removed entirely
   - `RFID`: For working with RFID ICs and modules
 
-### Standalone headers
+## Standalone headers
 
 - `Log.hpp`: Logging library with printf formatting, multiple sinks, logging levels, etc.
 - `Versioning.hpp`: A simplified implementation of [Semantic Versioning](https://semver.org)
@@ -31,6 +31,6 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 - `IO.hpp`: Simple classes for manipulating GPIO pins
 - `Runnable.hpp`: Simple task scheduler
 
-## How to use
+# How to use
 
 Clone the repository as a submodule into your project (e.g. in `Project-Dir/Tools`) and then include the headers you need (e.g. `<Tools/Core/Utils.hpp>`).

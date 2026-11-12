@@ -205,10 +205,10 @@ namespace STM32T
 			return converted;
 		}
 		
-		constexpr uint32_t pow(const uint32_t a, const uint8_t b)
+		constexpr uint32_t pow(const uint32_t a, uint8_t b)
 		{
 			uint32_t val = 1;
-			for (uint8_t i = 0; i < b; i++)
+			while (b--)
 				val *= a;
 			
 			return val;

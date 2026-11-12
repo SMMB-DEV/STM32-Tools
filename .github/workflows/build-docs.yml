@@ -5,8 +5,8 @@
 name: build-docs
 
 on:
-  push:
-    branches: ["main"]
+  #push:
+  #  branches: ["main"]
   
   # To allow testing changes in a PR
   pull_request:

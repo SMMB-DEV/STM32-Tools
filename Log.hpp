@@ -950,6 +950,9 @@ namespace STM32T::Log
 		template <auto& logger = g_defaultLogger, class... Args>
 		void LOG_D(const char *fmt, Args... args) { _LOG<Level::Debug, logger>(fmt, args...); }
 		
+		template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
+		void LOG(const char *fmt, Args... args) { _LOG<level, logger>(fmt, args...); }
+		
 		template <const Level level = Level::None, auto& logger = g_defaultLogger>
 		inline void LOGA(const uint8_t *arr, size_t len, const size_t line_count = 16)
 		{
