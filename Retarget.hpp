@@ -1,6 +1,7 @@
 /**
 * @file
-* 
+* @brief Utilities for retargetting `stdout`, `stderr`, `ttywrch`, etc.
+*
 * # Retargeting
 * 
 * Logs can be redirected to many different sinks including `stdout`. `stdout`, `stderr`, and `ttywrch`
@@ -9,6 +10,8 @@
 * Other libraries and frameworks might simply use `printf` for logging. Or for example,
 * the `<cassert>` library writes an error message to `stderr` when an assert fails.
 * By using this header you can redirect logs and error messages from other libraries to the same sinks as your normal logs.
+* @remark Mixing C and C++ often creates problems because of semihosting (not sure why it should but it does).
+* Using @ref STM32T_RT is one way of remedying that without changing the compiler run-time settings.
 */
 
 #include "./Log.hpp"
@@ -20,21 +23,23 @@ namespace STM32T::RT
 	inline std::vector<Log::output_t> _g_handlers;
 	
 	/**
-	* @note The @p logger must not write to `stdout` or `stderr` or use `ttywrch`.
+	* All `stdout`, `stderr`, and `ttywrch` outputs will be redirected to @p handler as well as other handlers added previously.
+	* @note The @p handler must not write to `stdout` or `stderr` or use `ttywrch`.
 	*/
-	inline void AddHandler(const Log::output_t logger)
+	inline void AddHandler(const Log::output_t handler)
 	{
-		if (logger != Log::default_output_stdout)
+		if (handler != Log::default_output_stdout)
 		{
-			auto it = std::find(_g_handlers.begin(), _g_handlers.end(), logger);
+			auto it = std::find(_g_handlers.begin(), _g_handlers.end(), handler);
 			if (it == _g_handlers.end())
-				_g_handlers.push_back(logger);
+				_g_handlers.push_back(handler);
 		}
 	}
 	
-	inline void RemoveHandler(const Log::output_t logger)
+	/// Removes a handler previously added by @ref AddHandler from the list of handlers.
+	inline void RemoveHandler(const Log::output_t handler)
 	{
-		auto it = std::remove(_g_handlers.begin(), _g_handlers.end(), logger);
+		auto it = std::remove(_g_handlers.begin(), _g_handlers.end(), handler);
 		_g_handlers.erase(it, _g_handlers.end());
 	}
 	
@@ -48,7 +53,10 @@ namespace STM32T::RT
 
 
 #ifdef _DOXYGEN_
-/// Define this to enable retargeting
+/**
+* Define this to enable retargeting. By default all `stdout`, `stderr`, and `ttywrch` outputs are ignored.
+* @see STM32T::RT::AddHandler
+*/
 #define STM32T_RT
 #endif
 

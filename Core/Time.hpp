@@ -111,9 +111,11 @@ namespace STM32T::Time
 	template <typename T>
 	using TickFuncPtr = T (*)();
 	
+	/// A pointer to a delay function that accepts a duration and returns nothing.
 	template <typename T>
 	using DelayFuncPtr = void (*)(T);
 	
+	/// The return type of `HAL_GetTick()`.
 	using tick_t = decltype(HAL_GetTick());
 	
 	using cycle_t = uint32_t;

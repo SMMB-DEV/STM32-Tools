@@ -19,8 +19,7 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 - [`GSM`](./GSM/README.md): For using GSM modules
 - [`1-Wire`](./1-Wire/README.md): For working with 1-wire sensors
 - `Memory`: For working with memory ICs
-- `Experimental`: Might change substantially or be removed entirely
-  - `RFID`: For working with RFID ICs and modules
+- [`Experimental`](./Experimental/README.md): Testing ground fot new features
 
 ## Standalone headers
 
