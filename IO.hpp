@@ -42,37 +42,59 @@ namespace STM32T
 	public:
 		virtual ~_IO() {}
 		
+		/// @return The input state of the pin.
+		/// @note This might not be the same as the output state of the pin (e.g. output in OD mode).
 		virtual bool Read() const = 0;
-		__attribute__((pure)) virtual bool Check() const = 0;
-		virtual bool Set(bool state = true) = 0;
 		
-		[[gnu::always_inline]] bool Reset()
+		/// @return The output state of the pin.
+		virtual bool Check() const = 0;
+		
+		/// Sets the state of the pin without checking previous state.
+		virtual void Set(bool state = true) = 0;
+		
+		/// @retval true if the state was actually changed.
+		virtual bool SetCheck(bool state = true) = 0;
+		
+		/// Has the same effect as @ref Set "Set(false)".
+		[[gnu::always_inline]] void Reset() { Set(false); }
+		
+		/// Has the same effect as @ref SetCheck "SetCheck(false)".
+		/// @copydoc SetCheck
+		[[gnu::always_inline]] bool ResetCheck() { return SetCheck(false); }
+		
+		virtual void Toggle() { Set(!Check()); }
+		
+		/**
+		* Pulses the pin for the specified time (set/delay/reset).
+		* @tparam TIME The underlying type for representing the time.
+		* @param time The duration of the pulse.
+		* @param state The type of pulse (high/low)
+		* @param delay The delay function to use for @p time
+		*/
+		template<typename TIME = Time::tick_t>
+		void Pulse(const TIME time, bool state = true, Time::DelayFuncPtr<TIME> delay = HAL_Delay)
 		{
-			return Set(false);
-		}
-		
-		virtual void Toggle() = 0;
-		
-		template<typename T = uint32_t>
-		void Timed(const T time, Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
-		{
-			static_assert(is_int_v<T>);
+			static_assert(is_int_v<TIME>);
 			
 			Set(state);
 			delay(time);
 			Set(!state);
 		}
 		
+		template<typename TIME = uint32_t>
+		[[deprecated("Use Pulse() instead. Will be removed in v0.7.0.")]]
+		void Timed(const TIME time, Time::DelayFuncPtr<TIME> delay = HAL_Delay, bool state = true) { Pulse<TIME>(time, state, delay); }
+		
 		void Error(const uint8_t n = 3, const Time::tick_t time_high = 200, const Time::tick_t time_low = 200)
 		{
 			for (uint8_t i = 1; i < n ; ++i)
 			{
-				Timed(time_high);
+				Pulse(time_high);
 				HAL_Delay(time_low);
 			}
 			
 			if (n)
-				Timed(time_high);
+				Pulse(time_high);
 		}
 		
 		bool Wait(const bool desired_state, const Time::tick_t timeout) const
@@ -170,22 +192,20 @@ namespace STM32T
 			return &S_IO;
 		}
 		
-		[[gnu::always_inline]] bool Read() const override
-		{
-			return (cp_port->IDR & c_pin) ? !active_low : active_low;
-		}
+		[[gnu::always_inline]] bool Read() const override { return (cp_port->IDR & c_pin) ? !active_low : active_low; }
 		
-		[[gnu::always_inline]] __attribute__((pure)) bool Check() const override
-		{
-			return (cp_port->ODR & c_pin) ? !active_low : active_low;
-		}
+		[[gnu::always_inline]] bool Check() const override { return (cp_port->ODR & c_pin) ? !active_low : active_low; }
 		
-		[[gnu::always_inline]] bool Set(bool state = true) override
+		[[gnu::always_inline]] void Set(bool state = true) override { cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER); }
+		
+		bool SetCheck(bool state = true) override
 		{
 			const bool old = Check();
-			cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
+			if (old == state)
+				return false;
 			
-			return old != state;
+			cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
+			return true;
 		}
 		
 		[[gnu::always_inline]] void Toggle() override
@@ -206,13 +226,21 @@ namespace STM32T
 		}
 	};
 	
-	/// Base class for anything representing a collection of @ref _IO "_IO"s.
-	template <size_t COUNT>
+	/**
+	* Base class for anything representing a collection of @ref _IO "_IO"s.
+	* @tparam COUNT The max. number of pins.
+	* @tparam T The underlying type for bitmasks.
+	*/
+	template <size_t COUNT, typename T = uint32_t>
 	class _IOs
 	{
-		static_assert(COUNT > 1 && COUNT <= 32);
+		static_assert(is_int_v<T> && std::is_unsigned_v<T>);
+		static_assert(COUNT > 1 && COUNT <= sizeof(T) * 8, "Invalid COUNT value!");
 		
 	public:
+		static constexpr size_t PIN_COUNT = COUNT;
+		static constexpr T ALL_PINS = std::numeric_limits<T>::max();
+		
 		/// A proxy for a single pin in the collection.
 		class PinProxy : public _IO
 		{
@@ -224,178 +252,177 @@ namespace STM32T
 			PinProxy(_IOs &ios, uint8_t pin_number) : m_ios(ios), c_pin(pin_number) {}
 			
 		public:
-			bool Read() const override
-			{
-				return m_ios.ReadBit(c_pin);
-			}
-			
-			__attribute__((pure)) bool Check() const override
-			{
-				return m_ios.CheckBit(c_pin);
-			}
-			
-			bool Set(bool state = true) override
-			{
-				return m_ios.SetBit(c_pin, state);
-			}
-			
-			void Toggle() override
-			{
-				m_ios.ToggleBit(c_pin);
-			}
+			bool Read() const override { return m_ios.ReadBit(c_pin); }
+			bool Check() const override { return m_ios.CheckBit(c_pin); }
+			void Set(bool state = true) override { m_ios.SetBit(c_pin, state); }
+			bool SetCheck(bool state = true) override { return m_ios.SetBitCheck(c_pin, state); }
+			void Toggle() override { m_ios.ToggleBit(c_pin); }
 		};
 		
 		virtual ~_IOs() {}
 		
-		static constexpr size_t PIN_COUNT = COUNT;
-		
 		constexpr size_t PinCount() { return COUNT; }
 		
-		PinProxy Proxy(uint8_t pin_number)
-		{
-			return PinProxy(*this, pin_number);
-		}
+		PinProxy Proxy(uint8_t pin_number) { return PinProxy(*this, pin_number); }
 		
-		virtual uint32_t Read() const = 0;
+		virtual T Read() const = 0;
 		
-		virtual bool ReadBit(uint8_t bit_number) const
-		{
-			return (Read() >> bit_number) & 1u;
-		}
+		virtual bool ReadBit(uint8_t bit_number) const { return (Read() >> bit_number) & 1u; }
 		
-		__attribute__((pure)) virtual uint32_t Check() const = 0;
+		virtual T Check() const = 0;
 		
-		__attribute__((pure)) virtual bool CheckBit(uint8_t bit_number)
-		{
-			return (Check() >> bit_number) & 1u;
-		}
+		virtual bool CheckBit(uint8_t bit_number) const { return (Check() >> bit_number) & 1u; }
 		
-		/**
-		* @retval True if any pin's state was changed (might not be implemented).
-		*/
-		virtual bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) = 0;
+		/// Sets the state of pins without checking previous states.
+		virtual void Set(const T vals = ALL_PINS, const T mask = ALL_PINS) = 0;
 		
-		virtual bool SetBit(uint8_t bit_number, bool state = true)
-		{
-			return Set(state << bit_number, 1u << bit_number);
-		}
+		/// @retval true if any pin's state was changed.
+		virtual T SetCheck(const T vals = ALL_PINS, const T mask = ALL_PINS) = 0;
 		
-		/**
-		* @retval True if any pin's state was changed (might not be implemented).
-		*/
-		virtual bool Reset(const uint32_t mask = 0xFFFF'FFFF) = 0;
+		/// @copydoc _IO::Set
+		virtual void SetBit(uint8_t bit_number, bool state = true) { Set(state << bit_number, 1u << bit_number); }
 		
-		virtual bool ResetBit(uint8_t bit_number)
-		{
-			return Reset(1u << bit_number);
-		}
+		/// @copydoc _IO::SetCheck
+		virtual bool SetBitCheck(uint8_t bit_number, bool state = true) { return SetCheck(state << bit_number, 1u << bit_number); }
 		
-		virtual void Toggle(const uint32_t mask = 0xFFFF'FFFF)
-		{
-			Set(Check() ^ mask, mask);
-		}
+		/// Has the same effect as @ref Set "Set(0, mask)".
+		void Reset(const T mask = ALL_PINS) { Set(T(0), mask); }
 		
-		virtual void ToggleBit(uint8_t bit_number)
-		{
-			Toggle(1u << bit_number);
-		}
+		/// Has the same effect as @ref SetCheck "SetCheck(0, mask)".
+		T ResetCheck(const T mask = ALL_PINS) { return SetCheck(T(0), mask); }
+		
+		/// Has the same effect as @ref SetBit "SetBit(bit_number, false)".
+		virtual void ResetBit(uint8_t bit_number) { Reset(1u << bit_number); }
+		
+		/// Has the same effect as @ref SetBitCheck "SetBitcheck(bit_number, false)".
+		virtual bool ResetBitCheck(uint8_t bit_number) { return ResetCheck(1u << bit_number); }
+		
+		virtual void Toggle(const T mask = ALL_PINS) { Set(Check() ^ mask, mask); }
+		
+		virtual void ToggleBit(uint8_t bit_number) { SetBit(bit_number, !CheckBit(bit_number)); }
 		
 		/**
 		* @param mode - Must be a value of `GPIO_mode` (HAL)
 		* @param pull - Must be a value of `GPIO_pull` (HAL)
 		* @param speed - Must be a value of `GPIO_speed` (HAL)
 		*/
-		virtual void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const uint32_t mask = 0xFFFF'FFFF) = 0;
+		virtual void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const T mask = ALL_PINS) = 0;
 		
 		virtual void SetBitMode(uint8_t bit_number, uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW)
 		{
-			SetMode(mode, pull, speed, 1 << bit_number);
+			SetMode(mode, pull, speed, 1u << bit_number);
 		}
 		
-		template<typename T = uint32_t>
-		void Timed(const T time, const uint32_t vals = 0xFFFF'FFFF, Time::DelayFuncPtr<T> delay = HAL_Delay, const uint32_t mask = 0xFFFF'FFFF)
+		/**
+		* Pulses the pins for the specified time (set/delay/reset).
+		* @tparam TIME The underlying type for representing the time.
+		* @param time The duration of the pulse.
+		* @param vals The type of pulse for each pin (high/low)
+		* @param mask The bitmask for @p vals
+		* @param delay The delay function to use for @p time
+		*/
+		template<typename TIME = uint32_t>
+		void Pulse(const TIME time, const T vals = ALL_PINS, const T mask = ALL_PINS, Time::DelayFuncPtr<TIME> delay = HAL_Delay)
 		{
-			static_assert(is_int_v<T>);
+			static_assert(is_int_v<TIME>);
 			
 			Set(vals, mask);
 			delay(time);
 			Set(~vals, mask);
 		}
 		
-		template<typename T = uint32_t>
-		void TimedBit(const T time, uint8_t bit_number, STM32T::Time::DelayFuncPtr<T> delay = HAL_Delay, bool state = true)
+		/// @copydoc _IO::Pulse
+		/// @param bit_number The index of the pin in the collection.
+		template<typename TIME = uint32_t>
+		void PulseBit(uint8_t bit_number, const TIME time, bool state = true, STM32T::Time::DelayFuncPtr<TIME> delay = HAL_Delay)
 		{
-			Timed<T>(time, state << bit_number, delay, 1u << bit_number);
+			static_assert(is_int_v<TIME>);
+			
+			SetBit(bit_number, state);
+			delay(time);
+			SetBit(bit_number, !state);
+		}
+		
+		template<typename TIME = uint32_t>
+		[[deprecated("Use Pulse() instead. Will be removed in v0.7.0.")]]
+		void Timed(const TIME time, const uint32_t vals = 0xFFFF'FFFF, Time::DelayFuncPtr<TIME> delay = HAL_Delay, const uint32_t mask = 0xFFFF'FFFF)
+		{
+			Pulse<TIME>(time, vals, mask, delay);
+		}
+		
+		template<typename TIME = uint32_t>
+		[[deprecated("Use PulseBit() instead. Will be removed in v0.7.0.")]]
+		void TimedBit(const TIME time, uint8_t bit_number, STM32T::Time::DelayFuncPtr<TIME> delay = HAL_Delay, bool state = true)
+		{
+			PulseBit<TIME>(bit_number, time, state, delay);
 		}
 	};
 	
-	template <size_t COUNT>
-	class IOArray : public _IOs<COUNT>
+	template <size_t COUNT, typename T = uint32_t>
+	class IOArray : public _IOs<COUNT, T>
 	{
+		using base = _IOs<COUNT, T>;
+		
 		std::array<IO, COUNT> m_pins;
 		
 	public:
+		using base::ALL_PINS;
+		
 		IOArray(std::array<IO, COUNT>&& pins) : m_pins(std::move(pins)) {}
 		
 		STM32T::IO& operator[](size_t index) { return m_pins[index]; }
 		
-		uint32_t Read() const override
+		T Read() const override
 		{
-			uint32_t bits = 0;
+			T bits = T(0);
 			for (size_t i = 0; i < COUNT; i++)
 				bits |= m_pins[i].Read() << i;
 			
 			return bits;
 		}
 		
-		bool ReadBit(uint8_t bit_number) const override
-		{
-			return m_pins[bit_number].Read();
-		}
+		bool ReadBit(uint8_t bit_number) const override { return m_pins[bit_number].Read(); }
 		
-		__attribute__((pure)) uint32_t Check() const override
+		T Check() const override
 		{
-			uint32_t bits = 0;
+			T bits = T(0);
 			for (size_t i = 0; i < COUNT; i++)
 				bits |= m_pins[i].Check() << i;
 			
 			return bits;
 		}
 		
-		__attribute__((pure)) bool CheckBit(uint8_t bit_number) override
+		bool CheckBit(uint8_t bit_number) const override { return m_pins[bit_number].Check(); }
+		
+		void Set(const T vals = ALL_PINS, const T mask = ALL_PINS) override
 		{
-			return m_pins[bit_number].Check();
+			for (size_t i = 0; i < COUNT; i++)
+			{
+				if (mask & (1u << i))
+					m_pins[i].Set((vals >> i) & 1u);
+			}
 		}
 		
-		bool Set(const uint32_t vals = 0xFFFF'FFFF, const uint32_t mask = 0xFFFF'FFFF) override
+		T SetCheck(const T vals = ALL_PINS, const T mask = ALL_PINS) override
 		{
-			bool changed = false;
+			T changed = T(0);
 			
 			for (size_t i = 0; i < COUNT; i++)
 			{
 				if (mask & (1u << i))
-					changed |= m_pins[i].Set((vals >> i) & 1u);
+					changed |= m_pins[i].SetCheck((vals >> i) & 1u) << i;
 			}
 			
 			return changed;
 		}
 		
-		bool SetBit(uint8_t bit_number, bool state = true) override
-		{
-			return m_pins[bit_number].Set(state);
-		}
+		void SetBit(uint8_t bit_number, bool state = true) override { m_pins[bit_number].Set(state); }
+		bool SetBitCheck(uint8_t bit_number, bool state = true) override { return m_pins[bit_number].SetCheck(state); }
 		
-		bool Reset(const uint32_t mask = 0xFFFF'FFFF) override
-		{
-			return Set(0x0000'0000, mask);
-		}
+		void ResetBit(uint8_t bit_number) override { m_pins[bit_number].Reset(); }
+		bool ResetBitCheck(uint8_t bit_number) override { return m_pins[bit_number].ResetCheck(); }
 		
-		bool ResetBit(uint8_t bit_number) override
-		{
-			return m_pins[bit_number].Reset();
-		}
-		
-		void Toggle(const uint32_t mask = 0xFFFF'FFFF) override
+		void Toggle(const T mask = ALL_PINS) override
 		{
 			for (size_t i = 0; i < COUNT; i++)
 			{
@@ -404,12 +431,9 @@ namespace STM32T
 			}
 		}
 		
-		void ToggleBit(uint8_t bit_number) override
-		{
-			m_pins[bit_number].Toggle();
-		}
+		void ToggleBit(uint8_t bit_number) override { m_pins[bit_number].Toggle(); }
 		
-		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const uint32_t mask = 0xFFFF'FFFF) override
+		void SetMode(uint32_t mode, uint32_t pull = GPIO_NOPULL, uint32_t speed = GPIO_SPEED_FREQ_LOW, const T mask = ALL_PINS) override
 		{
 			for (size_t i = 0; i < COUNT; i++)
 			{
