@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "./Utils.hpp"
+
 #include <cstddef>
 #include <limits>
 #include <array>
@@ -144,11 +146,11 @@ namespace STM32T
 		constexpr span() noexcept : p_data(nullptr), m_size(0) { static_assert(extent == 0 || extent == dynamic_extent); }
 		
 		template <class It>
-		explicit (extent != dynamic_extent)
+		WCPP20EXT(explicit (extent != dynamic_extent))
 		constexpr span(It first, size_type count) : p_data(to_address(first)), m_size(count) {}
 		
 		template <class It, class End>
-		explicit (extent != dynamic_extent)
+		WCPP20EXT(explicit (extent != dynamic_extent))
 		constexpr span(It first, End last) : p_data(to_address(first)), m_size(last - first) {}
 		
 		template <std::size_t N>
@@ -160,11 +162,11 @@ namespace STM32T
 		template <class U, std::size_t N>
 		constexpr span(const std::array<U, N>& arr) noexcept : p_data(std::data(arr)), m_size(N) {}
 		
-		explicit (extent != dynamic_extent)
+		WCPP20EXT(explicit (extent != dynamic_extent))
 		constexpr span(std::initializer_list<value_type> il) noexcept : p_data(il.begin()), m_size(il.size()) {}
 		
 		template <class U, std::size_t N>
-		explicit (extent != dynamic_extent && N == dynamic_extent)
+		WCPP20EXT(explicit (extent != dynamic_extent && N == dynamic_extent))
 		constexpr span(const span<U, N>& source) noexcept : p_data(source.data()), m_size(source.size()) {}
 		
 		constexpr span(const span& other) noexcept = default;

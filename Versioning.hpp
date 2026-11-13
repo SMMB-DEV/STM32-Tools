@@ -88,7 +88,7 @@ namespace STM32T
 		constexpr Version() : m_data{} {}
 		constexpr Version(const uint32_t val) : m_data{ uint8_t(val), uint8_t(val >> 8), uint8_t(val >> 16), uint8_t(val >> 24) } {}
 		constexpr Version(uint8_t major, uint8_t minor, uint8_t patch, PreRelease pr = Unspecified) : m_data{pr, patch, minor, major} {}
-		constexpr Version(const uint8_t (&arr)[4]) : m_data{arr[3], arr[2], arr[1], arr[0]} {}
+		constexpr Version(const uint8_t (&arr)[4]) : m_data{arr[0], arr[1], arr[2], arr[3]} {}
 		
 		constexpr Version(const Version& other) : m_data{other.m_data[0], other.m_data[1], other.m_data[2], other.m_data[3]} {}
 		
@@ -352,5 +352,5 @@ namespace STM32T
 	};
 	
 	// todo: Check what needs to be removed (deprecated) for each version. Search for "vx.y.z". Also update README.md.
-	constexpr Version VER = (0, 4, 0, Version::Normal);		///< Current version of the framework
+	constexpr Version VER(0, 4, 0, Version::Normal);		///< Current version of the framework
 }

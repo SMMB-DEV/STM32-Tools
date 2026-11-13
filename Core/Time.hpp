@@ -39,6 +39,10 @@
 #define STM32T_TIME_RTC_SS
 #endif	// _DOXYGEN_
 
+#ifndef HAL_IWDG_MODULE_ENABLED
+#undef STM32T_IWDG_TIMEOUT
+#endif	// HAL_IWDG_MODULE_ENABLED
+
 #ifndef STM32T_TIME_CLK
 #error "STM32T_TIME_CLK not defined! Define it to be equal to HCLK."
 #endif	// STM32T_TIME_CLK
