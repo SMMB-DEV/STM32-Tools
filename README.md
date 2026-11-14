@@ -14,7 +14,7 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 
 ## Modules (directories)
 
-- [`Core`](./Core/README.md): Core utilities that aren't dependent on other modules or header files in this framework
+- [`Core`](./Core/README.md): Core utilities that are mostly independent of other modules or header files in this framework
 - [`Display`](./Display/README.md): For using different types of display
 - [`GSM`](./GSM/README.md): For using GSM modules
 - [`1-Wire`](./1-Wire/README.md): For working with 1-wire sensors
@@ -32,4 +32,5 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 
 # How to use
 
-Clone the repository as a submodule into your project (e.g. in `Project-Dir/Tools`) and then include the headers you need (e.g. `<Tools/Core/Utils.hpp>`).
+Clone the repository as a submodule into your project or just download it (e.g. in `Project-Dir/Tools`)
+and then include the headers you need (e.g. `<Tools/module/header.hpp>`).

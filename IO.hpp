@@ -1,4 +1,7 @@
-/// @file
+/**
+* @file
+* Simple utilities for manipulating GPIO
+*/
 
 #pragma once
 
@@ -58,8 +61,10 @@ namespace STM32T
 		/// Has the same effect as @ref Set "Set(false)".
 		[[gnu::always_inline]] void Reset() { Set(false); }
 		
-		/// Has the same effect as @ref SetCheck "SetCheck(false)".
-		/// @copydoc SetCheck
+		/**
+		* Has the same effect as @ref SetCheck "SetCheck(false)".
+		* @copydoc SetCheck
+		*/
 		[[gnu::always_inline]] bool ResetCheck() { return SetCheck(false); }
 		
 		[[gnu::always_inline]] virtual void Toggle() { Set(!Check()); }
@@ -68,7 +73,7 @@ namespace STM32T
 		* Pulses the pin for the specified time (set/delay/reset).
 		* @tparam TIME The underlying type for representing the time.
 		* @param time The duration of the pulse.
-		* @param state The type of pulse (high/low)
+		* @param state The type of pulse (<b>high</b>/low)
 		* @param delay The delay function to use for @p time
 		*/
 		template<typename TIME = Time::tick_t>
@@ -126,10 +131,10 @@ namespace STM32T
 			return true;
 		}
 		
-		uint32_t CheckPulse(const bool desired_state, const Time::tick_t max, const Time::tick_t min = 0) const
+		Time::tick_t CheckPulse(const bool desired_state, const Time::tick_t max, const Time::tick_t min = 0) const
 		{
 			Time::tick_t elapsed = 0;
-			const uint32_t startTime = HAL_GetTick();
+			const Time::tick_t startTime = HAL_GetTick();
 			
 			while (Read() == desired_state)
 			{
@@ -161,6 +166,7 @@ namespace STM32T
 		}
 	};
 	
+	/// Represents a single GPIO pin
 	class IO : public _IO
 	{
 	protected:
@@ -360,6 +366,7 @@ namespace STM32T
 		}
 	};
 	
+	/// Represents an array of @ref IO "IO"s
 	template <size_t COUNT, typename T = uint32_t>
 	class IOArray : public _IOs<COUNT, T>
 	{

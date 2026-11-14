@@ -55,8 +55,7 @@ int main()
 {
     using namespace STM32T;
     
-    for (uint8_t i = 0; i < g_dataPins.PinCount(); i++)
-		g_dataPins[i].SetMode(GPIO_MODE_OUTPUT_OD, GPIO_PULLUP, GPIO_SPEED_FREQ_VERY_HIGH);
+    g_dataPins.SetMode(GPIO_MODE_OUTPUT_OD, GPIO_PULLUP, GPIO_SPEED_FREQ_VERY_HIGH);	// Pins need to be OD to read and write simultaneously
     
     lcd.Init().PutStr("Hello, World!");
 }

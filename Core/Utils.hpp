@@ -1,6 +1,6 @@
 /**
 * @file
-* Contains utility classes and generic helper functions and macros.
+* Contains utility classes and generic helper functions and macros. It must always be independent of other files in the framework.
 */
 
 #pragma once
@@ -25,14 +25,14 @@ PRAGMA(GCC diagnostic pop)
 #define WCPP20EXT(...)				NO_WARN("-Wc++20-extensions", __VA_ARGS__)
 #else
 #define WCPP20EXT(warning, ...)		__VA_ARGS__
-#warn "Using WCPP20EXT in unnecessary!"
+#warning "Using WCPP20EXT in unnecessary!"
 #endif	// __cplusplus < 202002L
 
 #if __cplusplus < 202302L
 #define WCPP23EXT(...)				NO_WARN("-Wc++23-extensions", __VA_ARGS__)
 #else
 #define WCPP23EXT(warning, ...)		__VA_ARGS__
-#warn "Using WCPP23EXT in unnecessary!"
+#warning "Using WCPP23EXT in unnecessary!"
 #endif	// __cplusplus < 202302L
 
 

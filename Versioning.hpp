@@ -12,7 +12,7 @@
 * The version can be stored (and transferred) as a 32-bit number divided into four 8-bit sections. Each section holds part of the version information.
 * 
 * |	8 (MSB)	|	8		|	8		|	8 (LSB)					|
-* |-----------|-----------|-----------|---------------------------|
+* |---------|-----------|-----------|---------------------------|
 * |	Major	|	Minor	|	Patch	|	Pre-release identifier	|
 *
 * This makes comparing two versions as easy as comparing two 32-bit numbers while taking into account their precedence.
@@ -22,7 +22,7 @@
 * These are the **only** valid pre-release identifiers and their associated numeric value:
 * 
 * |	Value	|	Text Form		|	Description							|
-* |-----------|-------------------|---------------------------------------|
+* |---------|-------------------|---------------------------------------|
 * |	255		|					|	Normal version (not pre-release)	|
 * |	97-127	|	-rc<b>x</b>		|	Release candidate - x from 1 to 31	|
 * |	96		|	-rc, -rc0		|	Release candidate					|
@@ -351,6 +351,6 @@ namespace STM32T
 		}
 	};
 	
-	// todo: Check what needs to be removed (deprecated) for each version. Search for "vx.y.z". Also update README.md.
-	constexpr Version VER(0, 4, 0, Version::Normal);		///< Current version of the framework
+	// todo: Check what needs to be removed (deprecated) for each version. Also update Config.doxygen.
+	constexpr Version VER(0, 4, 1, Version::Normal);		///< Current version of the framework
 }

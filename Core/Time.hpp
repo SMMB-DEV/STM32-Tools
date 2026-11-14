@@ -246,37 +246,37 @@ namespace STM32T::Time
 	}
 	#endif	// defined(DWT)
 	
-	inline constexpr cycle_t msToCycles(const ms_time_t time_ms)
+	constexpr cycle_t msToCycles(const ms_time_t time_ms)
 	{
 		static_assert(std::numeric_limits<ms_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000) <= std::numeric_limits<cycle_t>::max());
 		return time_ms * (STM32T_TIME_CLK / 1'000);
 	}
 	
-	inline constexpr cycle_t usToCycles(const us_time_t time_us)
+	constexpr cycle_t usToCycles(const us_time_t time_us)
 	{
 		static_assert(std::numeric_limits<us_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<cycle_t>::max());
 		return time_us * (STM32T_TIME_CLK / 1'000'000);
 	}
 	
-	inline constexpr cycle_t nsToCycles(const ns_time_t time_ns)
+	constexpr cycle_t nsToCycles(const ns_time_t time_ns)
 	{
 		static_assert(std::numeric_limits<ns_time_t>::max() * uintmax_t(STM32T_TIME_CLK / 1'000'000) / 1000 <= std::numeric_limits<cycle_t>::max());
 		return time_ns * (STM32T_TIME_CLK / 1'000'000) / 1000;
 	}
 	
-	inline constexpr ms_cycle_t CyclesTo_ms(cycle_t cyc)
+	constexpr ms_cycle_t CyclesTo_ms(cycle_t cyc)
 	{
 		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_TIME_CLK / 1'000) <= std::numeric_limits<ms_cycle_t>::max());
 		return cyc / (STM32T_TIME_CLK / 1'000);
 	}
 	
-	inline constexpr us_cycle_t CyclesTo_us(cycle_t cyc)
+	constexpr us_cycle_t CyclesTo_us(cycle_t cyc)
 	{
 		static_assert(std::numeric_limits<cycle_t>::max() / (STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<us_cycle_t>::max());
 		return cyc / (STM32T_TIME_CLK / 1'000'000);
 	}
 	
-	inline constexpr ns_cycle_t CyclesTo_ns(cycle_t cyc)
+	constexpr ns_cycle_t CyclesTo_ns(cycle_t cyc)
 	{
 		static_assert(std::numeric_limits<cycle_t>::max() * uintmax_t(1000) / (STM32T_TIME_CLK / 1'000'000) <= std::numeric_limits<ns_cycle_t>::max());
 		return cyc * uint64_t(1000) / (STM32T_TIME_CLK / 1'000'000);
@@ -286,8 +286,8 @@ namespace STM32T::Time
 	{
 		const tick_t start = HAL_GetTick();
 		
-		if (ticks < std::numeric_limits<tick_t>::max() - uwTickFreq)
-			ticks += uwTickFreq;	// Add a freq to guarantee minimum wait
+		if (ticks < std::numeric_limits<tick_t>::max() - HAL_GetTickFreq())
+			ticks += HAL_GetTickFreq();		// Add a freq to guarantee minimum wait
 		
 		while (HAL_GetTick() - start < ticks)
 		{
@@ -317,6 +317,8 @@ namespace STM32T::Time
 	
 	inline void Delay_ns(ns_time_t ns)
 	{
+		static_assert(nsToCycles(std::numeric_limits<ns_time_t>::max()) < std::numeric_limits<cycle_t>::max());		// because of <=
+		
 		const cycle_t start = GetCycle(), delay = nsToCycles(ns);
 		while (GetCycle() - start <= delay);	// <= because delay isn't always accurate.
 	}
