@@ -355,28 +355,19 @@ namespace STM32T
 		{
 			RCC_ClkInitTypeDef rcc =
 			{
-#if __cplusplus < 202302L
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wc++23-extensions"		// elifdef
-#endif
-
-#ifdef STM32F4
+#if defined(STM32F4) or defined(STM32F1)	// STM32F407, STM32F103
 				.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1,
 				.APB2CLKDivider = RCC_HCLK_DIV1
-#elifdef STM32G0
+#elif defined(STM32G0)	// STM32G030
 				.ClockType = RCC_CLOCKTYPE_ALL,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1
 #else
-#error "Clock configuration code not available for this family!"
-#endif
-
-#if __cplusplus < 202302L
-#pragma GCC diagnostic pop
+#warning "Clock configuration code not available for this family!"
 #endif
 			};
 			
@@ -1662,23 +1653,24 @@ namespace STM32T
 		}
 		
 		template <class F, class F2, class R, class... Args>
-		inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& _try, R ok, F2&& _fail)
+		inline bool Retry(uint8_t retry, const uint32_t delay_ms, F&& f_try, R ok, F2&& f_fail)
 		{
-			if (_try() == ok)
+			if (f_try() == ok)
 				return true;
 			
 			while (retry--)
 			{
 				HAL_Delay(delay_ms);
-				if (_try() == ok)
+				if (f_try() == ok)
 					return true;
 			}
 			
-			_fail();
+			f_fail();
 			
 			return false;
 		}
 
+		/// @deprecated Use Retry() instead. Will be removed in v0.6.0.
 		#define RETRY(_retry_count, _delay_ms, _try, _ok, _fail) \
 		{ \
 			uint8_t _retry = _retry_count; \
@@ -1698,6 +1690,34 @@ namespace STM32T
 				if (!_success) \
 					_fail; \
 			} \
+		}
+		
+		inline void SetReadProtection()
+		{
+			if (HAL_FLASH_OB_Unlock() != HAL_OK)
+				Error_Handler();
+			
+			FLASH_OBProgramInitTypeDef config;
+			HAL_FLASHEx_OBGetConfig(&config);
+			
+			if (!(config.OptionType & OPTIONBYTE_RDP) || config.RDPLevel == OB_RDP_LEVEL_0)
+			{
+				config.OptionType = OPTIONBYTE_RDP;
+				config.RDPLevel = OB_RDP_LEVEL_1;
+				
+				if (HAL_FLASHEx_OBProgram(&config)	!= HAL_OK)
+					Error_Handler();
+				
+				#ifdef STM32F1		// STM32F103
+				HAL_FLASH_OB_Launch();
+				#else
+				if (HAL_FLASH_OB_Launch() != HAL_OK)
+					Error_Handler();
+				#endif
+			}
+			
+			if (HAL_FLASH_OB_Lock() != HAL_OK)
+				Error_Handler();
 		}
 	}
 }

@@ -108,7 +108,7 @@ namespace STM32T
 			while (Read() != desired_state)
 			{
 				#ifdef STM32T_IWDG_TIMEOUT
-				HAL_IWDG_Refresh(&Time::hiwdg);
+				HAL_IWDG_Refresh(&hiwdg);
 				#endif
 				
 				if (Time::Elapsed_Tick(start, timeout))

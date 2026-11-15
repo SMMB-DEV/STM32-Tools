@@ -35,9 +35,12 @@
 /**
 * Define to be equal to the synchronous predivider of RTC. This enables having an exact period for @ref STM32T::Time::SystemClock.
 * @note Must be a `constexpr` value.
+* @note Only has an effect if the RTC is enabled and supports sub-seconds.
 */
 #define STM32T_TIME_RTC_SS
 #endif	// _DOXYGEN_
+
+
 
 #ifndef HAL_IWDG_MODULE_ENABLED
 #undef STM32T_IWDG_TIMEOUT
@@ -48,11 +51,24 @@
 #endif	// STM32T_TIME_CLK
 
 #ifdef STM32T_IWDG_TIMEOUT
-extern "C" IWDG_HandleTypeDef hiwdg;
+namespace STM32T { extern "C" IWDG_HandleTypeDef hiwdg; }
 #endif	// STM32T_IWDG_TIMEOUT
 
 #ifdef HAL_RTC_MODULE_ENABLED
-extern "C" RTC_HandleTypeDef *hrtc;
+
+namespace STM32T { extern "C" RTC_HandleTypeDef hrtc; }
+#if defined(STM32T_TIME_RTC_SS) and !defined(RTC_SSR_SS)
+#wrning "RTC does not support sub-seconds. STM32T_TIME_RTC_SS has no effect."
+#undef STM32T_TIME_RTC_SS
+#endif	// defined(STM32T_TIME_RTC_SS) and !defined(RTC_SSR_SS)
+
+#else
+
+#ifdef STM32T_TIME_RTC_SS
+#wrning "RTC is disabled. STM32T_TIME_RTC_SS has no effect!"
+#undef STM32T_TIME_RTC_SS
+#endif	// STM32T_TIME_RTC_SS
+
 #endif	// HAL_RTC_MODULE_ENABLED
 
 #ifdef STM32T_TIME_TIME
@@ -76,7 +92,7 @@ extern "C" std::time_t time(std::time_t* timer)
 	return result;
 }
 #else
-#warning "HAL_RTC_MODULE_ENABLED is not defined. `time` will always return -1."
+#warning "RTC is not enabled. `time()` will always return -1."
 extern "C" std::time_t time(std::time_t* timer)
 {
 	std::time_t result = std::time_t(-1);
@@ -132,67 +148,6 @@ namespace STM32T::Time
 	
 	static_assert(STM32T_TIME_CLK % 1'000'000 == 0, "STM32T_TIME_CLK must be divisible by 1,000,000!");
 	
-	#ifdef HAL_RTC_MODULE_ENABLED
-	/**
-	* @retval PREDIV_S The RTC's synchronous predivider value.
-	*/
-	inline uint16_t GetSecondFraction(RTC_HandleTypeDef *hrtc)
-	{
-		return hrtc->Instance->PRER & RTC_PRER_PREDIV_S;
-	}
-	
-	/**
-	* @note Expects date and time in 24-Hour, binary format. SubSeconds and SecondFraction must be set.
-	*/
-	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int64_t ms, uint16_t year_start = 2000)
-	{
-		std::tm tm{.tm_sec = time.Seconds, .tm_min = time.Minutes, .tm_hour = time.Hours,
-			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
-		
-		std::time_t ts = std::mktime(&tm) + (ms / 1000);
-		ms %= 1000;
-		
-		uint16_t msec = 1000u * (time.SecondFraction - time.SubSeconds) / (time.SecondFraction + 1u);
-		
-		if (ms >= 0)
-			msec += ms;
-		else
-		{
-			msec += 1000 + ms;
-			--ts;
-		}
-		
-		if (msec >= 1000)
-		{
-			msec -= 1000;
-			++ts;
-		}
-		
-		std::tm *tm2 = std::localtime(&ts);
-		
-		date.Year = tm2->tm_year % 100;
-		date.Month = tm2->tm_mon + 1;
-		date.Date = tm2->tm_mday;
-		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
-		
-		time.Minutes = tm2->tm_min;
-		time.Hours = tm2->tm_hour;
-		time.Seconds = tm2->tm_sec;
-		time.SubSeconds = time.SecondFraction - (time.SecondFraction + 1u) * msec / 1000u;
-	}
-	
-	inline void SetWeekDay(RTC_DateTypeDef& date, uint16_t year_start = 2000)
-	{
-		std::tm tm{.tm_sec = 0, .tm_min = 0, .tm_hour = 0,
-			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
-		
-		const std::time_t ts = std::mktime(&tm);
-		std::tm *tm2 = std::localtime(&ts);
-		
-		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
-	}
-	#endif	// HAL_RTC_MODULE_ENABLED
-	
 	/**
 	* Initializes the timing module and checks @ref STM32T_TIME_CLK validity.
 	* If your microcontroller has a `DWT` unit, it will be enabled and used for timing. Otherwise, the `SysTick` timer is used.
@@ -219,12 +174,12 @@ namespace STM32T::Time
 			Error_Handler();
 		#endif	// DWT
 		
-		#if defined(HAL_RTC_MODULE_ENABLED) and defined(STM32T_TIME_RTC_SS)
+		#ifdef STM32T_TIME_RTC_SS
 		static_assert(STM32T_TIME_RTC_SS <= STM32T_TIME_RTC_SS_MAX || STM32T_TIME_RTC_SS >= 0, "Invalid STM32T_TIME_RTC_SS value!");
 		
-		if (STM32T_TIME_RTC_SS != GetSecondFraction(hrtc))
+		if (STM32T_TIME_RTC_SS != GetSecondFraction(&hrtc))
 			Error_Handler();
-		#endif	// defined(HAL_RTC_MODULE_ENABLED) and defined(STM32T_TIME_RTC_SS)
+		#endif	// STM32T_TIME_RTC_SS
 	}
 	
 	#if defined(DWT) or defined(_DOXYGEN_)
@@ -516,14 +471,83 @@ namespace STM32T::Time
 	
 	#if defined(HAL_RTC_MODULE_ENABLED) or defined(_DOXYGEN_)
 	/**
+	* @retval PREDIV_S The RTC's synchronous predivider value.
+	*/
+	inline uint16_t GetSecondFraction(RTC_HandleTypeDef *hrtc)
+	{
+		#ifdef RTC_SSR_SS
+		return hrtc->Init->SynchPrediv;
+		#else
+		return 0u;
+		#endif	// RTC_SSR_SS
+	}
+	
+	/**
+	* @note Expects date and time in 24-Hour, binary format. SubSeconds and SecondFraction must be set.
+	*/
+	inline void AdjustDateAndTime(RTC_DateTypeDef& date, RTC_TimeTypeDef& time, int64_t ms, uint16_t year_start = 2000)
+	{
+		std::tm tm{.tm_sec = time.Seconds, .tm_min = time.Minutes, .tm_hour = time.Hours,
+			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
+		
+		std::time_t ts = std::mktime(&tm) + (ms / 1000);
+		ms %= 1000;
+		
+		#ifdef RTC_SSR_SS
+		uint16_t msec = 1000u * (time.SecondFraction - time.SubSeconds) / (time.SecondFraction + 1u);
+		
+		if (ms >= 0)
+			msec += ms;
+		else
+		{
+			msec += 1000 + ms;
+			--ts;
+		}
+		
+		if (msec >= 1000)
+		{
+			msec -= 1000;
+			++ts;
+		}
+		
+		time.SubSeconds = time.SecondFraction - (time.SecondFraction + 1u) * msec / 1000u;
+		#endif	// RTC_SSR_SS
+		
+		std::tm *tm2 = std::localtime(&ts);
+		
+		date.Year = tm2->tm_year % 100;
+		date.Month = tm2->tm_mon + 1;
+		date.Date = tm2->tm_mday;
+		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
+		
+		time.Minutes = tm2->tm_min;
+		time.Hours = tm2->tm_hour;
+		time.Seconds = tm2->tm_sec;
+	}
+	
+	inline void SetWeekDay(RTC_DateTypeDef& date, uint16_t year_start = 2000)
+	{
+		std::tm tm{.tm_sec = 0, .tm_min = 0, .tm_hour = 0,
+			.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = year_start + date.Year - 1900, .tm_isdst = 0};
+		
+		const std::time_t ts = std::mktime(&tm);
+		std::tm *tm2 = std::localtime(&ts);
+		
+		date.WeekDay = (tm2->tm_wday + 6) % 7 + 1;
+	}
+	
+	/**
 	* Similar to `std::chrono::system_clock`. Only available if the RTC is enabled (`HAL_RTC_MODULE_ENABLED`).
 	* If @ref STM32T_TIME_RTC_SS is defined, the period will be the exact period of the RTC. Otherwise, it's one microsecond.
 	*/
 	class SystemClock
 	{
 	public:
-		// __ARM_FP: b1: half, b2: single, b3: double
-		#if defined(__ARM_FP) and (__ARM_FP & 0b1000) == 0b1000
+		#ifndef RTC_SSR_SS
+		using rep = int32_t;
+		using period = std::ratio<1>;
+		#else
+		#if defined(__ARM_FP) and (__ARM_FP & 0b1000) == 0b1000		// __ARM_FP: b1: half, b2: single, b3: double
 		using rep = double;
 		using period = std::ratio<1>;
 		#else
@@ -534,6 +558,7 @@ namespace STM32T::Time
 		using period = std::micro;
 		#endif	// STM32T_TIME_RTC_SS
 		#endif	// defined(__ARM_FP) and (__ARM_FP & 0b1000) == 0b1000
+		#endif	// RTC_SSR_SS
 		
 		using duration = std::chrono::duration<rep, period>;
 		using time_point = std::chrono::time_point<HighResClock>;
@@ -549,13 +574,15 @@ namespace STM32T::Time
 			RTC_TimeTypeDef time;
 			RTC_DateTypeDef date;
 			
-			HAL_RTC_GetTime(hrtc, &time, RTC_FORMAT_BIN);
-			HAL_RTC_GetDate(hrtc, &date, RTC_FORMAT_BIN);
+			HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+			HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
 			
 			std::tm tm{.tm_sec = time.Seconds, .tm_min = time.Minutes, .tm_hour = time.Hours,
 				.tm_mday = date.Date, .tm_mon = date.Month - 1, .tm_year = (date.Year>= 70 ? 1970 : 2000) + date.Year - 1900, .tm_isdst = 0};
 			
 			std::time_t sec = std::mktime(&tm);
+			
+			#ifdef RTC_SSR_SS
 			uint32_t ss = time.SecondFraction - time.SubSeconds;
 			
 			static_assert(period::num == 1);
@@ -575,6 +602,9 @@ namespace STM32T::Time
 				
 				return time_point(duration(sec * period::den + ss));
 			}
+			#else
+			return time_point(duration(sec));
+			#endif	// RTC_SSR_SS
 		}
 		
 		/// @copydoc TickClock::sleep_for
