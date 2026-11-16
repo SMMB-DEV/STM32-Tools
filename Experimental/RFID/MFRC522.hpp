@@ -1,7 +1,10 @@
+/// @file
+
 #pragma once
 
 #include "../../IO.hpp"
 #include "../../Core/strv.hpp"
+#include "../../Core/Time.hpp"
 #include "../../Error Checking.hpp"
 
 #include <optional>
@@ -18,7 +21,10 @@ namespace STM32T
 	class MFRC522
 	{
 		static constexpr uint8_t
-			b1 = 0b0000'0001, b2 = 0b0000'0010, b3 = 0b0000'0100, b4 = 0b0000'1000, b5 = 0b0001'0000, b6 = 0b0010'0000, b7 = 0b0100'0000, b8 = 0b1000'0000;
+			b1 = 0b0000'0001, b2 = 0b0000'0010, b3 = 0b0000'0100, b4 = 0b0000'1000, b5 = 0b0001'0000, b6 = 0b0010'0000, b7 = 0b0100'0000, b8 = 0b1000'0000,
+			b4321 = b4 | b3 | b2 | b1, b8765 = b8 | b7 | b6 | b5;
+		
+		static constexpr size_t FS[16] = { 16, 24, 32, 40, 48, 64, 96, 128, 256, 257, 257, 257, 257, 257, 257, 257 };
 		
 		// todo: adjust all SPI timeouts
 	public:
@@ -26,21 +32,54 @@ namespace STM32T
 		{
 			UNKNOWN,
 			INCOMPLETE,
+			MF_CL_1K,
 			MF_CL_2K,
+			MF_CL_4K,
 			MF_CL_1K_SMX,
 			MF_CL_4K_SMX,
 			MF_UL_EV1,
 			MF_UL_AES,
 			MF_PL_2K_SL2,
 			MF_PL_4K_SL2,
+			MF_PL_EV1_2K_SL3,
+			MF_PL_EV1_4K_SL3,
+			MF_PL_EV2_2K_SL3,
+			MF_PL_EV2_4K_SL3,
+			MF_DF_EV1_256B,
+			MF_DF_EV1_2K,
+			MF_DF_EV1_4K,
+			MF_DF_EV1_8K,
+			MF_DF_EV2_2K,
+			MF_DF_EV2_4K,
+			MF_DF_EV2_8K,
+			MF_DF_EV2_16K,
+			MF_DF_EV2_32K,
+			MF_DF_EV3_2K,
+			MF_DF_EV3_4K,
+			MF_DF_EV3_8K,
+			MF_DFL,
+			MF_DUOX_2K,
+			MF_DUOX_4K,
+			MF_DUOX_8K,
+			MF_DUOX_16K,
 			MF_MINI,
-			NTAG2xx,
+			NTAG213,
+			NTAG215,
+			NTAG216,
 			NTAG_I2C_PL,
+			NTAG4xx,
+			NTAG_X_DNA,
 			TNP,					// TagNPlay (TNP3xxx)
 		};
 		
 		struct PICC
 		{
+		private:
+			friend class MFRC522;
+			
+			Type m_type = Type::UNKNOWN;
+			
+		public:
 			uint8_t
 				sak = b3,	// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
 				idLen = 0,	// Number of bytes in the UID. 4, 7 or 10.
@@ -48,6 +87,7 @@ namespace STM32T
 			
 			PICC & operator=(const PICC &other)
 			{
+				m_type = other.m_type;
 				sak = other.sak;
 				idLen = other.idLen;
 				memcpy(id, other.id, idLen);
@@ -55,18 +95,52 @@ namespace STM32T
 				return *this;
 			}
 			
-			bool operator==(const PICC &other)
+			bool operator==(const PICC &other) const
 			{
-				return sak == other.sak && idLen == other.idLen && memcmp(id, other.id, idLen) == 0;
+				return m_type == other.m_type && sak == other.sak && idLen == other.idLen && memcmp(id, other.id, idLen) == 0;
 			}
 			
-			bool operator!=(const PICC &other) { return !operator==(other); }
+			bool operator!=(const PICC &other) const { return !operator==(other); }
+			
 			constexpr bool isISO_14443_4() const { return sak & b6; }
+			
+			Type type() const { return m_type; }
 		};
 		
-		struct VersionInfo
+		struct VerInfo
 		{
-			uint8_t productType, productSubType, majorProductVersion, minorProductVersion, storageSize;
+			uint8_t vendorId, type, subType, majorVersion, minorVersion, storageSize, protocol;
+		};
+		
+		struct ATS
+		{
+			using duration_t = std::chrono::duration<uint32_t, std::ratio<1, 13'560'000>>;
+			
+			static constexpr uint8_t DEFAULT_FWI = 4;
+			
+			uint8_t TL;
+			std::optional<uint8_t> T0, TA, TB, TC;
+			std::vector<uint8_t> T1k;
+			
+			// Frame Size
+			constexpr uint8_t FSCI() const { return T0.value_or(0) & b4321; }
+			constexpr size_t FSC() const { return FS[FSCI()]; }
+			
+			// DS, DR
+			constexpr uint8_t DS() const { return (TA.value_or(0) >> 4) & 0b0111; }
+			constexpr uint8_t DR() const { return TA.value_or(0) & 0b0111; }
+			
+			// Frame Waiting (PCD req -> PICC resp)
+			constexpr uint8_t FWI() const { return TB ? *TB >> 4 : DEFAULT_FWI; }
+			constexpr duration_t FWT() const { return duration_t(256 * 16 * pow(2, FWI())); }
+			
+			// Start-up Frame Guard Time (PICC ATS -> PCD req)
+			constexpr uint8_t SFGI() const { return TB.value_or(0) & 0b1111; }
+			constexpr duration_t SFGT() const
+			{
+				auto sfgi = SFGI();
+				return duration_t{sfgi ? 256 * 16 * pow(2, sfgi) : 9 * 128 + 84};	// todo: check if this is correct.
+			}
 		};
 		
 	private:
@@ -133,8 +207,25 @@ namespace STM32T
 			MIFARE_NACK		= 0xff	// A MIFARE PICC responded with NAK.
 		};
 		
-		static constexpr uint8_t Addr4Read(const Reg reg) { return static_cast<uint8_t>(0b1000'0000 | (static_cast<uint8_t>(reg) << 1)); }
+		static constexpr uint8_t Addr4Read(const Reg reg) { return 0b1000'0000 | (static_cast<uint8_t>(reg) << 1); }
 		static constexpr uint8_t Addr4Write(const Reg reg) { return static_cast<uint8_t>(reg) << 1; }
+		
+		static constexpr strv StatusName(Status stat)
+		{
+			switch (stat)
+			{
+				case Status::OK:				return "OK"sv;
+				case Status::ERROR:				return "ERROR"sv;
+				case Status::COLLISION:			return "COLLISION"sv;
+				case Status::TIMEOUT:			return "TIMEOUT"sv;
+				case Status::NO_ROOM:			return "NO_ROOM"sv;
+				case Status::INTERNAL_ERROR:	return "INTERNAL_ERROR"sv;
+				case Status::INVALID:			return "INVALID"sv;
+				case Status::CRC_WRONG:			return "CRC_WRONG"sv;
+				case Status::MIFARE_NACK:		return "MIFARE_NACK"sv;
+				default:						return "UNKNOWN"sv;
+			}
+		}
 		
 		uint8_t Read(const Reg reg)
 		{
@@ -266,7 +357,7 @@ namespace STM32T
 		* @param result - Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
 		* @return STATUS_OK on success, STATUS_??? otherwise.
 		*/
-		/*Status PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t *result)
+		/*Status PCD_CalculateCRC(const uint8_t *data, uint8_t length, uint8_t *result)
 		{
 			Command(Cmd::Idle);						// Stop any active command.
 			Write(Reg::DivIrq, 0x04);				// Clear the CRCIRq interrupt request bit
@@ -305,6 +396,11 @@ namespace STM32T
 		{
 			unpack_le(result, reverse(SimpleCRC<uint16_t>(data, length, 0x1021, 0xC6C6, true)));
 			return Status::OK;
+		}
+		
+		static constexpr uint16_t CalculateCRC(const uint8_t *const data, const uint8_t length)
+		{
+			return reverse(SimpleCRC<uint16_t>(data, length, 0x1021, 0xC6C6, true));
 		}
 		
 		/**
@@ -349,7 +445,8 @@ namespace STM32T
 			const uint32_t deadline_start = HAL_GetTick();
 			bool completed = false;
 
-			do {
+			do
+			{
 				uint8_t n = Read(Reg::ComIrq);		// ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
 				if (n & waitIRq)					// One of the interrupts that signal success has been set.
 				{
@@ -687,19 +784,103 @@ namespace STM32T
 			return Status::OK;
 		}
 		
-		Status NXP_GET_VERSION_L3(VersionInfo *info)
+		Status PICC_RATS(ATS *ats, uint8_t FSDI = 5, uint8_t CID = 0)
 		{
-			constexpr uint8_t cmd[3] = { 0x60, 0xF8, 0x32 };
+			uint8_t cmd[4] = { 0xE0, static_cast<uint8_t>((FSDI << 4) | (CID & 0xF)) };
+			unpack_le(cmd + 2, CalculateCRC(cmd, 2));
 			
-			uint8_t resp[10], respLen = sizeof(resp);
+			uint8_t resp[64], respLen = sizeof(resp);
 			
 			if (const Status stat = PCD_TransceiveData(cmd, sizeof(cmd), resp, &respLen, nullptr, 0, true); stat != Status::OK)
 				return stat;
 			
-			if (respLen != sizeof(resp) || resp[0] != 0x0 || resp[1] != 0x4 || resp[7] != 0x3)
+			if (respLen < 3 || respLen - 2 != resp[0])
 				return Status::ERROR;
 			
-			memcpy(info, resp + 2, sizeof(*info));
+			ats->TL = resp[0];
+			
+			if (ats->TL == 1)
+				return Status::OK;
+			
+			ats->T0 = resp[1];
+			
+			const bool hasTA = *(ats->T0) & b5, hasTB = *(ats->T0) & b6, hasTC = *(ats->T0) & b7;
+			const uint8_t nonHistLen = 2 + hasTA + hasTB + hasTC;
+			
+			if (*(ats->T0) & b8 || ats->TL < nonHistLen)
+				return Status::ERROR;
+			
+			if (hasTA) ats->TA = resp[2];
+			if (hasTB) ats->TB = resp[2 + hasTA];
+			if (hasTC) ats->TC = resp[2 + hasTA + hasTB];
+			
+			if (ats->TL - nonHistLen)
+				ats->T1k.assign(resp + nonHistLen, resp + ats->TL);
+			
+			return Status::OK;
+		}
+		
+		Status PICC_PPS(std::optional<uint8_t> DSI_DRI, uint8_t CID = 0)
+		{
+			uint8_t
+				cmd[5] = { static_cast<uint8_t>(0b1101'0000 | (CID & 0b111)), static_cast<uint8_t>(0b0000'0001 | (bool(DSI_DRI) << 4)) },
+				len = 2;
+			
+			if (DSI_DRI)
+				cmd[len++] = *DSI_DRI & 0b0000'1111;
+			
+			unpack_le(cmd + len, CalculateCRC(cmd, len));
+			len += 2;
+			
+			uint8_t resp[3], respLen = sizeof(resp);
+			
+			if (const Status stat = PCD_TransceiveData(cmd, sizeof(cmd), resp, &respLen, nullptr, 0, true); stat != Status::OK)
+				return stat;
+			
+			if (respLen != sizeof(resp) || resp[0] != cmd[0])
+				return Status::ERROR;
+			
+			return Status::OK;
+		}
+		
+		Status NXP_GET_VERSION_L3(VerInfo *info)
+		{
+			static constexpr uint8_t CMD[3] = { 0x60, (uint8_t)CalculateCRC(CMD, 1), (uint8_t)(CalculateCRC(CMD, 1) >> 8) };
+			
+			uint8_t resp[10], respLen = sizeof(resp);
+			
+			if (const Status stat = PCD_TransceiveData(CMD, sizeof(CMD), resp, &respLen, nullptr, 0, true); stat != Status::OK)
+				return stat;
+			
+			if (respLen != sizeof(resp) || resp[0] != 0x00 || resp[7] != 0x03)
+				return Status::ERROR;
+			
+			memcpy(info, resp + 1, sizeof(*info));
+			
+			return Status::OK;
+		}
+		
+		Status NXP_GET_VERSION_L4(VerInfo *info)
+		{
+			static constexpr uint8_t CMD[5] = { 0x90, 0x60, 0x00, 0x00, 0x00 };
+			using namespace STM32T::Log::DefLog;
+			uint8_t resp[9], respLen = sizeof(resp);
+			
+			if (const Status stat = PCD_TransceiveData(CMD, sizeof(CMD), resp, &respLen); stat != Status::OK)
+			{
+				LOG_D("Status: %s", StatusName(stat).data());
+				return stat;
+			}
+			LOG_D("len: %hhu", respLen);
+			if (respLen != sizeof(resp))	// || resp[6] != 0x05)
+				return Status::ERROR;
+			
+			const uint16_t status = pack_le<uint16_t>(resp + respLen - 2);
+			LOG_D("stat2: %04hX", status);
+			if (status != 0x9100 && status != 0x91AF)
+				return Status::ERROR;
+			
+			memcpy(info, resp, sizeof(*info));
 			
 			return Status::OK;
 		}
@@ -711,11 +892,13 @@ namespace STM32T
 		
 		void Init()
 		{
+			Time::Init();
+			
 			Read(Reg::Reserved);
 			
-			// https://github.com/miguelbalboa/rfid
-			
 			Write(Reg::ModWidth, 0x26);
+			Write(Reg::RxThreshold, 0x14);
+			
 			Write(Reg::TMode, 0x80);				// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
 			Write(Reg::TPrescaler, 0xA9);			// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25µs.
 			Write(Reg::TReloadH, 0x03);				// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
@@ -781,42 +964,76 @@ namespace STM32T
 		* Based on NXP AN10833 Fig. 1.
 		* 
 		* @note The type of the PICC is determined partly based on the SAK returned after selecting it.
-		*	The SAK contains proprietary information and the actual type of the PICC cannot be guaranteed in some cases.
+		* The SAK contains proprietary information and the actual type of the PICC cannot be guaranteed in some cases.
+		* @note Assumes the PICC is still in the field.
 		*/
-		Type GetType(const PICC &picc)
+		void GetType(PICC &picc)
 		{
 			const auto sak = picc.sak;
 			
 			if (sak & b3 || !picc.idLen)
-				return Type::INCOMPLETE;
+			{
+				picc.m_type = Type::INCOMPLETE;
+				return;
+			}
 			
-			if (sak & b2)
-				return Type::UNKNOWN;	// non-MIFARE
+			picc.m_type = Type::UNKNOWN;
+			
+			if (sak & b2)	// non-NXP
+				return;
 			
 			if (sak & b4)							// 0bxxxx'100x
 			{
 				if (sak & b5)						// 0bxxx1'100x
 				{
 					if (sak & b1)					// 0bxxx1'1001
-						return Type::MF_CL_2K;
+					{
+						if (sak == 0x19)
+							picc.m_type = Type::MF_CL_2K;
+					}
 					else							// 0bxxx1'1000
 					{
 						if (sak & b6)				// 0bxx11'1000
-							return Type::MF_CL_4K_SMX;
+						{
+							if (sak == 0x38)
+								picc.m_type = Type::MF_CL_4K_SMX;
+						}
 						else						// 0bxx01'1000
-							return Type::UNKNOWN;	// todo: RATS
+						{
+							ATS ats;
+							
+							if (PICC_RATS(&ats) == Status::OK)
+								return;		// todo: GET_VERSION_L4
+							
+							if (sak == 0x18)
+								picc.m_type = Type::MF_CL_4K;
+						}
 					}
 				}
 				else								// 0bxxx0'100x
 				{
 					if (sak & b1)					// 0bxxx0'1001
-						return Type::MF_MINI;
+					{
+						if (sak == 0x09)
+							picc.m_type = Type::MF_MINI;
+					}
 					else							// 0bxxx0'1000
 					{
 						if (sak & b6)				// 0bxx10'1000
-							return Type::MF_CL_1K_SMX;
-						else						// 0bxx00'1000 
-							return Type::UNKNOWN;	// todo: RATS
+						{
+							if (sak == 0x28)
+								picc.m_type = Type::MF_CL_1K_SMX;
+						}
+						else						// 0bxx00'1000
+						{
+							ATS ats;
+							
+							if (PICC_RATS(&ats) == Status::OK)
+								return;		// todo: GET_VERSION_L4
+							
+							if (sak == 0x08)
+								picc.m_type = Type::MF_CL_1K;
+						}
 					}
 				}
 			}
@@ -825,59 +1042,197 @@ namespace STM32T
 				if (sak & b5)						// 0bxxx1'000x
 				{
 					if (sak & b1)					// 0bxxx1'0001
-						return Type::MF_PL_4K_SL2;
+					{
+						if (sak == 0x11)
+							picc.m_type = Type::MF_PL_4K_SL2;
+					}
 					else							// 0bxxx1'0000
-						return Type::MF_PL_2K_SL2;
+					{
+						if (sak == 0x10)
+							picc.m_type = Type::MF_PL_2K_SL2;
+					}
 				}
 				else								// 0bxxx0'000x
 				{
 					if (sak & b1)					// 0bxxx0'0001
-						return Type::TNP;
+						picc.m_type = Type::TNP;
 					else							// 0bxxx0'0000
 					{
 						if (sak & b6)				// 0bxx10'0000
-							return Type::UNKNOWN;	// todo: RATS
-						else
 						{
-							VersionInfo info;
-							if (NXP_GET_VERSION_L3(&info) != Status::OK)
+							if (sak != 0x20)
+								return;
+							
+							ATS ats;
+							if (PICC_RATS(&ats) != Status::OK)
+								return;
+							
+							Time::HighResClock::sleep_for(ats.SFGT());
+							
+							const uint8_t ds = ats.DS(), dr = ats.DR();
+							if (PICC_PPS(ds || dr ? std::make_optional(0) : std::nullopt) != Status::OK)
+								return;
+							
+							VerInfo info;
+							if (NXP_GET_VERSION_L4(&info) != Status::OK)
 							{
-								return Type::UNKNOWN;	// todo: Auth L3
+								if (sak != 0x20)
+									return;
+								
+								// todo: historical bytes
+								return;
 							}
-							else
+							
+							switch (info.type)
 							{
-								switch (info.productType)
+								case 0x01:
+								case 0x81:
+								{
+									if (info.majorVersion == 0xA0)
+									{
+										if (info.type == 0x01)
+										{
+											switch (info.storageSize)
+											{
+												case 0x16:	picc.m_type = Type::MF_DUOX_2K; break;
+												case 0x18:	picc.m_type = Type::MF_DUOX_4K; break;
+												case 0x1A:	picc.m_type = Type::MF_DUOX_8K; break;
+												case 0x1C:	picc.m_type = Type::MF_DUOX_16K; break;
+											}
+										}
+										
+										break;
+									}
+									else
+									{
+										switch (info.majorVersion & 0x0F)
+										{
+											case 0x1:
+											{
+												switch (info.storageSize)
+												{
+													case 0x10:	picc.m_type = Type::MF_DF_EV1_256B; break;
+													case 0x16:	picc.m_type = Type::MF_DF_EV1_2K; break;
+													case 0x18:	picc.m_type = Type::MF_DF_EV1_4K; break;
+													case 0x1A:	picc.m_type = Type::MF_DF_EV1_8K; break;
+												}
+												
+												break;
+											}
+											
+											case 0x2:
+											{
+												switch (info.storageSize)
+												{
+													case 0x16:	picc.m_type = Type::MF_DF_EV2_2K; break;
+													case 0x18:	picc.m_type = Type::MF_DF_EV2_4K; break;
+													case 0x1A:	picc.m_type = Type::MF_DF_EV2_8K; break;
+													case 0x1C:	picc.m_type = Type::MF_DF_EV2_16K; break;
+													case 0x1E:	picc.m_type = Type::MF_DF_EV2_32K; break;
+												}
+												
+												break;
+											}
+											
+											case 0x3:
+											{
+												switch (info.storageSize)
+												{
+													case 0x16:	picc.m_type = Type::MF_DF_EV3_2K; break;
+													case 0x18:	picc.m_type = Type::MF_DF_EV3_4K; break;
+													case 0x1A:	picc.m_type = Type::MF_DF_EV3_8K; break;
+												}
+												
+												break;
+											}
+										}
+									}
+									
+									break;
+								}
+								
+								case 0x02:
+								case 0x82:
+								{
+									if (info.majorVersion == 0x11 && info.storageSize == 0x16)
+										picc.m_type = Type::MF_PL_EV1_2K_SL3;
+									else if (info.majorVersion == 0x11 && info.storageSize == 0x18)
+										picc.m_type = Type::MF_PL_EV1_4K_SL3;
+									else if (info.majorVersion == 0x22 && info.storageSize == 0x16)
+										picc.m_type = Type::MF_PL_EV2_2K_SL3;
+									else if (info.majorVersion == 0x22 && info.storageSize == 0x18)
+										picc.m_type = Type::MF_PL_EV2_4K_SL3;
+									
+									break;
+								}
+								
+								case 0x08:
+								{
+									picc.m_type = Type::MF_DFL;
+									break;
+								}
+								
+								case 0x04:
+								{
+									if (info.majorVersion == 0xA0)
+										picc.m_type = Type::NTAG_X_DNA;
+									else
+										picc.m_type = Type::NTAG4xx;
+									
+									break;
+								}
+							}
+						}
+						else						// 0bxx00'0000
+						{
+							if (sak != 0x00)
+								return;
+							
+							VerInfo info;
+							if (NXP_GET_VERSION_L3(&info) == Status::OK)
+							{
+								switch (info.type)
 								{
 									case 0x03:
 									{
-										switch (info.majorProductVersion)
+										switch (info.majorVersion)
 										{
-											case 0x01:	return Type::MF_UL_EV1;
-											case 0x04:	return Type::MF_UL_AES;
-											default:	return Type::UNKNOWN;
+											case 0x01:	picc.m_type = Type::MF_UL_EV1; break;
+											case 0x04:	picc.m_type = Type::MF_UL_AES; break;
 										}
+										
+										break;
 									}
 									
 									case 0x04:
 									{
-										switch (info.productSubType)
+										switch (info.subType)
 										{
-											case 0x02:	return Type::NTAG2xx;
-											case 0x05:	return Type::NTAG_I2C_PL;
-											default:	return Type::UNKNOWN;
+											case 0x02:
+											{
+												switch (info.storageSize)
+												{
+													case 0x0F:	picc.m_type = Type::NTAG213; break;
+													case 0x11:	picc.m_type = Type::NTAG215; break;
+													case 0x13:	picc.m_type = Type::NTAG216; break;
+												}
+												
+												break;
+											}
+											
+											case 0x05:	picc.m_type = Type::NTAG_I2C_PL; break;
 										}
+										
+										break;
 									}
-									
-									default:
-										return Type::UNKNOWN;
 								}
 							}
+							else
+								;	// todo: Auth L3
 						}
 					}
 				}
 			}
-			
-			return Type::UNKNOWN;
 		}
 	};
 }
