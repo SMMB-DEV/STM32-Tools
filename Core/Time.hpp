@@ -435,6 +435,7 @@ namespace STM32T::Time
 		static time_point now() { return time_point(duration(GetCycle())); }
 		
 		/// @copydoc TickClock::sleep_for
+		/// @note The performance of this function is very slightly worse than the `Delay_xx()` functions for very small delays (~1μs).
 		template <class Rep, class Period>
 		static void sleep_for(const std::chrono::duration<Rep, Period> sleep_duration)
 		{

@@ -344,7 +344,7 @@ namespace STM32T::Log
 		{
 			for (auto ch : data)
 			{
-				while (ITM->PORT[0].u32);
+				while (ITM->PORT[0].u32 == 0);
 				ITM->PORT[0].u8 = ch;
 			}
 		}

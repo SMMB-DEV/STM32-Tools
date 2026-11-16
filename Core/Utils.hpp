@@ -355,19 +355,17 @@ namespace STM32T
 		{
 			RCC_ClkInitTypeDef rcc =
 			{
-#if defined(STM32F4) or defined(STM32F1)	// STM32F407, STM32F103
+#ifdef RCC_CLOCKTYPE_PCLK2
 				.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1,
 				.APB2CLKDivider = RCC_HCLK_DIV1
-#elif defined(STM32G0)	// STM32G030
+#else
 				.ClockType = RCC_CLOCKTYPE_ALL,
 				.SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
 				.AHBCLKDivider = RCC_SYSCLK_DIV1,
 				.APB1CLKDivider = RCC_HCLK_DIV1
-#else
-#warning "Clock configuration code not available for this family!"
 #endif
 			};
 			
@@ -1692,6 +1690,19 @@ namespace STM32T
 			} \
 		}
 		
+		/// Calls a `HAL_XXX` function and returns the result. If the function returns `void`, it returns `HAL_OK`.
+		template <typename Fn, typename... Args>
+		HAL_StatusTypeDef CallStatus(Fn fn, Args... args)
+		{
+			if constexpr (std::is_void_v<std::invoke_result_t<Fn>>)
+			{
+				fn(args...);
+				return HAL_OK;
+			}
+			else
+				return fn(args...);
+		}
+		
 		inline void SetReadProtection()
 		{
 			if (HAL_FLASH_OB_Unlock() != HAL_OK)
@@ -1708,12 +1719,8 @@ namespace STM32T
 				if (HAL_FLASHEx_OBProgram(&config)	!= HAL_OK)
 					Error_Handler();
 				
-				#ifdef STM32F1		// STM32F103
-				HAL_FLASH_OB_Launch();
-				#else
-				if (HAL_FLASH_OB_Launch() != HAL_OK)
+				if (CallStatus(HAL_FLASH_OB_Launch) != HAL_OK)
 					Error_Handler();
-				#endif
 			}
 			
 			if (HAL_FLASH_OB_Lock() != HAL_OK)

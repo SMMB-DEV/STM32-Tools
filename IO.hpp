@@ -8,6 +8,8 @@
 #include "./Core/Time.hpp"
 #include "./Core/Utils.hpp"
 
+#include <cassert>
+
 
 
 namespace STM32T
@@ -202,7 +204,7 @@ namespace STM32T
 		
 		[[gnu::always_inline]] bool Check() const override { return (cp_port->ODR & c_pin) ? !active_low : active_low; }
 		
-		[[gnu::always_inline]] void Set(bool state = true) override { cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER); }
+		[[gnu::always_inline]] void Set(bool state = true) override{ cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER); }
 		
 		bool SetCheck(bool state = true) override
 		{
@@ -212,6 +214,19 @@ namespace STM32T
 			
 			cp_port->BSRR = c_pin << ((active_low ^ state) ? 0 : GPIO_NUMBER);
 			return true;
+		}
+		
+		/// Ignores polarity of the pin (active low) and always sets it to logic 1.
+		[[gnu::always_inline]] void SetFast() { cp_port->BSRR = c_pin; }
+		
+		/// Ignores polarity of the pin (active low) and always sets it to logic 0.
+		[[gnu::always_inline]] void ResetFast()
+		{
+			#if defined(GPIO_BRR_BR0) or defined(GPIO_BRR_BR_0)
+				cp_port->BRR = c_pin;
+			#else
+				cp_port->BSRR = c_pin << GPIO_NUMBER;
+			#endif	// defined(GPIO_BRR_BR0) or defined(GPIO_BRR_BR_0)
 		}
 		
 		[[gnu::always_inline]] void Toggle() override

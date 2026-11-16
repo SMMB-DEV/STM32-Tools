@@ -26,7 +26,7 @@ It might not be usable with STM32CubeIDE or other IDEs. It relies on some HAL fu
 - `Log.hpp`: Logging library with printf formatting, multiple sinks, logging levels, etc.
 - `Versioning.hpp`: A simplified implementation of [Semantic Versioning](https://semver.org)
 - `Retarget.hpp`: For redirecting `stdout`, `stderr`, etc. to custom handlers
-- `Error Checking.hpp`: CRC and Hamming code calculation
+- `EDAC.hpp`: CRC and Hamming code calculation
 - `IO.hpp`: Simple classes for manipulating GPIO pins
 - `Runnable.hpp`: Simple task scheduler
 

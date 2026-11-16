@@ -3,9 +3,13 @@
 * @brief A simplified implementation of [Semantic Versioning](https://semver.org)
 * # Simplified Semantic Versioning 1.0.0
 *
-* This versioning scheme is mostly identical to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) with limited major, minor, and patch versions (each max. 255) and fewer and more strict [pre-release identifiers](https://semver.org/spec/v2.0.0.html#spec-item-9). [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10) cannot be displayed using this format.
+* This versioning scheme is mostly identical to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) with limited major, minor, and patch versions
+* (each max. 255) and fewer and more strict [pre-release identifiers](https://semver.org/spec/v2.0.0.html#spec-item-9).
+* [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10) cannot be displayed using this format.
 *
-* If a patch version reaches 255, the next version will increment the minor version and reset the patch to 0 even if it's not actually a minor release. Similarly, after a minor version of 255, the major version is incremented and the minor and patch versions are reset to 0. If the major version reaches 255, maybe contemplate why you need 256 major versions.
+* If a patch version reaches 255, the next version will increment the minor version and reset the patch to 0 even if it's not actually a minor release.
+* Similarly, after a minor version of 255, the major version is incremented and the minor and patch versions are reset to 0.
+* If the major version reaches 255, maybe contemplate why you need 256 major versions.
 *
 * ## Storage
 *
@@ -352,5 +356,5 @@ namespace STM32T
 	};
 	
 	// todo: Check what needs to be removed (deprecated) for each version. Also update Config.doxygen.
-	constexpr Version VER(0, 4, 1, Version::Normal);		///< Current version of the framework
+	constexpr Version VER(0, 4, 2, Version::Normal);		///< Current version of the framework
 }
