@@ -4,6 +4,7 @@
 
 #include "../../IO.hpp"
 #include "../../Core/strv.hpp"
+#include "../../Core/span.hpp"
 #include "../../Core/Time.hpp"
 #include "../../EDAC.hpp"
 
@@ -11,8 +12,14 @@
 
 
 
-namespace STM32T
+namespace STM32T::RFID
 {
+	static constexpr uint8_t
+		b1 = 0b0000'0001, b2 = 0b0000'0010, b3 = 0b0000'0100, b4 = 0b0000'1000, b5 = 0b0001'0000, b6 = 0b0010'0000, b7 = 0b0100'0000, b8 = 0b1000'0000,
+		b4321 = b4 | b3 | b2 | b1, b8765 = b8 | b7 | b6 | b5;
+	
+	class PICC;
+	
 	/**
 	* @copyright This is mostly taken from the <a href="https://github.com/miguelbalboa/rfid">Arduino RFID library</a>
 	*		which uses the <a href="https://unlicense.org/">"Unlicense"</a>.
@@ -20,109 +27,9 @@ namespace STM32T
 	*/
 	class MFRC522
 	{
-		static constexpr uint8_t
-			b1 = 0b0000'0001, b2 = 0b0000'0010, b3 = 0b0000'0100, b4 = 0b0000'1000, b5 = 0b0001'0000, b6 = 0b0010'0000, b7 = 0b0100'0000, b8 = 0b1000'0000,
-			b4321 = b4 | b3 | b2 | b1, b8765 = b8 | b7 | b6 | b5;
-		
-		static constexpr size_t FS[16] = { 16, 24, 32, 40, 48, 64, 96, 128, 256, 257, 257, 257, 257, 257, 257, 257 };
-		
 		// todo: adjust all SPI timeouts
-	public:
-		enum class Type : uint8_t
-		{
-			UNKNOWN,
-			INCOMPLETE,
-			MF_CL_1K, MF_CL_2K, MF_CL_4K,
-			MF_CL_1K_SMX, MF_CL_4K_SMX,
-			MF_UL_EV1, MF_UL_AES,
-			MF_PL_2K_SL2, MF_PL_4K_SL2,
-			MF_PL_EV1_2K_SL3, MF_PL_EV1_4K_SL3,
-			MF_PL_EV2_2K_SL3, MF_PL_EV2_4K_SL3,
-			MF_DF_EV1_256B, MF_DF_EV1_2K, MF_DF_EV1_4K, MF_DF_EV1_8K,
-			MF_DF_EV2_2K, MF_DF_EV2_4K, MF_DF_EV2_8K, MF_DF_EV2_16K, MF_DF_EV2_32K,
-			MF_DF_EV3_2K, MF_DF_EV3_4K, MF_DF_EV3_8K,
-			MF_DFL,
-			MF_DUOX_2K, MF_DUOX_4K, MF_DUOX_8K, MF_DUOX_16K,
-			MF_MINI,
-			NTAG213, NTAG215, NTAG216,
-			NTAG_I2C_PL,
-			NTAG4xx,
-			NTAG_X_DNA,
-			TNP,					// TagNPlay (TNP3xxx)
-		};
+		friend class PICC;
 		
-		struct PICC
-		{
-		private:
-			friend class MFRC522;
-			
-			Type m_type = Type::UNKNOWN;
-			
-		public:
-			uint8_t
-				sak = b3,	// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
-				idLen = 0,	// Number of bytes in the UID. 4, 7 or 10.
-				id[10];
-			
-			PICC & operator=(const PICC &other)
-			{
-				m_type = other.m_type;
-				sak = other.sak;
-				idLen = other.idLen;
-				memcpy(id, other.id, idLen);
-				
-				return *this;
-			}
-			
-			bool operator==(const PICC &other) const
-			{
-				return m_type == other.m_type && sak == other.sak && idLen == other.idLen && memcmp(id, other.id, idLen) == 0;
-			}
-			
-			bool operator!=(const PICC &other) const { return !operator==(other); }
-			
-			constexpr bool isISO_14443_4() const { return sak & b6; }
-			
-			Type type() const { return m_type; }
-		};
-		
-		struct VerInfo
-		{
-			uint8_t vendorId, type, subType, majorVersion, minorVersion, storageSize, protocol;
-		};
-		
-		struct ATS
-		{
-			using duration_t = std::chrono::duration<uint32_t, std::ratio<1, 13'560'000>>;
-			
-			static constexpr uint8_t DEFAULT_FWI = 4;
-			
-			uint8_t TL;
-			std::optional<uint8_t> T0, TA, TB, TC;
-			std::vector<uint8_t> T1k;
-			
-			// Frame Size
-			constexpr uint8_t FSCI() const { return T0.value_or(0) & b4321; }
-			constexpr size_t FSC() const { return FS[FSCI()]; }
-			
-			// DS, DR
-			constexpr uint8_t DS() const { return (TA.value_or(0) >> 4) & 0b0111; }
-			constexpr uint8_t DR() const { return TA.value_or(0) & 0b0111; }
-			
-			// Frame Waiting (PCD req -> PICC resp)
-			constexpr uint8_t FWI() const { return TB ? *TB >> 4 : DEFAULT_FWI; }
-			constexpr duration_t FWT() const { return duration_t(256 * 16 * pow(2, FWI())); }
-			
-			// Start-up Frame Guard Time (PICC ATS -> PCD req)
-			constexpr uint8_t SFGI() const { return TB.value_or(0) & 0b1111; }
-			constexpr duration_t SFGT() const
-			{
-				auto sfgi = SFGI();
-				return duration_t{sfgi ? 256 * 16 * pow(2, sfgi) : 9 * 128 + 84};	// todo: check if this is correct.
-			}
-		};
-		
-	private:
 		SPI_HandleTypeDef *p_spi;
 		IO m_cs;
 		
@@ -184,6 +91,72 @@ namespace STM32T
 			INVALID			,	// Invalid argument.
 			CRC_WRONG		,	// The CRC_A does not match
 			MIFARE_NACK		= 0xff	// A MIFARE PICC responded with NAK.
+		};
+		
+		struct ATS
+		{
+			static constexpr size_t FS[16] = { 16, 24, 32, 40, 48, 64, 96, 128, 256, 257, 257, 257, 257, 257, 257, 257 };
+			
+			static constexpr uint8_t DEFAULT_FWI = 4;
+			
+			using duration_t = std::chrono::duration<uint32_t, std::ratio<1, 13'560'000>>;
+			
+			uint8_t TL;
+			std::optional<uint8_t> T0, TA, TB, TC;
+			std::vector<uint8_t> T1k;
+			
+			// Frame Size
+			constexpr uint8_t FSCI() const { return T0.value_or(0) & b4321; }
+			constexpr size_t FSC() const { return FS[FSCI()]; }
+			
+			// DS, DR
+			constexpr uint8_t DS() const { return (TA.value_or(0) >> 4) & 0b0111; }
+			constexpr uint8_t DR() const { return TA.value_or(0) & 0b0111; }
+			
+			// Frame Waiting (PCD req -> PICC resp)
+			constexpr uint8_t FWI() const { return TB ? *TB >> 4 : DEFAULT_FWI; }
+			constexpr duration_t FWT() const { return duration_t(256 * 16 * pow(2, FWI())); }
+			
+			// Start-up Frame Guard Time (PICC ATS -> PCD req)
+			constexpr uint8_t SFGI() const { return TB.value_or(0) & 0b1111; }
+			constexpr duration_t SFGT() const
+			{
+				auto sfgi = SFGI();
+				return duration_t{sfgi ? 256 * 16 * pow(2, sfgi) : 9 * 128 + 84};	// todo: check if this is correct.
+			}
+			
+			template <Log::Level level = Log::Level::Debug>
+			void Log() const
+			{
+				using namespace STM32T::Log::DefLog;
+				using namespace std::chrono;
+				
+				LOG<level>("ATS:\n\tTL: %hhu", TL);
+				
+				if (T0)
+					LOG_N<level>("\n\tT0: %#.8hhb (FSC: %zu)", *T0, FSC());
+				else
+					LOG_N<level>("\n\tT0: N/A");
+				
+				if (TA)
+					LOG_N<level>("\n\tTA: %#.8hhb", *TA);
+				else
+					LOG_N<level>("\t\nTA: N/A");
+				
+				if (TB)
+					LOG_N<level>("\n\tTB: %#.8hhb (FWT: %.1f ms, SFGT: %.1f ms)",
+					*TB, duration_cast<duration<float, std::milli>>(FWT()).count(), duration_cast<duration<float, std::milli>>(SFGT()).count());
+				else
+					LOG_N<level>("\n\tTB: N/A");
+				
+				if (TC)
+					LOG_N<level>("\n\tTC: %#.8hhb", *TC);
+				else
+					LOG_N<level>("\n\tTC: N/A");
+				
+				LOG_N<level>("\nHistorical bytes (%zu):\n", T1k.size());
+				LOGA<level>(T1k.data(), T1k.size());
+			}
 		};
 		
 		static constexpr uint8_t Addr4Read(const Reg reg) { return 0b1000'0000 | (static_cast<uint8_t>(reg) << 1); }
@@ -323,59 +296,11 @@ namespace STM32T
 		
 		void Command(Cmd cmd)
 		{
+			// todo: Tranceive command doesn't need to be written every time.
 			Write(Reg::Command, static_cast<uint8_t>(cmd));
 		}
 		
 		//------------------------------------------------------------------------------------------------------------------------------------------------------
-		
-		/**
-		* Use the CRC coprocessor in the MFRC522 to calculate a CRC_A.
-		* 
-		* @param data - In: Pointer to the data to transfer to the FIFO for CRC calculation.
-		* @param length - In: The number of bytes to transfer.
-		* @param result - Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
-		* @return STATUS_OK on success, STATUS_??? otherwise.
-		*/
-		/*Status PCD_CalculateCRC(const uint8_t *data, uint8_t length, uint8_t *result)
-		{
-			Command(Cmd::Idle);						// Stop any active command.
-			Write(Reg::DivIrq, 0x04);				// Clear the CRCIRq interrupt request bit
-			Write(Reg::FIFOLevel, 0x80);			// FlushBuffer = 1, FIFO initialization
-			Write(Reg::FIFOData, data, length);		// Write data to the FIFO
-			Command(Cmd::CalcCRC);					// Start the calculation
-			
-			// Wait for the CRC calculation to complete. Check for the register to
-			// indicate that the CRC calculation is complete in a loop. If the
-			// calculation is not indicated as complete in ~90ms, then time out
-			// the operation.
-			const uint32_t deadline_start = HAL_GetTick();
-
-			do {
-				// DivIrqReg[7..0] bits are: Set2 reserved reserved MfinActIRq reserved CRCIRq reserved reserved
-				uint8_t n = Read(Reg::DivIrq);
-				if (n & 0x04)						// CRCIRq bit set - calculation done
-				{
-					Command(Cmd::Idle);				// Stop calculating CRC for new content in the FIFO.
-					// Transfer the result from the registers to the result buffer
-					result[0] = Read(Reg::CRCResultL);
-					result[1] = Read(Reg::CRCResultH);
-					return Status::OK;
-				}
-			}
-			while (HAL_GetTick() - deadline_start < 89);
-
-			// 89ms passed and nothing happened. Communication with the MFRC522 might be down.
-			return Status::TIMEOUT;
-		}*/
-		
-		/**
-		* @param result - Must be at least 2 bytes long.
-		*/
-		static constexpr Status CalculateCRC(const uint8_t *const data, const uint8_t length, uint8_t *result)
-		{
-			unpack_le(result, reverse(SimpleCRC<uint16_t>(data, length, 0x1021, 0xC6C6, true)));
-			return Status::OK;
-		}
 		
 		static constexpr uint16_t CalculateCRC(const uint8_t *const data, const uint8_t length)
 		{
@@ -386,19 +311,20 @@ namespace STM32T
 		* Transfers data to the MFRC522 FIFO, executes a command, waits for completion and transfers data back from the FIFO.
 		* CRC validation can only be done if backData and backLen are specified.
 		*
-		* @param command	- The command to execute. One of the PCD_Command enums.
-		* @param waitIRq	- The bits in the ComIrqReg register that signals successful completion of the command.
-		* @param sendData	- Pointer to the data to transfer to the FIFO.
-		* @param sendLen	- Number of bytes to transfer to the FIFO.
-		* @param backData	- nullptr or pointer to buffer if data should be read back after executing the command.
-		* @param backLen	- In: Max number of bytes to write to *backData. Out: The number of bytes returned.
-		* @param validBits	- In/Out: The number of valid bits in the last byte. 0 for 8 valid bits.
-		* @param rxAlign	- In: Defines the bit position in backData[0] for the first bit received. Default 0.
-		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
-		* @return STATUS_OK on success, STATUS_??? otherwise.
+		* @param command			The command to execute. One of the PCD_Command enums.
+		* @param send				The data to transfer to the FIFO. @todo make the extent static?
+		* @param backData			nullptr or pointer to buffer if data should be read back after executing the command.
+		* @param[inout] backLen		Max number of bytes to write to *backData / The number of bytes returned.
+		* @param waitIRq			The bits in the ComIrqReg register that signals successful completion of the command.
+		* @param[inout] validBits	The number of valid bits in the last byte. 0 for 8 valid bits.
+		* @param[in] rxAlign		Defines the bit position in backData[0] for the first bit received. Default 0.
+		* @param[in] checkCRC		True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+		* 
+		* @retval STATUS_OK on success
+		* @retval STATUS_??? otherwise.
 		*/
-		Status PCD_CommunicateWithPICC(Cmd command, uint8_t waitIRq, const uint8_t *sendData, uint8_t sendLen,
-			uint8_t *backData, uint8_t *backLen, uint8_t *validBits, uint8_t rxAlign, bool checkCRC)		
+		Status PCD_CommunicateWithPICC(Cmd command, const span<const uint8_t> send, uint8_t *backData, uint8_t *backLen,
+			uint8_t waitIRq, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false, const uint32_t timeout = 36)
 		{
 			// Prepare values for BitFramingReg
 			uint8_t txLastBits = validBits ? *validBits : 0;
@@ -407,23 +333,21 @@ namespace STM32T
 			Command(Cmd::Idle);										// Stop any active command.
 			Write(Reg::ComIrq, 0x7F);								// Clear all seven interrupt request bits
 			Write(Reg::FIFOLevel, 0x80);							// FlushBuffer = 1, FIFO initialization
-			Write(Reg::FIFOData, sendData, sendLen);				// Write sendData to the FIFO
+			Write(Reg::FIFOData, send.data(), send.size());			// Write sendData to the FIFO
 			Write(Reg::BitFraming, bitFraming);						// Bit adjustments
 			Command(command);										// Execute the command
 			if (command == Cmd::Transceive)
 				SetBits(Reg::BitFraming, 0x80);						// StartSend=1, transmission of data starts
 			
-			// In PCD_Init() we set the TAuto flag in TModeReg. This means the timer
-			// automatically starts when the PCD stops transmitting.
-			//
 			// Wait here for the command to complete. The bits specified in the
 			// `waitIRq` parameter define what bits constitute a completed command.
 			// When they are set in the ComIrqReg register, then the command is
-			// considered complete. If the command is not indicated as complete in
-			// ~36ms, then consider the command as timed out.
+			// considered complete.
+			
+			// todo: Take into account the tranmission time.
 			const uint32_t deadline_start = HAL_GetTick();
 			bool completed = false;
-
+			
 			do
 			{
 				uint8_t n = Read(Reg::ComIrq);		// ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
@@ -432,13 +356,10 @@ namespace STM32T
 					completed = true;
 					break;
 				}
-				
-				if (n & 0x01)						// Timer interrupt - nothing received in 25ms
-					return Status::TIMEOUT;
 			}
-			while (HAL_GetTick() - deadline_start < 36);
+			while (HAL_GetTick() - deadline_start <= timeout);
 
-			// 36ms and nothing happened. Communication with the MFRC522 might be down.
+			// Nothing happened. Communication with the MFRC522 might be down.
 			if (!completed)
 				return Status::TIMEOUT;
 			
@@ -479,43 +400,34 @@ namespace STM32T
 					return Status::CRC_WRONG;
 				
 				// Verify CRC_A - do our own calculation and store the control in controlBuffer.
-				uint8_t controlBuffer[2];
-				Status status = CalculateCRC(&backData[0], *backLen - 2, &controlBuffer[0]);
-				if (status != Status::OK)
-					return status;
+				const uint16_t control = CalculateCRC(&backData[0], *backLen - 2);
 				
-				if ((backData[*backLen - 2] != controlBuffer[0]) || (backData[*backLen - 1] != controlBuffer[1]))
+				if (pack_le<uint16_t>(&backData[*backLen - 2]) != control)
 					return Status::CRC_WRONG;
 			}
 			
 			return Status::OK;
 		}
 		
-		/**
-		* Executes the Transceive command.
-		* CRC validation can only be done if backData and backLen are specified.
-		* 
-		* @param sendData	- Pointer to the data to transfer to the FIFO.
-		* @param sendLen	- Number of bytes to transfer to the FIFO.
-		* @param backData	- nullptr or pointer to buffer if data should be read back after executing the command.
-		* @param backLen	- In: Max number of bytes to write to *backData. Out: The number of bytes returned.
-		* @param validBits	- In/Out: The number of valid bits in the last byte. 0 for 8 valid bits. Default nullptr.
-		* @param rxAlign	- In: Defines the bit position in backData[0] for the first bit received. Default 0.
-		* @param checkCRC	- In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
-		* @return STATUS_OK on success, STATUS_??? otherwise.
-		*/
-		Status PCD_TransceiveData(const uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen,
-			uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false)
+		Status PCD_CommunicateWithPICC(Cmd command, span<uint8_t> send, uint8_t *backData, uint8_t *backLen,
+			uint8_t waitIRq, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false, bool addCRC = false, const uint32_t timeout = 36)
 		{
-			uint8_t waitIRq = 0x30;		// RxIRq and IdleIRq
-			return PCD_CommunicateWithPICC(Cmd::Transceive, waitIRq, sendData, sendLen, backData, backLen, validBits, rxAlign, checkCRC);
+			if (addCRC)
+			{
+				if (send.size() < 2)
+					return Status::INVALID;
+				
+				unpack_le(send.end() - 2, CalculateCRC(send.data(), send.size() - 2));
+			}
+			
+			return PCD_CommunicateWithPICC(command, span<const uint8_t>(send), backData, backLen, waitIRq, validBits, rxAlign, checkCRC, timeout);
 		}
 		
 		/**
 		* Transmits REQA or WUPA commands.
 		* Beware: When two PICCs are in the field at the same time I often get STATUS_TIMEOUT - probably due do bad antenna design.
 		* 
-		* @param command - The command to send - PICC_CMD_REQA or PICC_CMD_WUPA
+		* @param command	The command to send - PICC_CMD_REQA or PICC_CMD_WUPA
 		* @return A pair of {STATUS_OK on success, STATUS_??? otherwise, The ATQA returned or 0 in case of error}.
 		*/
 		Status PICC_REQA_or_WUPA(uint8_t command, uint16_t *atqa)
@@ -524,8 +436,8 @@ namespace STM32T
 			
 			ClearBits(Reg::Coll, 0x80);					// ValuesAfterColl=1 => Bits received after collision are cleared.
 			uint8_t validBits = 7;						// For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte. TxLastBits = BitFramingReg[2..0]
-			const Status status = PCD_TransceiveData(&command, 1, reinterpret_cast<uint8_t *>(&atqa), &bufferSize, &validBits);
-			if (status != Status::OK)
+			const Status status = PCD_CommunicateWithPICC(Cmd::Transceive, span<const uint8_t>{&command, 1u}, reinterpret_cast<uint8_t *>(&atqa), &bufferSize, 0x30, &validBits);
+			if (status != Status::OK)	// todo: check COLLISION as well?
 				return status;
 			
 			if (bufferSize != 2 || validBits != 0)		// ATQA must be exactly 16 bits.
@@ -534,243 +446,12 @@ namespace STM32T
 			return Status::OK;
 		}
 		
-		/**
-		* Transmits SELECT/ANTICOLLISION commands to select a single PICC.
-		* Before calling this function the PICCs must be placed in the READY(*) state by calling PICC_RequestA() or PICC_WakeupA().
-		* On success:
-		* 		- The chosen PICC is in state ACTIVE(*) and all other PICCs have returned to state IDLE/HALT. (Figure 7 of the ISO/IEC 14443-3 draft.)
-		* 		- The UID size and value of the chosen PICC is returned in *uid along with the SAK.
-		* 
-		* A PICC UID consists of 4, 7 or 10 bytes.
-		* Only 4 bytes can be specified in a SELECT command, so for the longer UIDs two or three iterations are used:
-		* 		UID size	Number of UID bytes		Cascade levels		Example of PICC
-		* 		========	===================		==============		===============
-		* 		single				 4						1				MIFARE Classic
-		* 		double				 7						2				MIFARE Ultralight
-		* 		triple				10						3				Not currently in use?
-		* 
-		* @param uid		- Pointer to Uid struct. Normally output, but can also be used to supply a known UID.
-		* @param validBits	- The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
-		* @return STATUS_OK on success, STATUS_??? otherwise.
-		*/
-		Status PICC_Select(PICC *uid, uint8_t validBits = 0)
-		{
-			bool uidComplete, selectDone, useCascadeTag;
-			uint8_t cascadeLevel = 1;
-			Status result;
-			uint8_t count;
-			uint8_t checkBit;
-			uint8_t index;
-			uint8_t uidIndex;				// The first index in uid->uidByte[] that is used in the current Cascade Level.
-			int8_t currentLevelKnownBits;	// The number of known UID bits in the current Cascade Level.
-			uint8_t buffer[9];				// The SELECT/ANTICOLLISION commands uses a 7 byte standard frame + 2 bytes CRC_A
-			uint8_t bufferUsed;				// The number of bytes used in the buffer, ie the number of bytes to transfer to the FIFO.
-			uint8_t rxAlign;				// Used in BitFramingReg. Defines the bit position for the first bit received.
-			uint8_t txLastBits;				// Used in BitFramingReg. The number of valid bits in the last transmitted byte. 
-			uint8_t *responseBuffer;
-			uint8_t responseLength;
-			
-			// Description of buffer structure:
-			//		Byte 0: SEL 				Indicates the Cascade Level: PICC_CMD_SEL_CL1, PICC_CMD_SEL_CL2 or PICC_CMD_SEL_CL3
-			//		Byte 1: NVB					Number of Valid Bits (in complete command, not just the UID): High nibble: complete bytes, Low nibble: Extra bits. 
-			//		Byte 2: UID-data or CT		See explanation below. CT means Cascade Tag.
-			//		Byte 3: UID-data
-			//		Byte 4: UID-data
-			//		Byte 5: UID-data
-			//		Byte 6: BCC					Block Check Character - XOR of bytes 2-5
-			//		Byte 7: CRC_A
-			//		Byte 8: CRC_A
-			// The BCC and CRC_A are only transmitted if we know all the UID bits of the current Cascade Level.
-			//
-			// Description of bytes 2-5: (Section 6.5.4 of the ISO/IEC 14443-3 draft: UID contents and cascade levels)
-			//		UID size	Cascade level	Byte2	Byte3	Byte4	Byte5
-			//		========	=============	=====	=====	=====	=====
-			//		 4 bytes		1			uid0	uid1	uid2	uid3
-			//		 7 bytes		1			CT		uid0	uid1	uid2
-			//						2			uid3	uid4	uid5	uid6
-			//		10 bytes		1			CT		uid0	uid1	uid2
-			//						2			CT		uid3	uid4	uid5
-			//						3			uid6	uid7	uid8	uid9
-			
-			// Sanity checks
-			if (validBits > 80)
-				return Status::INVALID;
-			
-			// Prepare MFRC522
-			ClearBits(Reg::Coll, 0x80);		// ValuesAfterColl=1 => Bits received after collision are cleared.
-			
-			// Repeat Cascade Level loop until we have a complete UID.
-			uidComplete = false;
-			while (!uidComplete)
-			{
-				// Set the Cascade Level in the SEL byte, find out if we need to use the Cascade Tag in byte 2.
-				switch (cascadeLevel)
-				{
-					case 1:
-						buffer[0] = CmdPICC::SEL_CL1;
-						uidIndex = 0;
-						useCascadeTag = validBits && uid->idLen > 4;	// When we know that the UID has more than 4 bytes
-						break;
-					
-					case 2:
-						buffer[0] = CmdPICC::SEL_CL2;
-						uidIndex = 3;
-						useCascadeTag = validBits && uid->idLen > 7;	// When we know that the UID has more than 7 bytes
-						break;
-					
-					case 3:
-						buffer[0] = CmdPICC::SEL_CL3;
-						uidIndex = 6;
-						useCascadeTag = false;						// Never used in CL3.
-						break;
-					
-					default:
-						return Status::INTERNAL_ERROR;
-						break;
-				}
-				
-				// How many UID bits are known in this Cascade Level?
-				currentLevelKnownBits = validBits - (8 * uidIndex);
-				if (currentLevelKnownBits < 0)
-					currentLevelKnownBits = 0;
-				
-				// Copy the known bits from uid->uidByte[] to buffer[]
-				index = 2; // destination index in buffer[]
-				if (useCascadeTag)
-					buffer[index++] = CmdPICC::CT;
-				
-				uint8_t bytesToCopy = currentLevelKnownBits / 8 + (currentLevelKnownBits % 8 ? 1 : 0); // The number of bytes needed to represent the known bits for this level.
-				if (bytesToCopy)
-				{
-					uint8_t maxBytes = useCascadeTag ? 3 : 4; // Max 4 bytes in each Cascade Level. Only 3 left if we use the Cascade Tag
-					if (bytesToCopy > maxBytes)
-						bytesToCopy = maxBytes;
-					
-					for (count = 0; count < bytesToCopy; count++)
-						buffer[index++] = uid->id[uidIndex + count];
-				}
-				
-				// Now that the data has been copied we need to include the 8 bits in CT in currentLevelKnownBits
-				if (useCascadeTag)
-					currentLevelKnownBits += 8;
-				
-				// Repeat anti collision loop until we can transmit all UID bits + BCC and receive a SAK - max 32 iterations.
-				selectDone = false;
-				while (!selectDone)
-				{
-					// Find out how many bits and bytes to send and receive.
-					if (currentLevelKnownBits >= 32)	// All UID bits in this Cascade Level are known. This is a SELECT.
-					{
-						//Serial.print(F("SELECT: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
-						buffer[1] = 0x70; // NVB - Number of Valid Bits: Seven whole bytes
-						// Calculate BCC - Block Check Character
-						buffer[6] = buffer[2] ^ buffer[3] ^ buffer[4] ^ buffer[5];
-						// Calculate CRC_A
-						result = CalculateCRC(buffer, 7, &buffer[7]);
-						if (result != Status::OK)
-							return result;
-						
-						txLastBits		= 0; // 0 => All 8 bits are valid.
-						bufferUsed		= 9;
-						// Store response in the last 3 bytes of buffer (BCC and CRC_A - not needed after tx)
-						responseBuffer	= &buffer[6];
-						responseLength	= 3;
-					}
-					else	// This is an ANTICOLLISION.
-					{
-						//Serial.print(F("ANTICOLLISION: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
-						txLastBits		= currentLevelKnownBits % 8;
-						count			= currentLevelKnownBits / 8;	// Number of whole bytes in the UID part.
-						index			= 2 + count;					// Number of whole bytes: SEL + NVB + UIDs
-						buffer[1]		= (index << 4) + txLastBits;	// NVB - Number of Valid Bits
-						bufferUsed		= index + (txLastBits ? 1 : 0);
-						// Store response in the unused part of buffer
-						responseBuffer	= &buffer[index];
-						responseLength	= sizeof(buffer) - index;
-					}
-					
-					// Set bit adjustments
-					rxAlign = txLastBits;											// Having a separate variable is overkill. But it makes the next line easier to read.
-					Write(Reg::BitFraming, (rxAlign << 4) + txLastBits);			// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
-					
-					// Transmit the buffer and receive the response.
-					result = PCD_TransceiveData(buffer, bufferUsed, responseBuffer, &responseLength, &txLastBits, rxAlign);
-					if (result == Status::COLLISION)	// More than one PICC in the field => collision.
-					{
-						uint8_t valueOfCollReg = Read(Reg::Coll); // CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
-						if (valueOfCollReg & 0x20)		// CollPosNotValid
-							return Status::COLLISION;	// Without a valid collision position we cannot continue
-						
-						uint8_t collisionPos = valueOfCollReg & 0x1F; // Values 0-31, 0 means bit 32.
-						if (collisionPos == 0)
-							collisionPos = 32;
-						
-						if (collisionPos <= currentLevelKnownBits)	// No progress - should not happen 
-							return Status::INTERNAL_ERROR;
-						
-						// Choose the PICC with the bit set.
-						currentLevelKnownBits	= collisionPos;
-						count			= currentLevelKnownBits % 8; // The bit to modify
-						checkBit		= (currentLevelKnownBits - 1) % 8;
-						index			= 1 + (currentLevelKnownBits / 8) + (count ? 1 : 0); // First byte is index 0.
-						buffer[index]	|= (1 << checkBit);
-					}
-					else if (result != Status::OK)
-						return result;
-					else	// STATUS_OK
-					{
-						if (currentLevelKnownBits >= 32)	// This was a SELECT.
-							selectDone = true;				// No more anticollision; we continue below outside the while.
-						else								// This was an ANTICOLLISION.
-							// We now have all 32 bits of the UID in this Cascade Level
-							currentLevelKnownBits = 32;
-							// Run loop again to do the SELECT.
-					}
-				} // End of while (!selectDone)
-				
-				// We do not check the CBB - it was constructed by us above.
-				
-				// Copy the found UID bytes from buffer[] to uid->uidByte[]
-				index			= (buffer[2] == CmdPICC::CT) ? 3 : 2; // source index in buffer[]
-				bytesToCopy		= (buffer[2] == CmdPICC::CT) ? 3 : 4;
-				for (count = 0; count < bytesToCopy; count++)
-					uid->id[uidIndex + count] = buffer[index++];
-				
-				// Check response SAK (Select Acknowledge)
-				if (responseLength != 3 || txLastBits != 0)		// SAK must be exactly 24 bits (1 byte + CRC_A).
-					return Status::ERROR;
-				
-				// Verify CRC_A - do our own calculation and store the control in buffer[2..3] - those bytes are not needed anymore.
-				result = CalculateCRC(responseBuffer, 1, &buffer[2]);
-				if (result != Status::OK)
-					return result;
-				
-				if ((buffer[2] != responseBuffer[1]) || (buffer[3] != responseBuffer[2]))
-					return Status::CRC_WRONG;
-				
-				if (responseBuffer[0] & 0x04)	// Cascade bit set - UID not complete yes
-					cascadeLevel++;
-				else
-				{
-					uidComplete = true;
-					uid->sak = responseBuffer[0];
-				}
-			} // End of while (!uidComplete)
-			
-			// Set correct uid->size
-			uid->idLen = 3 * cascadeLevel + 1;
-
-			return Status::OK;
-		}
-		
+		Status PICC_Select(PICC *uid, uint8_t validBits = 0);
 		Status PICC_RATS(ATS *ats, uint8_t FSDI = 5, uint8_t CID = 0)
 		{
-			uint8_t cmd[4] = { 0xE0, static_cast<uint8_t>((FSDI << 4) | (CID & 0xF)) };
-			unpack_le(cmd + 2, CalculateCRC(cmd, 2));
+			uint8_t cmd[4] = { 0xE0, static_cast<uint8_t>((FSDI << 4) | (CID & 0xF)) }, resp[64], respLen = sizeof(resp);
 			
-			uint8_t resp[64], respLen = sizeof(resp);
-			
-			if (const Status stat = PCD_TransceiveData(cmd, sizeof(cmd), resp, &respLen, nullptr, 0, true); stat != Status::OK)
+			if (const Status stat = PCD_CommunicateWithPICC(Cmd::Transceive, cmd, resp, &respLen, 0x30, nullptr, 0, true, true); stat != Status::OK)
 				return stat;
 			
 			if (respLen < 3 || respLen - 2 != resp[0])
@@ -808,58 +489,16 @@ namespace STM32T
 			if (DSI_DRI)
 				cmd[len++] = *DSI_DRI & 0b0000'1111;
 			
-			unpack_le(cmd + len, CalculateCRC(cmd, len));
-			len += 2;
+			len += 2;	// CRC
 			
 			uint8_t resp[3], respLen = sizeof(resp);
 			
-			if (const Status stat = PCD_TransceiveData(cmd, sizeof(cmd), resp, &respLen, nullptr, 0, true); stat != Status::OK)
+			const Status stat = PCD_CommunicateWithPICC(Cmd::Transceive, {cmd, size_t(len)}, resp, &respLen, 0x30, nullptr, 0, true, true);
+			if (stat != Status::OK)
 				return stat;
 			
 			if (respLen != sizeof(resp) || resp[0] != cmd[0])
 				return Status::ERROR;
-			
-			return Status::OK;
-		}
-		
-		Status NXP_GET_VERSION_L3(VerInfo *info)
-		{
-			static constexpr uint8_t CMD[3] = { 0x60, (uint8_t)CalculateCRC(CMD, 1), (uint8_t)(CalculateCRC(CMD, 1) >> 8) };
-			
-			uint8_t resp[10], respLen = sizeof(resp);
-			
-			if (const Status stat = PCD_TransceiveData(CMD, sizeof(CMD), resp, &respLen, nullptr, 0, true); stat != Status::OK)
-				return stat;
-			
-			if (respLen != sizeof(resp) || resp[0] != 0x00 || resp[7] != 0x03)
-				return Status::ERROR;
-			
-			memcpy(info, resp + 1, sizeof(*info));
-			
-			return Status::OK;
-		}
-		
-		Status NXP_GET_VERSION_L4(VerInfo *info)
-		{
-			static constexpr uint8_t CMD[5] = { 0x90, 0x60, 0x00, 0x00, 0x00 };
-			using namespace STM32T::Log::DefLog;
-			uint8_t resp[9], respLen = sizeof(resp);
-			
-			if (const Status stat = PCD_TransceiveData(CMD, sizeof(CMD), resp, &respLen); stat != Status::OK)
-			{
-				LOG_D("Status: %s", StatusName(stat).data());
-				return stat;
-			}
-			LOG_D("len: %hhu", respLen);
-			if (respLen != sizeof(resp))	// || resp[6] != 0x05)
-				return Status::ERROR;
-			
-			const uint16_t status = pack_le<uint16_t>(resp + respLen - 2);
-			LOG_D("stat2: %04hX", status);
-			if (status != 0x9100 && status != 0x91AF)
-				return Status::ERROR;
-			
-			memcpy(info, resp, sizeof(*info));
 			
 			return Status::OK;
 		}
@@ -877,11 +516,6 @@ namespace STM32T
 			
 			Write(Reg::ModWidth, 0x26);
 			Write(Reg::RxThreshold, 0x14);
-			
-			Write(Reg::TMode, 0x80);				// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
-			Write(Reg::TPrescaler, 0xA9);			// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25µs.
-			Write(Reg::TReloadH, 0x03);				// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
-			Write(Reg::TReloadL, 0xE8);
 			
 			Write(Reg::TxASK, 0x40);				// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
 			Write(Reg::Mode, 0x3D);					// Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
@@ -920,7 +554,7 @@ namespace STM32T
 		/**
 		* @retval The ATQA if there are any new (IDLE state) PICCs in the field.
 		*/
-		std::optional<uint16_t> IsIdlePICC()
+		/*std::optional<uint16_t> IsIdlePICC()
 		{
 			// Reset baud rates
 			Write(Reg::TxMode, 0);
@@ -931,136 +565,194 @@ namespace STM32T
 			uint16_t atqa;
 			const Status stat = PICC_REQA_or_WUPA(CmdPICC::REQA, &atqa);
 			return (stat == Status::OK || stat == Status::COLLISION) ? std::make_optional(atqa) : std::nullopt;
+		}*/
+		
+		/// Sends REQA command and automatically selects a PICC (if available).
+		std::optional<PICC> SelectPICC();
+	};
+	
+	struct PICC
+	{
+		enum class Type : uint8_t
+		{
+			UNKNOWN,
+			INCOMPLETE,
+			MF_CL_1K, MF_CL_2K, MF_CL_4K,
+			MF_CL_1K_SMX, MF_CL_4K_SMX,
+			MF_UL_EV1, MF_UL_AES,
+			MF_PL_2K_SL2, MF_PL_4K_SL2,
+			MF_PL_EV1_2K_SL3, MF_PL_EV1_4K_SL3,
+			MF_PL_EV2_2K_SL3, MF_PL_EV2_4K_SL3,
+			MF_DF_EV1_256B, MF_DF_EV1_2K, MF_DF_EV1_4K, MF_DF_EV1_8K,
+			MF_DF_EV2_2K, MF_DF_EV2_4K, MF_DF_EV2_8K, MF_DF_EV2_16K, MF_DF_EV2_32K,
+			MF_DF_EV3_2K, MF_DF_EV3_4K, MF_DF_EV3_8K,
+			MF_DFL,
+			MF_DUOX_2K, MF_DUOX_4K, MF_DUOX_8K, MF_DUOX_16K,
+			MF_MINI,
+			NTAG213, NTAG215, NTAG216,
+			NTAG_I2C_PL,
+			NTAG4xx,
+			NTAG_X_DNA,
+			TNP,					// TagNPlay (TNP3xxx)
+			
+			//ISO_14443_4		,		// PICC compliant with ISO/IEC 14443-4 
+			//ISO_18092		, 		// PICC compliant with ISO/IEC 18092 (NFC)
+		};
+		
+		PICC & operator=(const PICC &other)
+		{
+			m_type = other.m_type;
+			m_sak = other.m_sak;
+			m_idLen = other.m_idLen;
+			memcpy(m_id, other.m_id, m_idLen);
+			
+			return *this;
 		}
 		
-		std::optional<PICC> SelectPICC()
+		bool operator==(const PICC &other) const
 		{
-			PICC picc;
-			return PICC_Select(&picc) == Status::OK ? std::make_optional(std::move(picc)) : std::nullopt;
+			return m_type == other.m_type && m_sak == other.m_sak && m_idLen == other.m_idLen && memcmp(m_id, other.m_id, m_idLen) == 0;
 		}
+		
+		bool operator!=(const PICC &other) const { return !operator==(other); }
 		
 		/**
-		* Based on NXP AN10833 Fig. 1.
+		* Determines whether the PICC supports ISO 14443-4 based on the SAK.
+		* @note Some PICCs support ISO 14443-4 despite the SAK not showing it.
+		*/
+		constexpr bool isISO_14443_4() const { return m_sak & b6; }
+		
+		span<const uint8_t> id() const { return {m_id, size_t(m_idLen)}; }
+		
+		uint8_t sak() const { return m_sak; }
+		
+		Type type() const { return m_type; }
+		
+		/**
+		* Based on NXP AN10833 Fig. 1. Sets the type of the PICC. It can only be called once after the PICC is selected.
 		* 
 		* @note The type of the PICC is determined partly based on the SAK returned after selecting it.
 		* The SAK contains proprietary information and the actual type of the PICC cannot be guaranteed in some cases.
-		* @note Assumes the PICC is still in the field.
+		* @note Modifies the state of the PICC. It might send RATS and PPS commands which prohibits you from sending them again.
 		*/
-		void GetType(PICC &picc)
+		void CheckType()
 		{
-			const auto sak = picc.sak;
-			
-			if (sak & b3 || !picc.idLen)
+			if (m_sak & b3 || !m_idLen)
 			{
-				picc.m_type = Type::INCOMPLETE;
+				m_type = Type::INCOMPLETE;
 				return;
 			}
 			
-			picc.m_type = Type::UNKNOWN;
+			m_type = Type::UNKNOWN;
 			
-			if (sak & b2)	// non-NXP
+			if (m_sak & b2)	// non-NXP
 				return;
 			
-			if (sak & b4)							// 0bxxxx'100x
+			if (m_sak & b4)							// 0bxxxx'100x
 			{
-				if (sak & b5)						// 0bxxx1'100x
+				if (m_sak & b5)						// 0bxxx1'100x
 				{
-					if (sak & b1)					// 0bxxx1'1001
+					if (m_sak & b1)					// 0bxxx1'1001
 					{
-						if (sak == 0x19)
-							picc.m_type = Type::MF_CL_2K;
+						if (m_sak == 0x19)
+							m_type = Type::MF_CL_2K;
 					}
 					else							// 0bxxx1'1000
 					{
-						if (sak & b6)				// 0bxx11'1000
+						if (m_sak & b6)				// 0bxx11'1000
 						{
-							if (sak == 0x38)
-								picc.m_type = Type::MF_CL_4K_SMX;
+							if (m_sak == 0x38)
+								m_type = Type::MF_CL_4K_SMX;
 						}
 						else						// 0bxx01'1000
 						{
-							ATS ats;
+							MFRC522::ATS ats;
 							
-							if (PICC_RATS(&ats) == Status::OK)
+							if (m_frontend.PICC_RATS(&ats) == MFRC522::Status::OK)
 								return;		// todo: GET_VERSION_L4
 							
-							if (sak == 0x18)
-								picc.m_type = Type::MF_CL_4K;
+							if (m_sak == 0x18)
+								m_type = Type::MF_CL_4K;
 						}
 					}
 				}
 				else								// 0bxxx0'100x
 				{
-					if (sak & b1)					// 0bxxx0'1001
+					if (m_sak & b1)					// 0bxxx0'1001
 					{
-						if (sak == 0x09)
-							picc.m_type = Type::MF_MINI;
+						if (m_sak == 0x09)
+							m_type = Type::MF_MINI;
 					}
 					else							// 0bxxx0'1000
 					{
-						if (sak & b6)				// 0bxx10'1000
+						if (m_sak & b6)				// 0bxx10'1000
 						{
-							if (sak == 0x28)
-								picc.m_type = Type::MF_CL_1K_SMX;
+							if (m_sak == 0x28)
+								m_type = Type::MF_CL_1K_SMX;
 						}
 						else						// 0bxx00'1000
 						{
-							ATS ats;
+							MFRC522::ATS ats;
 							
-							if (PICC_RATS(&ats) == Status::OK)
+							if (m_frontend.PICC_RATS(&ats) == MFRC522::Status::OK)
 								return;		// todo: GET_VERSION_L4
 							
-							if (sak == 0x08)
-								picc.m_type = Type::MF_CL_1K;
+							if (m_sak == 0x08)
+								m_type = Type::MF_CL_1K;
 						}
 					}
 				}
 			}
 			else									// 0bxxxx'000x
 			{
-				if (sak & b5)						// 0bxxx1'000x
+				if (m_sak & b5)						// 0bxxx1'000x
 				{
-					if (sak & b1)					// 0bxxx1'0001
+					if (m_sak & b1)					// 0bxxx1'0001
 					{
-						if (sak == 0x11)
-							picc.m_type = Type::MF_PL_4K_SL2;
+						if (m_sak == 0x11)
+							m_type = Type::MF_PL_4K_SL2;
 					}
 					else							// 0bxxx1'0000
 					{
-						if (sak == 0x10)
-							picc.m_type = Type::MF_PL_2K_SL2;
+						if (m_sak == 0x10)
+							m_type = Type::MF_PL_2K_SL2;
 					}
 				}
 				else								// 0bxxx0'000x
 				{
-					if (sak & b1)					// 0bxxx0'0001
-						picc.m_type = Type::TNP;
+					if (m_sak & b1)					// 0bxxx0'0001
+						m_type = Type::TNP;
 					else							// 0bxxx0'0000
 					{
-						if (sak & b6)				// 0bxx10'0000
+						if (m_sak & b6)				// 0bxx10'0000
 						{
-							if (sak != 0x20)
+							if (m_sak != 0x20)
 								return;
 							
-							ATS ats;
-							if (PICC_RATS(&ats) != Status::OK)
+							MFRC522::ATS ats;
+							if (m_frontend.PICC_RATS(&ats) != MFRC522::Status::OK)
 								return;
 							
+							ats.Log();
 							Time::HighResClock::sleep_for(ats.SFGT());
 							
 							const uint8_t ds = ats.DS(), dr = ats.DR();
-							if (PICC_PPS(ds || dr ? std::make_optional(0) : std::nullopt) != Status::OK)
+							if (m_frontend.PICC_PPS(ds || dr ? std::make_optional(0) : std::nullopt) != MFRC522::Status::OK)
 								return;
 							
+							Log::LOG_D("PPS");
+							
 							VerInfo info;
-							if (NXP_GET_VERSION_L4(&info) != Status::OK)
+							if (NXP_GET_VERSION_L4(&info) != MFRC522::Status::OK)
 							{
-								if (sak != 0x20)
+								if (m_sak != 0x20)
 									return;
 								
 								// todo: historical bytes
 								return;
 							}
+							
+							Log::LOG_D("Version");
 							
 							switch (info.type)
 							{
@@ -1073,10 +765,10 @@ namespace STM32T
 										{
 											switch (info.storageSize)
 											{
-												case 0x16:	picc.m_type = Type::MF_DUOX_2K; break;
-												case 0x18:	picc.m_type = Type::MF_DUOX_4K; break;
-												case 0x1A:	picc.m_type = Type::MF_DUOX_8K; break;
-												case 0x1C:	picc.m_type = Type::MF_DUOX_16K; break;
+												case 0x16:	m_type = Type::MF_DUOX_2K; break;
+												case 0x18:	m_type = Type::MF_DUOX_4K; break;
+												case 0x1A:	m_type = Type::MF_DUOX_8K; break;
+												case 0x1C:	m_type = Type::MF_DUOX_16K; break;
 											}
 										}
 										
@@ -1090,10 +782,10 @@ namespace STM32T
 											{
 												switch (info.storageSize)
 												{
-													case 0x10:	picc.m_type = Type::MF_DF_EV1_256B; break;
-													case 0x16:	picc.m_type = Type::MF_DF_EV1_2K; break;
-													case 0x18:	picc.m_type = Type::MF_DF_EV1_4K; break;
-													case 0x1A:	picc.m_type = Type::MF_DF_EV1_8K; break;
+													case 0x10:	m_type = Type::MF_DF_EV1_256B; break;
+													case 0x16:	m_type = Type::MF_DF_EV1_2K; break;
+													case 0x18:	m_type = Type::MF_DF_EV1_4K; break;
+													case 0x1A:	m_type = Type::MF_DF_EV1_8K; break;
 												}
 												
 												break;
@@ -1103,11 +795,11 @@ namespace STM32T
 											{
 												switch (info.storageSize)
 												{
-													case 0x16:	picc.m_type = Type::MF_DF_EV2_2K; break;
-													case 0x18:	picc.m_type = Type::MF_DF_EV2_4K; break;
-													case 0x1A:	picc.m_type = Type::MF_DF_EV2_8K; break;
-													case 0x1C:	picc.m_type = Type::MF_DF_EV2_16K; break;
-													case 0x1E:	picc.m_type = Type::MF_DF_EV2_32K; break;
+													case 0x16:	m_type = Type::MF_DF_EV2_2K; break;
+													case 0x18:	m_type = Type::MF_DF_EV2_4K; break;
+													case 0x1A:	m_type = Type::MF_DF_EV2_8K; break;
+													case 0x1C:	m_type = Type::MF_DF_EV2_16K; break;
+													case 0x1E:	m_type = Type::MF_DF_EV2_32K; break;
 												}
 												
 												break;
@@ -1117,9 +809,9 @@ namespace STM32T
 											{
 												switch (info.storageSize)
 												{
-													case 0x16:	picc.m_type = Type::MF_DF_EV3_2K; break;
-													case 0x18:	picc.m_type = Type::MF_DF_EV3_4K; break;
-													case 0x1A:	picc.m_type = Type::MF_DF_EV3_8K; break;
+													case 0x16:	m_type = Type::MF_DF_EV3_2K; break;
+													case 0x18:	m_type = Type::MF_DF_EV3_4K; break;
+													case 0x1A:	m_type = Type::MF_DF_EV3_8K; break;
 												}
 												
 												break;
@@ -1134,29 +826,29 @@ namespace STM32T
 								case 0x82:
 								{
 									if (info.majorVersion == 0x11 && info.storageSize == 0x16)
-										picc.m_type = Type::MF_PL_EV1_2K_SL3;
+										m_type = Type::MF_PL_EV1_2K_SL3;
 									else if (info.majorVersion == 0x11 && info.storageSize == 0x18)
-										picc.m_type = Type::MF_PL_EV1_4K_SL3;
+										m_type = Type::MF_PL_EV1_4K_SL3;
 									else if (info.majorVersion == 0x22 && info.storageSize == 0x16)
-										picc.m_type = Type::MF_PL_EV2_2K_SL3;
+										m_type = Type::MF_PL_EV2_2K_SL3;
 									else if (info.majorVersion == 0x22 && info.storageSize == 0x18)
-										picc.m_type = Type::MF_PL_EV2_4K_SL3;
+										m_type = Type::MF_PL_EV2_4K_SL3;
 									
 									break;
 								}
 								
 								case 0x08:
 								{
-									picc.m_type = Type::MF_DFL;
+									m_type = Type::MF_DFL;
 									break;
 								}
 								
 								case 0x04:
 								{
 									if (info.majorVersion == 0xA0)
-										picc.m_type = Type::NTAG_X_DNA;
+										m_type = Type::NTAG_X_DNA;
 									else
-										picc.m_type = Type::NTAG4xx;
+										m_type = Type::NTAG4xx;
 									
 									break;
 								}
@@ -1164,11 +856,11 @@ namespace STM32T
 						}
 						else						// 0bxx00'0000
 						{
-							if (sak != 0x00)
+							if (m_sak != 0x00)
 								return;
 							
 							VerInfo info;
-							if (NXP_GET_VERSION_L3(&info) == Status::OK)
+							if (NXP_GET_VERSION_L3(&info) == MFRC522::Status::OK)
 							{
 								switch (info.type)
 								{
@@ -1176,8 +868,8 @@ namespace STM32T
 									{
 										switch (info.majorVersion)
 										{
-											case 0x01:	picc.m_type = Type::MF_UL_EV1; break;
-											case 0x04:	picc.m_type = Type::MF_UL_AES; break;
+											case 0x01:	m_type = Type::MF_UL_EV1; break;
+											case 0x04:	m_type = Type::MF_UL_AES; break;
 										}
 										
 										break;
@@ -1191,15 +883,15 @@ namespace STM32T
 											{
 												switch (info.storageSize)
 												{
-													case 0x0F:	picc.m_type = Type::NTAG213; break;
-													case 0x11:	picc.m_type = Type::NTAG215; break;
-													case 0x13:	picc.m_type = Type::NTAG216; break;
+													case 0x0F:	m_type = Type::NTAG213; break;
+													case 0x11:	m_type = Type::NTAG215; break;
+													case 0x13:	m_type = Type::NTAG216; break;
 												}
 												
 												break;
 											}
 											
-											case 0x05:	picc.m_type = Type::NTAG_I2C_PL; break;
+											case 0x05:	m_type = Type::NTAG_I2C_PL; break;
 										}
 										
 										break;
@@ -1213,5 +905,310 @@ namespace STM32T
 				}
 			}
 		}
+		
+	private:
+		struct VerInfo { uint8_t vendorId, type, subType, majorVersion, minorVersion, storageSize, protocol; };
+		
+		friend class MFRC522;
+		
+		MFRC522 &m_frontend;
+		uint16_t m_atqa;
+		uint8_t
+			m_sak = b3,		// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
+			m_idLen = 0,	// Number of bytes in the UID. 4, 7 or 10.
+			m_id[10];
+		
+		Type m_type = Type::UNKNOWN;
+		
+		PICC(MFRC522 &frontend, uint16_t atqa) : m_frontend(frontend), m_atqa(atqa) {}
+		
+		MFRC522::Status NXP_GET_VERSION_L3(VerInfo *info)
+		{
+			static constexpr uint8_t CMD[3] = { 0x60, (uint8_t)MFRC522::CalculateCRC(CMD, 1), (uint8_t)(MFRC522::CalculateCRC(CMD, 1) >> 8) };
+			
+			uint8_t resp[10], respLen = sizeof(resp);
+			
+			const MFRC522::Status stat = m_frontend.PCD_CommunicateWithPICC(MFRC522::Cmd::Transceive, CMD, resp, &respLen, 0x30, nullptr, 0, true);
+			if (stat != MFRC522::Status::OK)
+				return stat;
+			
+			if (respLen != sizeof(resp) || resp[0] != 0x00 || resp[7] != 0x03)
+				return MFRC522::Status::ERROR;
+			
+			memcpy(info, resp + 1, sizeof(*info));
+			
+			return MFRC522::Status::OK;
+		}
+		
+		MFRC522::Status NXP_GET_VERSION_L4(VerInfo *info)
+		{
+			static constexpr uint8_t CMD[5] = { 0x90, 0x60, 0x00, 0x00, 0x00 };
+			using namespace STM32T::Log::DefLog;
+			uint8_t resp[9], respLen = sizeof(resp);
+			
+			const MFRC522::Status stat = m_frontend.PCD_CommunicateWithPICC(MFRC522::Cmd::Transceive, CMD, resp, &respLen, 0x30);
+			if (stat != MFRC522::Status::OK)
+			{
+				LOG_D("Status: %s", MFRC522::StatusName(stat).data());
+				return stat;
+			}
+			LOG_D("len: %hhu", respLen);
+			if (respLen != sizeof(resp))	// || resp[6] != 0x05)
+				return MFRC522::Status::ERROR;
+			
+			const uint16_t status = pack_le<uint16_t>(resp + respLen - 2);
+			LOG_D("stat2: %04hX", status);
+			if (status != 0x9100 && status != 0x91AF)
+				return MFRC522::Status::ERROR;
+			
+			memcpy(info, resp, sizeof(*info));
+			
+			return MFRC522::Status::OK;
+		}
 	};
+	
+	/**
+	* Transmits SELECT/ANTICOLLISION commands to select a single PICC.
+	* Before calling this function the PICCs must be placed in the READY(*) state by calling PICC_RequestA() or PICC_WakeupA().
+	* On success:
+	* 		- The chosen PICC is in state ACTIVE(*) and all other PICCs have returned to state IDLE/HALT. (Figure 7 of the ISO/IEC 14443-3 draft.)
+	* 		- The UID size and value of the chosen PICC is returned in *uid along with the SAK.
+	* 
+	* A PICC UID consists of 4, 7 or 10 bytes.
+	* Only 4 bytes can be specified in a SELECT command, so for the longer UIDs two or three iterations are used:
+	* 		UID size	Number of UID bytes		Cascade levels		Example of PICC
+	* 		========	===================		==============		===============
+	* 		single				 4						1				MIFARE Classic
+	* 		double				 7						2				MIFARE Ultralight
+	* 		triple				10						3				Not currently in use?
+	* 
+	* @param uid		- Pointer to Uid struct. Normally output, but can also be used to supply a known UID.
+	* @param validBits	- The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
+	* @return STATUS_OK on success, STATUS_??? otherwise.
+	*/
+	MFRC522::Status MFRC522::PICC_Select(PICC *uid, uint8_t validBits)
+	{
+		bool uidComplete, selectDone, useCascadeTag;
+		uint8_t cascadeLevel = 1;
+		Status result;
+		uint8_t count;
+		uint8_t checkBit;
+		uint8_t index;
+		uint8_t uidIndex;				// The first index in uid->uidByte[] that is used in the current Cascade Level.
+		int8_t currentLevelKnownBits;	// The number of known UID bits in the current Cascade Level.
+		uint8_t buffer[9];				// The SELECT/ANTICOLLISION commands uses a 7 byte standard frame + 2 bytes CRC_A
+		uint8_t bufferUsed;				// The number of bytes used in the buffer, ie the number of bytes to transfer to the FIFO.
+		uint8_t rxAlign;				// Used in BitFramingReg. Defines the bit position for the first bit received.
+		uint8_t txLastBits;				// Used in BitFramingReg. The number of valid bits in the last transmitted byte. 
+		uint8_t *responseBuffer;
+		uint8_t responseLength;
+		
+		// Description of buffer structure:
+		//		Byte 0: SEL 				Indicates the Cascade Level: PICC_CMD_SEL_CL1, PICC_CMD_SEL_CL2 or PICC_CMD_SEL_CL3
+		//		Byte 1: NVB					Number of Valid Bits (in complete command, not just the UID): High nibble: complete bytes, Low nibble: Extra bits. 
+		//		Byte 2: UID-data or CT		See explanation below. CT means Cascade Tag.
+		//		Byte 3: UID-data
+		//		Byte 4: UID-data
+		//		Byte 5: UID-data
+		//		Byte 6: BCC					Block Check Character - XOR of bytes 2-5
+		//		Byte 7: CRC_A
+		//		Byte 8: CRC_A
+		// The BCC and CRC_A are only transmitted if we know all the UID bits of the current Cascade Level.
+		//
+		// Description of bytes 2-5: (Section 6.5.4 of the ISO/IEC 14443-3 draft: UID contents and cascade levels)
+		//		UID size	Cascade level	Byte2	Byte3	Byte4	Byte5
+		//		========	=============	=====	=====	=====	=====
+		//		 4 bytes		1			uid0	uid1	uid2	uid3
+		//		 7 bytes		1			CT		uid0	uid1	uid2
+		//						2			uid3	uid4	uid5	uid6
+		//		10 bytes		1			CT		uid0	uid1	uid2
+		//						2			CT		uid3	uid4	uid5
+		//						3			uid6	uid7	uid8	uid9
+		
+		// Sanity checks
+		if (validBits > 80)
+			return Status::INVALID;
+		
+		// Prepare MFRC522
+		ClearBits(Reg::Coll, 0x80);		// ValuesAfterColl=1 => Bits received after collision are cleared.
+		
+		// Repeat Cascade Level loop until we have a complete UID.
+		uidComplete = false;
+		while (!uidComplete)
+		{
+			// Set the Cascade Level in the SEL byte, find out if we need to use the Cascade Tag in byte 2.
+			switch (cascadeLevel)
+			{
+				case 1:
+					buffer[0] = CmdPICC::SEL_CL1;
+					uidIndex = 0;
+					useCascadeTag = validBits && uid->m_idLen > 4;	// When we know that the UID has more than 4 bytes
+					break;
+				
+				case 2:
+					buffer[0] = CmdPICC::SEL_CL2;
+					uidIndex = 3;
+					useCascadeTag = validBits && uid->m_idLen > 7;	// When we know that the UID has more than 7 bytes
+					break;
+				
+				case 3:
+					buffer[0] = CmdPICC::SEL_CL3;
+					uidIndex = 6;
+					useCascadeTag = false;						// Never used in CL3.
+					break;
+				
+				default:
+					return Status::INTERNAL_ERROR;
+					break;
+			}
+			
+			// How many UID bits are known in this Cascade Level?
+			currentLevelKnownBits = validBits - (8 * uidIndex);
+			if (currentLevelKnownBits < 0)
+				currentLevelKnownBits = 0;
+			
+			// Copy the known bits from uid->uidByte[] to buffer[]
+			index = 2; // destination index in buffer[]
+			if (useCascadeTag)
+				buffer[index++] = CmdPICC::CT;
+			
+			uint8_t bytesToCopy = currentLevelKnownBits / 8 + (currentLevelKnownBits % 8 ? 1 : 0); // The number of bytes needed to represent the known bits for this level.
+			if (bytesToCopy)
+			{
+				uint8_t maxBytes = useCascadeTag ? 3 : 4; // Max 4 bytes in each Cascade Level. Only 3 left if we use the Cascade Tag
+				if (bytesToCopy > maxBytes)
+					bytesToCopy = maxBytes;
+				
+				for (count = 0; count < bytesToCopy; count++)
+					buffer[index++] = uid->m_id[uidIndex + count];
+			}
+			
+			// Now that the data has been copied we need to include the 8 bits in CT in currentLevelKnownBits
+			if (useCascadeTag)
+				currentLevelKnownBits += 8;
+			
+			// Repeat anti collision loop until we can transmit all UID bits + BCC and receive a SAK - max 32 iterations.
+			selectDone = false;
+			while (!selectDone)
+			{
+				// Find out how many bits and bytes to send and receive.
+				if (currentLevelKnownBits >= 32)	// All UID bits in this Cascade Level are known. This is a SELECT.
+				{
+					//Serial.print(F("SELECT: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+					buffer[1] = 0x70; // NVB - Number of Valid Bits: Seven whole bytes
+					// Calculate BCC - Block Check Character
+					buffer[6] = buffer[2] ^ buffer[3] ^ buffer[4] ^ buffer[5];
+					// Calculate CRC_A
+					unpack_le<uint16_t>(&buffer[7], CalculateCRC(buffer, 7));
+					result = Status::OK;
+					
+					txLastBits		= 0; // 0 => All 8 bits are valid.
+					bufferUsed		= 9;
+					// Store response in the last 3 bytes of buffer (BCC and CRC_A - not needed after tx)
+					responseBuffer	= &buffer[6];
+					responseLength	= 3;
+				}
+				else	// This is an ANTICOLLISION.
+				{
+					//Serial.print(F("ANTICOLLISION: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+					txLastBits		= currentLevelKnownBits % 8;
+					count			= currentLevelKnownBits / 8;	// Number of whole bytes in the UID part.
+					index			= 2 + count;					// Number of whole bytes: SEL + NVB + UIDs
+					buffer[1]		= (index << 4) + txLastBits;	// NVB - Number of Valid Bits
+					bufferUsed		= index + (txLastBits ? 1 : 0);
+					// Store response in the unused part of buffer
+					responseBuffer	= &buffer[index];
+					responseLength	= sizeof(buffer) - index;
+				}
+				
+				// Set bit adjustments
+				rxAlign = txLastBits;											// Having a separate variable is overkill. But it makes the next line easier to read.
+				Write(Reg::BitFraming, (rxAlign << 4) + txLastBits);			// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
+				
+				// Transmit the buffer and receive the response.
+				result = PCD_CommunicateWithPICC(Cmd::Transceive, span<const uint8_t>{buffer, size_t(bufferUsed)}, responseBuffer, &responseLength, 0x30, &txLastBits, rxAlign);
+				if (result == Status::COLLISION)	// More than one PICC in the field => collision.
+				{
+					uint8_t valueOfCollReg = Read(Reg::Coll); // CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
+					if (valueOfCollReg & 0x20)		// CollPosNotValid
+						return Status::COLLISION;	// Without a valid collision position we cannot continue
+					
+					uint8_t collisionPos = valueOfCollReg & 0x1F; // Values 0-31, 0 means bit 32.
+					if (collisionPos == 0)
+						collisionPos = 32;
+					
+					if (collisionPos <= currentLevelKnownBits)	// No progress - should not happen 
+						return Status::INTERNAL_ERROR;
+					
+					// Choose the PICC with the bit set.
+					currentLevelKnownBits	= collisionPos;
+					count			= currentLevelKnownBits % 8; // The bit to modify
+					checkBit		= (currentLevelKnownBits - 1) % 8;
+					index			= 1 + (currentLevelKnownBits / 8) + (count ? 1 : 0); // First byte is index 0.
+					buffer[index]	|= (1 << checkBit);
+				}
+				else if (result != Status::OK)
+					return result;
+				else	// STATUS_OK
+				{
+					if (currentLevelKnownBits >= 32)	// This was a SELECT.
+						selectDone = true;				// No more anticollision; we continue below outside the while.
+					else								// This was an ANTICOLLISION.
+						// We now have all 32 bits of the UID in this Cascade Level
+						currentLevelKnownBits = 32;
+						// Run loop again to do the SELECT.
+				}
+			} // End of while (!selectDone)
+			
+			// We do not check the CBB - it was constructed by us above.
+			
+			// Copy the found UID bytes from buffer[] to uid->uidByte[]
+			index			= (buffer[2] == CmdPICC::CT) ? 3 : 2; // source index in buffer[]
+			bytesToCopy		= (buffer[2] == CmdPICC::CT) ? 3 : 4;
+			for (count = 0; count < bytesToCopy; count++)
+				uid->m_id[uidIndex + count] = buffer[index++];
+			
+			// Check response SAK (Select Acknowledge)
+			if (responseLength != 3 || txLastBits != 0)		// SAK must be exactly 24 bits (1 byte + CRC_A).
+				return Status::ERROR;
+			
+			// Verify CRC_A - do our own calculation and store the control in buffer[2..3] - those bytes are not needed anymore.
+			unpack_le<uint16_t>(&buffer[2], CalculateCRC(responseBuffer, 1));
+			result = Status::OK;
+			
+			if ((buffer[2] != responseBuffer[1]) || (buffer[3] != responseBuffer[2]))
+				return Status::CRC_WRONG;
+			
+			if (responseBuffer[0] & 0x04)	// Cascade bit set - UID not complete yes
+				cascadeLevel++;
+			else
+			{
+				uidComplete = true;
+				uid->m_sak = responseBuffer[0];
+			}
+		} // End of while (!uidComplete)
+		
+		// Set correct uid->size
+		uid->m_idLen = 3 * cascadeLevel + 1;
+
+		return Status::OK;
+	}
+	
+	std::optional<PICC> MFRC522::SelectPICC()
+	{
+		// Reset baud rates
+		Write(Reg::TxMode, 0);
+		Write(Reg::RxMode, 0);
+		// Reset ModWidthReg
+		Write(Reg::ModWidth, 0x26);
+		
+		uint16_t atqa;
+		const Status stat = PICC_REQA_or_WUPA(CmdPICC::REQA, &atqa);
+		if (stat != Status::OK && stat != Status::COLLISION)
+			return std::nullopt;
+		
+		PICC picc(*this, atqa);
+		
+		return PICC_Select(&picc) == Status::OK ? std::make_optional(std::move(picc)) : std::nullopt;
+	}
 }
