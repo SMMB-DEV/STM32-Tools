@@ -222,10 +222,10 @@ namespace STM32T
 		/// Ignores polarity of the pin (active low) and always sets it to logic 0.
 		[[gnu::always_inline]] void ResetFast()
 		{
-			#if defined(GPIO_BRR_BR0) or defined(GPIO_BRR_BR_0)
-				cp_port->BRR = c_pin;
-			#else
+			#if GPIO_BRR_BR0 == GPIO_BSRR_BR0
 				cp_port->BSRR = c_pin << GPIO_NUMBER;
+			#else
+				cp_port->BRR = c_pin;
 			#endif	// defined(GPIO_BRR_BR0) or defined(GPIO_BRR_BR_0)
 		}
 		

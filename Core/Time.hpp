@@ -477,7 +477,7 @@ namespace STM32T::Time
 	inline uint16_t GetSecondFraction(RTC_HandleTypeDef *hrtc)
 	{
 		#ifdef RTC_SSR_SS
-		return hrtc->Init->SynchPrediv;
+		return hrtc->Init.SynchPrediv;
 		#else
 		return 0u;
 		#endif	// RTC_SSR_SS

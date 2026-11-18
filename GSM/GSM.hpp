@@ -225,7 +225,7 @@ namespace STM32T
 			#ifdef STM32T_IWDG_TIMEOUT
 			while (1)
 			{
-				HAL_IWDG_Refresh(&Time::hiwdg);
+				HAL_IWDG_Refresh(&hiwdg);
 				
 				if (stat == HAL_OK)
 					goto ok;
@@ -452,7 +452,7 @@ namespace STM32T
 				do
 				{
 					#ifdef STM32T_IWDG_TIMEOUT
-					HAL_IWDG_Refresh(&Time::hiwdg);
+					HAL_IWDG_Refresh(&hiwdg);
 					#endif	// STM32T_IWDG_TIMEOUT
 					
 					state = HAL_UART_GetState(p_huart);
