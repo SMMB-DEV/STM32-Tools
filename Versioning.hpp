@@ -356,5 +356,5 @@ namespace STM32T
 	};
 	
 	// todo: Check what needs to be removed (deprecated) for each version. Also update Config.doxygen.
-	constexpr Version VER(0, 4, 2, Version::Normal);		///< Current version of the framework
+	constexpr Version VER(0, 4, 3, Version::Normal);		///< Current version of the framework
 }

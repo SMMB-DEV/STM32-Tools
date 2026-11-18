@@ -130,7 +130,7 @@ namespace STM32T::Log
 	*/
 	enum class Level : uint8_t
 	{
-		None,		///< Disables the logger
+		None,		///< Disables the logger. Logging messages with this level disables formatting.
 		Fatal,		///< For unrecoverable conditions (calls the @ref Logger::fatal_handler "fatal handler")
 		Error,		///< For errors (calls the @ref Logger::error_handler "error handler")
 		Warning,	///< For warnings
@@ -340,7 +340,7 @@ namespace STM32T::Log
 	inline void default_output_itm(strv data, bool last_chunk)	// todo: Rewrite (Unlock and enable ITM, check DWT status if necessary)
 	{
 		// ITM enabled & ITM port #0 enabled
-		if (READ_BIT(ITM->TCR, ITM_TCR_ITMENA_Msk) &&  READ_BIT(ITM->TER, (1UL << 0)))
+		if (READ_BIT(ITM->TCR, ITM_TCR_ITMENA_Msk) && READ_BIT(ITM->TER, 1u))
 		{
 			for (auto ch : data)
 			{
@@ -443,6 +443,7 @@ namespace STM32T::Log
 		constexpr bool isEnabled() const { return level > Level::None; }
 		constexpr bool isEnabled(const Level level) const { return this->level >= level; }
 		
+		/// Does not check whether the logger is enabled.
 		void log(const Level level, const char *fmt, ...) const
 		{
 			if (!isEnabled(level))
@@ -454,6 +455,7 @@ namespace STM32T::Log
 			va_end(args);
 		}
 		
+		/// @copydoc log
 		void log(const Level level, const char *fmt, va_list args) const
 		{
 			if (!isEnabled(level))
@@ -927,6 +929,10 @@ namespace STM32T::Log
 	/// @brief @ref Log_Static_Example.cpp "Static" logging functions
 	inline namespace DefLog
 	{
+		/**
+		* Logs without any formatting or new line character by default. The specified @p level must be enabled.
+		* @tparam level If set to anything other than Level::None, enables formatting.
+		*/
 		template <const Level level = Level::None, auto& logger = g_defaultLogger, class... Args>
 		[[gnu::always_inline]]
 		inline void LOG_N(const char *fmt, Args... args)
